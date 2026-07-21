@@ -2,8 +2,12 @@
 #include "tinyexpr/tinyexpr.h"
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cmath>
+#include <exception>
 #include <expected>
+#include <format>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <numbers>
@@ -160,12 +164,17 @@ private:
 
 struct Expression;
 
-using NumberString = std::string;
+using NumberString = double;
 
 struct BinaryExpression {
-  std::string_view op;
+  std::string op;
   std::unique_ptr<Expression> lhs;
   std::unique_ptr<Expression> rhs;
+};
+
+struct ConversionExpression {
+  std::unique_ptr<Expression> b;
+  std::string target;
 };
 
 struct UnaryExpression {
@@ -173,22 +182,122 @@ struct UnaryExpression {
   Expression *lhs;
 };
 
-enum class ExpressionType {
+enum class UnitType {
   Date,
   Currency,
-  Real,
+  Distance,
 };
 
+struct Unit {};
+
 struct Expression {
-  std::variant<BinaryExpression, UnaryExpression, NumberString> data;
-  ExpressionType type = ExpressionType::Real;
+  std::variant<BinaryExpression, UnaryExpression, NumberString,
+               ConversionExpression>
+      data;
+  std::optional<UnitType> unit;
 };
 
 struct AST {
   std::unique_ptr<Expression> root;
 };
 
+struct UnitDerivative {};
+
+struct UnitDef {
+  std::string id;
+  std::vector<std::string> aliases;
+  double factor;
+  std::string family;
+  UnitType type;
+};
+
+struct UnitBaseRelation {
+  std::string lhs;
+  std::string rhs;
+  double factor;
+};
+
+class UnitDatabase {
+public:
+  UnitDatabase() {
+    registerUnit(UnitDef{
+        .id = "inch",
+        .aliases = {"in"},
+        .factor = 0,
+        .family = "imperial",
+    });
+    registerUnit(UnitDef{
+        .id = "meter",
+        .aliases = {"m"},
+        .factor = 0,
+        .family = "metric",
+    });
+    registerRelation(UnitBaseRelation{
+        .lhs = "imperial", .rhs = "metric", .factor = 39.3701});
+  }
+  //.factor = 39.3701
+
+  void registerUnit(UnitDef unit) { m_units.emplace_back(unit); }
+  void registerRelation(UnitBaseRelation rel) { m_relations.emplace_back(rel); }
+
+  const UnitDef *findUnit(const std::string &id) const {
+    auto it = std::ranges::find_if(m_units, [&](const UnitDef &u) {
+      return u.id == id || std::ranges::contains(u.aliases, id);
+    });
+
+    return it != m_units.end() ? &*it : nullptr;
+  }
+
+  std::expected<double, std::string> convert(double n, const UnitDef &from,
+                                             const UnitDef &to) {
+    if (from.family == to.family) {
+      return n * to.factor;
+    }
+
+    auto rel =
+        std::ranges::find_if(m_relations, [&](const UnitBaseRelation &rel) {
+          return (rel.lhs == from.family && rel.rhs == to.family) ||
+                 (rel.lhs == to.family && rel.rhs == from.family);
+        });
+
+    if (rel == m_relations.end()) {
+      return std::unexpected(
+          std::format("No idea how to convert {} to {}. You probably forgot to "
+                      "register the unit relation.",
+                      from.family, to.family));
+    }
+
+    return n * from.factor * rel->factor;
+  }
+
+private:
+  std::vector<UnitDef> m_units;
+  std::vector<UnitBaseRelation> m_relations;
+};
+
+struct OperatorDefinition {
+  std::string_view id;
+  std::vector<std::string> aliases;
+  int precedence;
+};
+
+static std::vector<OperatorDefinition> operators{
+    OperatorDefinition{.id = "to", .aliases = {"to", "in"}, .precedence = 1},
+    OperatorDefinition{
+        .id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
+    OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
+    OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 3},
+    OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 3},
+    OperatorDefinition{
+        .id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
+    OperatorDefinition{
+        .id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}};
+
 class Parser {
+  // hardcoded list, obviously not desirable
+  static constexpr auto CURRENCIES =
+      std::to_array<std::string_view>({"usd", "eur", "gbp", "yen", "kwon"});
+
 public:
   Parser(std::string_view data) : m_lexer(data) {}
 
@@ -215,153 +324,105 @@ public:
     return std::ranges::contains(std::initializer_list{"-", "minus"}, tok.raw);
   }
 
-  static std::unique_ptr<Expression> makeNumberExpr(auto n) {
+  static std::unique_ptr<Expression> makeNumberExpr(double n) {
     return std::make_unique<Expression>(NumberString{n});
   }
 
-  template <typename T>
-  std::unique_ptr<Expression>
-  parseHigher(const T &fn, std::initializer_list<std::string_view> operators) {
-    auto left = fn();
+  static std::unique_ptr<Expression> makeNumberExpr(const std::string &ns) {
+    double n;
+    std::from_chars(ns.data(), ns.data() + ns.size(), n);
+    return makeNumberExpr(n);
+  }
 
-    while (m_lexer.peak() &&
-           std::ranges::contains(operators, m_lexer.peak()->raw)) {
-      auto tok = m_lexer.peak();
-      m_lexer.next();
-      auto right = fn();
-      left = std::make_unique<Expression>(BinaryExpression({
-          .op = tok->raw,
-          .lhs = std::move(left),
-          .rhs = std::move(right),
-      }));
+  std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs,
+                                          std::unique_ptr<Expression> rhs,
+                                          const std::string &op) {
+    auto expr = std::make_unique<Expression>();
+
+    if (lhs->unit && rhs->unit && *lhs->unit != *rhs->unit) {
+      throw std::runtime_error("incompatible units");
     }
 
-    return left;
+    // result is of the type of rhs always, except if rhs has no type
+    auto unit = rhs->unit.or_else([&]() { return lhs->unit; });
+
+    return std::make_unique<Expression>(BinaryExpression{.op = op,
+                                                         .lhs = std::move(lhs),
+                                                         .rhs = std::move(rhs)},
+                                        unit);
   }
 
   std::unique_ptr<Expression> parseTerm() {
+    auto expr = std::unique_ptr<Expression>();
+
     if (m_lexer.peak() && m_lexer.peak()->raw == "(") {
       m_lexer.next();
-      auto inner = parseAddition();
+      expr = pratParse();
       if (m_lexer.peak() && m_lexer.peak()->raw != ")") {
         throw std::runtime_error("expected closing parenthesis");
       }
       m_lexer.next();
-      return inner;
     }
 
     if (m_lexer.peakIf(Lexer::TokenType::Number)) {
-      return parseNumber();
+      expr = parseNumber();
     }
 
-    throw std::runtime_error("Expected term");
+    // unit can be found after any term.
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
+      std::cout << "token string " << std::quoted(tok->raw);
+      if (tok->raw == "m" || tok->raw == "km") {
+        m_lexer.next();
+        expr->unit = UnitType::Distance;
+      } else if (tok->raw == "usd" || tok->raw == "gbp") {
+        m_lexer.next();
+        expr->unit = UnitType::Currency;
+      } else {
+      }
+    }
+
+    if (!expr) {
+      throw std::runtime_error("Expected term");
+    }
+
+    return expr;
   }
 
   std::unique_ptr<Expression> parseNumber() {
     if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
       m_lexer.next();
-      return makeNumberExpr(tok->raw);
+      return makeNumberExpr(std::string{tok->raw});
     }
     throw std::runtime_error("Expected a number");
   }
 
-  std::unique_ptr<Expression> parseExp() {
+  std::unique_ptr<Expression> pratParse(int minPrec = 0) {
     auto left = parseTerm();
 
     while (auto tok = m_lexer.peak()) {
-      std::initializer_list<std::string_view> longForm{"to", "the", "power",
-                                                       "of"};
-      bool isLongForm = m_lexer.isWordSequence(longForm);
+      auto it =
+          std::ranges::find_if(operators, [&](const OperatorDefinition &op) {
+            return std::ranges::contains(op.aliases, tok->raw);
+          });
 
-      if (tok->raw == "power" || tok->raw == "^" || tok->raw == "exp" ||
-          isLongForm) {
-        size_t nskip = isLongForm ? longForm.size() : 1;
-
-        for (auto i = 0; i != nskip; ++i) {
-          m_lexer.next();
-        }
-
-        auto right = parseTerm();
-        left = std::make_unique<Expression>(BinaryExpression({
-            .op = "^",
-            .lhs = std::move(left),
-            .rhs = std::move(right),
-        }));
+      if (it != operators.end()) {
+        if (it->precedence < minPrec)
+          break;
+        m_lexer.next();
+        auto right = pratParse(it->precedence + 1);
+        left =
+            makeBinExpr(std::move(left), std::move(right), std::string{it->id});
       } else {
         break;
       }
     }
 
     return left;
-  }
-
-  // 100 + 40% of 100 * 5
-
-  std::unique_ptr<Expression> parseMul() {
-    auto left = parseExp();
-
-    while (auto tok = m_lexer.peak()) {
-      if (isModuloOperator(tok.value())) {
-        m_lexer.next();
-        bool isPctOf = tok->raw == "%" && m_lexer.peak()->raw == "of";
-
-        if (isPctOf) {
-          m_lexer.next();
-
-          // X% of Y should transform to (X/100 * Y)
-
-          auto factor = std::make_unique<Expression>(
-              BinaryExpression({.op = "/",
-                                .lhs = std::move(left),
-                                .rhs = makeNumberExpr("100")}));
-
-          auto right = parseExp();
-
-          left = std::make_unique<Expression>(BinaryExpression({
-              .op = "*",
-              .lhs = std::move(factor),
-              .rhs = std::move(right),
-          }));
-        } else {
-
-          auto right = parseExp();
-          left = std::make_unique<Expression>(BinaryExpression({
-              .op = "%",
-              .lhs = std::move(left),
-              .rhs = std::move(right),
-          }));
-        }
-      } else if (isMulOperator(tok.value())) {
-        m_lexer.next();
-        auto right = parseExp();
-        left = std::make_unique<Expression>(BinaryExpression({
-            .op = "*",
-            .lhs = std::move(left),
-            .rhs = std::move(right),
-        }));
-      } else if (isDivOperator(tok.value())) {
-        m_lexer.next();
-        auto right = parseExp();
-        left = std::make_unique<Expression>(BinaryExpression({
-            .op = "/",
-            .lhs = std::move(left),
-            .rhs = std::move(right),
-        }));
-      } else {
-        break;
-      }
-    }
-
-    return left;
-  }
-
-  std::unique_ptr<Expression> parseAddition() {
-    return parseHigher([this]() { return parseMul(); }, {"+", "-"});
   }
 
   AST parse() {
     AST ast;
-    ast.root = parseAddition();
+    ast.root = pratParse();
     return ast;
   }
 
@@ -370,6 +431,11 @@ private:
 };
 
 namespace abacus {
+struct Computed {
+  double n;
+  std::optional<UnitType> unit;
+};
+
 class Abacus {
 public:
   Abacus() = default;
@@ -384,26 +450,94 @@ public:
     return std::format("{:.6g}", res);
   }
 
-  static std::string computeExpression(const Expression &expr) {
+  // we may not need tinyexpr after all...
+  double computeExpr(const Expression &expr) {
     if (auto be = std::get_if<BinaryExpression>(&expr.data)) {
-      return tinyexprEvalString(std::format("({} {} {})",
-                                            computeExpression(*be->lhs), be->op,
-                                            computeExpression(*be->rhs)));
+      if (be->op == "convert") {
+        bool needsConversion =
+            be->lhs->unit && be->rhs->unit && be->lhs->unit != be->rhs->unit;
+        if (!needsConversion) {
+        }
+      }
+
+      if (be->op == "+") {
+        return computeExpr(*be->lhs) + computeExpr(*be->rhs);
+      }
+      if (be->op == "-") {
+        return computeExpr(*be->lhs) - computeExpr(*be->rhs);
+      }
+      if (be->op == "*") {
+        return computeExpr(*be->lhs) * computeExpr(*be->rhs);
+      }
+      if (be->op == "/") {
+        return computeExpr(*be->lhs) / computeExpr(*be->rhs);
+      }
+      if (be->op == "%") {
+        return static_cast<int>(computeExpr(*be->lhs)) %
+               static_cast<int>(computeExpr(*be->rhs));
+      }
+      if (be->op == "^") {
+        return std::pow(computeExpr(*be->lhs), computeExpr(*be->rhs));
+      }
+      throw std::runtime_error(std::format("Unhandled operator {}", be->op));
     }
 
     if (auto n = std::get_if<NumberString>(&expr.data)) {
       return *n;
     }
-    return "";
+
+    throw std::runtime_error("Unhandled expression type");
+  }
+
+  /*
+  std::string computeExpression(const Expression &expr) {
+    if (auto be = std::get_if<BinaryExpression>(&expr.data)) {
+      auto str = std::format("({} {} {})", computeExpression(*be->lhs), be->op,
+                             computeExpression(*be->rhs));
+
+      std::cout << str << std::endl;
+
+      return tinyexprEvalString(str);
+    }
+
+    if (auto n = std::get_if<NumberString>(&expr.data)) {
+      return *n;
+    }
+
+    throw std::runtime_error("Unhandled expression type");
+  }
+  */
+
+  /**
+   * Parse the expression and return its AST.
+   */
+  std::expected<AST, std::string> parse(const std::string &expr) {
+    return Parser{expr}.parse();
+  }
+
+  std::expected<Computed, std::string> compute(const std::string &expr) {
+    try {
+      Parser parser{expr};
+      auto ast = parser.parse();
+      Computed c;
+      c.n = computeExpr(*ast.root);
+      c.unit = ast.root->unit;
+
+      return c;
+    } catch (const std::exception &e) {
+      return std::unexpected(e.what());
+    }
   }
 
   std::expected<std::string, std::string> evaluate(const std::string &expr) {
     Parser parser{expr};
     auto ast = parser.parse();
-    auto result = computeExpression(*ast.root);
-
-    return result;
+    auto result = computeExpr(*ast.root);
+    return std::format("{:.6g}", result);
   }
+
+private:
+  UnitDatabase m_unitDb;
 };
 
 }; // namespace abacus
