@@ -1,10 +1,11 @@
 #include "abacus/abacus.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 #include <string_view>
 
 auto inline evaluate(std::string_view expr) {
   abacus::Abacus calc;
-  return calc.evaluate(std::string{expr});
+  return calc.evaluate(expr);
 }
 
 #define assertExpr(expr, expected)                                             \
@@ -66,84 +67,128 @@ TEST_CASE("division operator") {
   // assertExpr("100 div 10 / 2", "5")
 }
 
-TEST_CASE("unit support") {
+TEST_CASE("unit should tag any expression", "[unit]") {
   abacus::Abacus calc;
-
   {
     auto res = calc.compute("5 * 2 + 10 usd");
     REQUIRE(res.has_value());
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "usd");
+    REQUIRE(res->unitRaw == "usd");
     REQUIRE(res->n == 20);
   }
+}
 
+TEST_CASE("right unit should take precedence over left unit", "[unit]") {
+  abacus::Abacus calc;
   {
     auto res = calc.compute("5 * 2 + 10 usd * 100 gbp");
     REQUIRE(res.has_value());
     REQUIRE(res->n == 1010);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "gbp");
+    REQUIRE(res->unitRaw == "gbp");
   }
+}
+
+TEST_CASE("unit should apply to parenthesized term", "[unit]") {
+  abacus::Abacus calc;
 
   {
     auto res = calc.compute("(5 * 2 + 10) usd * 100 gbp");
     REQUIRE(res.has_value());
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "gbp");
+    REQUIRE(res->unitRaw == "gbp");
     REQUIRE(res->n == 2000);
   }
 }
 
-TEST_CASE("unit conversion operator") {
+TEST_CASE("unit can be converted using the 'to' operator", "[unit]") {
   abacus::Abacus calc;
 
   {
     auto res = calc.compute("1 km to m");
     REQUIRE(res);
     REQUIRE(res->n == 1000);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "meter");
+    REQUIRE(res->unitRaw == "m");
   }
+}
+
+TEST_CASE("unit can be converted using the 'in' operator", "[unit]") {
+  abacus::Abacus calc;
 
   {
-    auto res = calc.compute("1000m to km");
+    auto res = calc.compute("1 km in m");
     REQUIRE(res);
-    REQUIRE(res->n == 1);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "kilometer");
+    REQUIRE(res->n == 1000);
+    REQUIRE(res->unitRaw == "m");
   }
+}
 
-  {
-    auto res = calc.compute("1km to m to km");
-    REQUIRE(res);
-    REQUIRE(res->n == 1);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "kilometer");
-  }
-
-  {
-    auto res = calc.compute("1km to m to km * 10 + 5");
-    REQUIRE(res);
-    REQUIRE(res->n == 15);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "kilometer");
-  }
-
-  {
-    auto res = calc.compute("(1km to m * 10) to km");
-    REQUIRE(res);
-    REQUIRE(res->n == 10);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "kilometer");
-  }
+TEST_CASE("unit can be converted many times in a row", "[unit]") {
+  abacus::Abacus calc;
 
   {
     auto res = calc.compute("1 km in m to km");
     REQUIRE(res);
     REQUIRE(res->n == 1);
-    REQUIRE(res->unit);
-    REQUIRE(res->unit->id == "kilometer");
+    REQUIRE(res->unitRaw == "km");
   }
+}
+
+TEST_CASE("artithmetic can be used on a converted unit", "[unit]") {
+  abacus::Abacus calc;
+  {
+    auto res = calc.compute("1km to m to km * 10 + 5");
+    REQUIRE(res);
+    REQUIRE(res->n == 15);
+    REQUIRE(res->unitRaw == "km");
+  }
+}
+
+TEST_CASE("unit name should be inferred from context", "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("1m to s");
+    REQUIRE(res);
+    REQUIRE(res->n == 60);
+    REQUIRE(res->unitRaw == "s");
+  }
+}
+
+TEST_CASE("inconvertible units should return an error", "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("1meter to s");
+    REQUIRE(!res);
+  }
+}
+
+TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("km to m");
+    REQUIRE(res);
+    REQUIRE(res->n == 1000);
+  }
+}
+
+TEST_CASE("no unit after conversion operator should error", "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("1m to 150");
+    REQUIRE(!res);
+  }
+}
+
+TEST_CASE("in should work as a conversion operator in the right context, and a "
+          "unit name in others",
+          "[unit]") {
+  abacus::Abacus calc;
+  auto res = calc.compute("1m in in"); // 1 meter to inches, here the middle
+                                       // in is an alias for the 'to' operator
+  REQUIRE(res);
+  REQUIRE(std::round(res->n) == 39);
+  REQUIRE(res->unitRaw == "in");
 }
 
 TEST_CASE("whitespaces do no matter") {
