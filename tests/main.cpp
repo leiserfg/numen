@@ -72,22 +72,77 @@ TEST_CASE("unit support") {
   {
     auto res = calc.compute("5 * 2 + 10 usd");
     REQUIRE(res.has_value());
-    REQUIRE(res->unit == UnitType::Currency);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "usd");
     REQUIRE(res->n == 20);
   }
 
   {
     auto res = calc.compute("5 * 2 + 10 usd * 100 gbp");
     REQUIRE(res.has_value());
-    REQUIRE(res->unit == UnitType::Currency);
     REQUIRE(res->n == 1010);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "gbp");
   }
 
   {
     auto res = calc.compute("(5 * 2 + 10) usd * 100 gbp");
     REQUIRE(res.has_value());
-    REQUIRE(res->unit == UnitType::Currency);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "gbp");
     REQUIRE(res->n == 2000);
+  }
+}
+
+TEST_CASE("unit conversion operator") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("1 km to m");
+    REQUIRE(res);
+    REQUIRE(res->n == 1000);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "meter");
+  }
+
+  {
+    auto res = calc.compute("1000m to km");
+    REQUIRE(res);
+    REQUIRE(res->n == 1);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "kilometer");
+  }
+
+  {
+    auto res = calc.compute("1km to m to km");
+    REQUIRE(res);
+    REQUIRE(res->n == 1);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "kilometer");
+  }
+
+  {
+    auto res = calc.compute("1km to m to km * 10 + 5");
+    REQUIRE(res);
+    REQUIRE(res->n == 15);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "kilometer");
+  }
+
+  {
+    auto res = calc.compute("(1km to m * 10) to km");
+    REQUIRE(res);
+    REQUIRE(res->n == 10);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "kilometer");
+  }
+
+  {
+    auto res = calc.compute("1 km in m to km");
+    REQUIRE(res);
+    REQUIRE(res->n == 1);
+    REQUIRE(res->unit);
+    REQUIRE(res->unit->id == "kilometer");
   }
 }
 

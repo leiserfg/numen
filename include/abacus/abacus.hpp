@@ -7,10 +7,8 @@
 #include <exception>
 #include <expected>
 #include <format>
-#include <iomanip>
 #include <iostream>
 #include <memory>
-#include <numbers>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -162,46 +160,8 @@ private:
   std::string_view::size_type m_cursor;
 };
 
-struct Expression;
-
-using NumberString = double;
-
-struct BinaryExpression {
-  std::string op;
-  std::unique_ptr<Expression> lhs;
-  std::unique_ptr<Expression> rhs;
-};
-
-struct ConversionExpression {
-  std::unique_ptr<Expression> b;
-  std::string target;
-};
-
-struct UnaryExpression {
-  std::string_view op;
-  Expression *lhs;
-};
-
-enum class UnitType {
-  Date,
-  Currency,
-  Distance,
-};
-
-struct Unit {};
-
-struct Expression {
-  std::variant<BinaryExpression, UnaryExpression, NumberString,
-               ConversionExpression>
-      data;
-  std::optional<UnitType> unit;
-};
-
-struct AST {
-  std::unique_ptr<Expression> root;
-};
-
 struct UnitDerivative {};
+enum class UnitType { Date, Currency, Distance, Temperature };
 
 struct UnitDef {
   std::string id;
@@ -229,11 +189,21 @@ public:
     registerUnit(UnitDef{
         .id = "meter",
         .aliases = {"m"},
-        .factor = 0,
+        .factor = 1,
+        .family = "metric",
+    });
+    registerUnit(UnitDef{
+        .id = "kilometer",
+        .aliases = {"km"},
+        .factor = 1e3,
         .family = "metric",
     });
     registerRelation(UnitBaseRelation{
         .lhs = "imperial", .rhs = "metric", .factor = 39.3701});
+
+    registerUnit(UnitDef{.id = "usd", .family = "currency"});
+    registerUnit(UnitDef{.id = "gbp", .family = "currency"});
+    registerUnit(UnitDef{.id = "eur", .family = "currency"});
   }
   //.factor = 39.3701
 
@@ -250,8 +220,11 @@ public:
 
   std::expected<double, std::string> convert(double n, const UnitDef &from,
                                              const UnitDef &to) {
+    // 1km to m
+    // 1000m to km
+
     if (from.family == to.family) {
-      return n * to.factor;
+      return n * from.factor / to.factor;
     }
 
     auto rel =
@@ -273,6 +246,49 @@ public:
 private:
   std::vector<UnitDef> m_units;
   std::vector<UnitBaseRelation> m_relations;
+};
+
+struct Expression;
+
+using NumberString = double;
+
+struct BinaryExpression {
+  std::string op;
+  std::unique_ptr<Expression> lhs;
+  std::unique_ptr<Expression> rhs;
+};
+
+struct ConversionExpression {
+  std::unique_ptr<Expression> b;
+  UnitDef target;
+};
+
+struct UnaryExpression {
+  std::string_view op;
+  std::unique_ptr<Expression> lhs;
+};
+
+struct UnitExpression {
+  UnitDef unit;
+  std::unique_ptr<Expression> expr;
+};
+
+struct Expression {
+  std::variant<BinaryExpression, UnaryExpression, NumberString, UnitExpression,
+               ConversionExpression>
+      data;
+
+  const BinaryExpression *asBinaryExpression() const {
+    return std::get_if<BinaryExpression>(&data);
+  }
+
+  const ConversionExpression *asConversion() const {
+    return std::get_if<ConversionExpression>(&data);
+  }
+};
+
+struct AST {
+  std::unique_ptr<Expression> root;
 };
 
 struct OperatorDefinition {
@@ -299,7 +315,8 @@ class Parser {
       std::to_array<std::string_view>({"usd", "eur", "gbp", "yen", "kwon"});
 
 public:
-  Parser(std::string_view data) : m_lexer(data) {}
+  Parser(std::string_view data, const UnitDatabase &unitDb)
+      : m_lexer(data), m_unitDb(unitDb) {}
 
   static constexpr bool isModuloOperator(const Lexer::Token &tok) {
     return std::ranges::contains(
@@ -339,17 +356,25 @@ public:
                                           const std::string &op) {
     auto expr = std::make_unique<Expression>();
 
-    if (lhs->unit && rhs->unit && *lhs->unit != *rhs->unit) {
-      throw std::runtime_error("incompatible units");
+    return std::make_unique<Expression>(BinaryExpression{
+        .op = op, .lhs = std::move(lhs), .rhs = std::move(rhs)});
+  }
+
+  static std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner,
+                                              const UnitDef &unit) {
+    return std::make_unique<Expression>(UnitExpression{
+        .unit = unit,
+        .expr = std::move(inner),
+    });
+  }
+
+  std::optional<UnitDef> parseUnit() {
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
+      if (auto unit = m_unitDb.findUnit(std::string{tok->raw})) {
+        return *unit;
+      }
     }
-
-    // result is of the type of rhs always, except if rhs has no type
-    auto unit = rhs->unit.or_else([&]() { return lhs->unit; });
-
-    return std::make_unique<Expression>(BinaryExpression{.op = op,
-                                                         .lhs = std::move(lhs),
-                                                         .rhs = std::move(rhs)},
-                                        unit);
+    return std::nullopt;
   }
 
   std::unique_ptr<Expression> parseTerm() {
@@ -369,16 +394,9 @@ public:
     }
 
     // unit can be found after any term.
-    if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-      std::cout << "token string " << std::quoted(tok->raw);
-      if (tok->raw == "m" || tok->raw == "km") {
-        m_lexer.next();
-        expr->unit = UnitType::Distance;
-      } else if (tok->raw == "usd" || tok->raw == "gbp") {
-        m_lexer.next();
-        expr->unit = UnitType::Currency;
-      } else {
-      }
+    if (auto unit = parseUnit()) {
+      expr = makeUnit(std::move(expr), *unit);
+      m_lexer.next();
     }
 
     if (!expr) {
@@ -400,6 +418,21 @@ public:
     auto left = parseTerm();
 
     while (auto tok = m_lexer.peak()) {
+      if (tok->raw == "to" || tok->raw == "in" | tok->raw == "->") {
+        m_lexer.next();
+        auto unit = parseUnit();
+
+        if (!unit)
+          throw std::runtime_error("expected unit after conversion operator");
+
+        m_lexer.next();
+
+        left = std::make_unique<Expression>(
+            ConversionExpression{.b = std::move(left), .target = unit.value()});
+
+        continue;
+      }
+
       auto it =
           std::ranges::find_if(operators, [&](const OperatorDefinition &op) {
             return std::ranges::contains(op.aliases, tok->raw);
@@ -428,12 +461,51 @@ public:
 
 private:
   Lexer m_lexer;
+  const UnitDatabase &m_unitDb;
 };
 
 namespace abacus {
-struct Computed {
+struct ComputedValue {
   double n;
-  std::optional<UnitType> unit;
+  // TODO: maybe we want the pointer in the db, idk...
+  // optional is convenient, and no lifetime issues by copying...
+  std::optional<UnitDef> unit;
+
+  ComputedValue operator+(const ComputedValue &rhs) const {
+    return output(n + rhs.n, rhs);
+  }
+
+  ComputedValue operator-(const ComputedValue &rhs) const {
+    return output(n - rhs.n, rhs);
+  }
+
+  ComputedValue operator*(const ComputedValue &rhs) const {
+    return output(n * rhs.n, rhs);
+  }
+
+  ComputedValue operator/(const ComputedValue &rhs) const {
+    return output(n / rhs.n, rhs);
+  }
+
+  ComputedValue operator%(const ComputedValue &rhs) const {
+    return output(static_cast<int>(n) % static_cast<int>(rhs.n), rhs);
+  }
+
+  ComputedValue pow(const ComputedValue &rhs) const {
+    return output(std::pow(n, rhs.n), rhs);
+  }
+
+private:
+  ComputedValue output(double n, const ComputedValue &rhs) const {
+    return ComputedValue{
+        .n = n,
+        .unit = foldUnit(rhs),
+    };
+  }
+
+  std::optional<UnitDef> foldUnit(const ComputedValue &rhs) const {
+    return rhs.unit.or_else([&]() { return unit; });
+  }
 };
 
 class Abacus {
@@ -451,15 +523,8 @@ public:
   }
 
   // we may not need tinyexpr after all...
-  double computeExpr(const Expression &expr) {
-    if (auto be = std::get_if<BinaryExpression>(&expr.data)) {
-      if (be->op == "convert") {
-        bool needsConversion =
-            be->lhs->unit && be->rhs->unit && be->lhs->unit != be->rhs->unit;
-        if (!needsConversion) {
-        }
-      }
-
+  ComputedValue computeExpr(const Expression &expr) {
+    if (auto be = expr.asBinaryExpression()) {
       if (be->op == "+") {
         return computeExpr(*be->lhs) + computeExpr(*be->rhs);
       }
@@ -473,17 +538,47 @@ public:
         return computeExpr(*be->lhs) / computeExpr(*be->rhs);
       }
       if (be->op == "%") {
-        return static_cast<int>(computeExpr(*be->lhs)) %
-               static_cast<int>(computeExpr(*be->rhs));
+        return computeExpr(*be->lhs) % computeExpr(*be->rhs);
       }
       if (be->op == "^") {
-        return std::pow(computeExpr(*be->lhs), computeExpr(*be->rhs));
+        return computeExpr(*be->lhs).pow(computeExpr(*be->rhs));
       }
       throw std::runtime_error(std::format("Unhandled operator {}", be->op));
     }
 
-    if (auto n = std::get_if<NumberString>(&expr.data)) {
-      return *n;
+    else if (auto conv = expr.asConversion()) {
+      auto value = computeExpr(*conv->b);
+
+      // if converted expression has no unit there is nothing to do, just tag it
+      // with the target unit...
+      if (!value.unit)
+        return {.n = value.n, .unit = conv->target};
+
+      if (value.unit->type != conv->target.type) {
+        throw std::runtime_error(std::format("Incompatible units ({} to {})",
+                                             value.unit->id, conv->target.id));
+      }
+
+      std::cout << "converting " << value.unit->id << " to " << conv->target.id
+                << std::endl;
+
+      auto res = m_unitDb.convert(value.n, *value.unit, conv->target);
+
+      if (!res)
+        throw std::runtime_error(res.error());
+
+      return {.n = res.value(), .unit = conv->target};
+    }
+
+    else if (auto n = std::get_if<NumberString>(&expr.data)) {
+      return ComputedValue{.n = *n};
+    }
+
+    else if (auto ue = std::get_if<UnitExpression>(&expr.data)) {
+      double n = computeExpr(*ue->expr).n;
+      // since we unitify the expression, we discard any unit the expr might
+      // have had
+      return ComputedValue{.n = n, .unit = ue->unit};
     }
 
     throw std::runtime_error("Unhandled expression type");
@@ -512,28 +607,25 @@ public:
    * Parse the expression and return its AST.
    */
   std::expected<AST, std::string> parse(const std::string &expr) {
-    return Parser{expr}.parse();
+    return Parser{expr, m_unitDb}.parse();
   }
 
-  std::expected<Computed, std::string> compute(const std::string &expr) {
+  std::expected<ComputedValue, std::string> compute(const std::string &expr) {
     try {
-      Parser parser{expr};
+      Parser parser{expr, m_unitDb};
       auto ast = parser.parse();
-      Computed c;
-      c.n = computeExpr(*ast.root);
-      c.unit = ast.root->unit;
 
-      return c;
+      return computeExpr(*ast.root);
     } catch (const std::exception &e) {
       return std::unexpected(e.what());
     }
   }
 
   std::expected<std::string, std::string> evaluate(const std::string &expr) {
-    Parser parser{expr};
+    Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
     auto result = computeExpr(*ast.root);
-    return std::format("{:.6g}", result);
+    return std::format("{:.6g}", result.n);
   }
 
 private:
