@@ -38,9 +38,12 @@ public:
     return std::nullopt;
   }
 
-  std::optional<Token> peak() {
+  std::optional<Token> peak(int n = 0) {
     auto old = m_cursor;
-    auto tok = next();
+    std::optional<Token> tok;
+    for (int i = 0; i != n + 1; ++i) {
+      tok = next();
+    }
     m_cursor = old;
     return tok;
   }

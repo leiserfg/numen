@@ -6,40 +6,42 @@
 #include <string_view>
 
 namespace abacus {
+
 struct ComputedValue {
-  double n;
+  double value;
+
   // TODO: maybe we want the pointer in the db, idk...
   // optional is convenient, and no lifetime issues by copying...
   std::optional<UnitDef> unit;
   std::optional<std::string_view> unitRaw;
 
   ComputedValue operator+(const ComputedValue &rhs) const {
-    return output(n + rhs.n, rhs);
+    return output(value + rhs.value, rhs);
   }
 
   ComputedValue operator-(const ComputedValue &rhs) const {
-    return output(n - rhs.n, rhs);
+    return output(value - rhs.value, rhs);
   }
 
   ComputedValue operator*(const ComputedValue &rhs) const {
-    return output(n * rhs.n, rhs);
+    return output(value * rhs.value, rhs);
   }
 
   ComputedValue operator/(const ComputedValue &rhs) const {
-    return output(n / rhs.n, rhs);
+    return output(value / rhs.value, rhs);
   }
 
   ComputedValue operator%(const ComputedValue &rhs) const {
-    return output(static_cast<int>(n) % static_cast<int>(rhs.n), rhs);
+    return output(static_cast<int>(value) % static_cast<int>(rhs.value), rhs);
   }
 
   ComputedValue pow(const ComputedValue &rhs) const {
-    return output(std::pow(n, rhs.n), rhs);
+    return output(std::pow(value, rhs.value), rhs);
   }
 
 private:
   ComputedValue output(double n, const ComputedValue &rhs) const {
-    return ComputedValue{.n = n,
+    return ComputedValue{.value = n,
                          .unit = foldUnit(rhs),
                          .unitRaw =
                              rhs.unitRaw.or_else([&]() { return unitRaw; })};

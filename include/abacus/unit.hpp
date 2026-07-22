@@ -8,6 +8,7 @@
 #include <vector>
 
 struct UnitDerivative {};
+
 enum class UnitType { Date, Currency, Distance, Duration, Temperature };
 
 struct UnitDef {

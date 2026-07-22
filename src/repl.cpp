@@ -20,7 +20,7 @@ void process(const std::string &s) {
     if (!res) {
       std::cout << "Error: " << res.error() << "\n";
     } else {
-      std::cout << res->n << res->unitRaw.value_or("") << "\n";
+      std::cout << res->value << res->unitRaw.value_or("") << "\n";
     }
   }
 }

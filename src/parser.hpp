@@ -35,6 +35,11 @@ struct UnaryExpression {
   std::unique_ptr<Expression> lhs;
 };
 
+struct FunctionCall {
+  std::string_view name;
+  std::vector<std::unique_ptr<Expression>> args;
+};
+
 struct UnitExpression {
   OpaqueUnit unit;
   std::unique_ptr<Expression> expr;
@@ -42,7 +47,7 @@ struct UnitExpression {
 
 struct Expression {
   std::variant<BinaryExpression, UnaryExpression, NumberString, UnitExpression,
-               ConversionExpression>
+               ConversionExpression, FunctionCall>
       data;
 
   const BinaryExpression *asBinaryExpression() const {
@@ -55,6 +60,10 @@ struct Expression {
 
   const ConversionExpression *asConversion() const {
     return std::get_if<ConversionExpression>(&data);
+  }
+
+  const FunctionCall *asFunction() const {
+    return std::get_if<FunctionCall>(&data);
   }
 };
 
@@ -147,6 +156,34 @@ public:
 
     if (m_lexer.peakIf(Lexer::TokenType::Number)) {
       expr = parseNumber();
+    }
+
+    else if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
+      if (auto next = m_lexer.peak(1); next && next->raw == "(") {
+        m_lexer.next();
+        m_lexer.next();
+
+        FunctionCall fn{.name = tok->raw};
+
+        while (true) {
+          auto tok = m_lexer.peak();
+          if (tok->raw == ")")
+            break;
+          fn.args.emplace_back(pratParse());
+          tok = m_lexer.peak();
+
+          if (tok->raw == ")") {
+            break;
+          }
+          if (tok->raw != ",") {
+            throw std::runtime_error("Expected , to add another argument");
+          }
+          m_lexer.next();
+        }
+
+        m_lexer.next();
+        return std::make_unique<Expression>(std::move(fn));
+      }
     }
 
     // unit can be found after any term.
