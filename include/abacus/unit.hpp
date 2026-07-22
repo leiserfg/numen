@@ -16,6 +16,7 @@ struct UnitDef {
   double factor;
   std::string family;
   UnitType type;
+  double offset = 0;
 };
 
 struct UnitBaseRelation {
@@ -29,7 +30,7 @@ public:
   UnitDatabase() noexcept {
     registerUnit(UnitDef{.id = "inch",
                          .aliases = {"in"},
-                         .factor = 0,
+                         .factor = 0.0254,
                          .family = "imperial",
                          .type = UnitType::Distance});
     registerUnit(UnitDef{.id = "meter",
@@ -42,8 +43,6 @@ public:
                          .factor = 1e3,
                          .family = "metric",
                          .type = UnitType::Distance});
-    registerRelation(UnitBaseRelation{
-        .lhs = "imperial", .rhs = "metric", .factor = 39.3701});
 
     registerUnit(UnitDef{.id = "second",
                          .aliases = {"s", "sec", "secs", "seconds"},
@@ -66,14 +65,33 @@ public:
                          .family = "duration",
                          .type = UnitType::Duration});
 
+    registerUnit(UnitDef{.id = "kelvin",
+                         .factor = 1,
+                         .family = "degree",
+                         .type = UnitType::Temperature});
+    registerUnit(UnitDef{
+        .id = "celsius",
+        .aliases = {"cel", "c"},
+        .factor = 1,
+        .family = "degree",
+        .type = UnitType::Temperature,
+        .offset = 273.15,
+    });
+    registerUnit(UnitDef{
+        .id = "fahrenheight",
+        .aliases = {"fahren", "f"},
+        .factor = 5.0 / 9,
+        .family = "degree",
+        .type = UnitType::Temperature,
+        .offset = 459.67 * 5 / 9,
+    });
+
     registerUnit(UnitDef{.id = "usd", .family = "currency"});
     registerUnit(UnitDef{.id = "gbp", .family = "currency"});
     registerUnit(UnitDef{.id = "eur", .family = "currency"});
   }
-  //.factor = 39.3701
 
   void registerUnit(UnitDef unit) { m_units.emplace_back(unit); }
-  void registerRelation(UnitBaseRelation rel) { m_relations.emplace_back(rel); }
 
   // units can share a same identifier, e.g 'm' can stand for 'meter' or
   // 'minute'.
@@ -97,30 +115,16 @@ public:
 
   std::expected<double, std::string> convert(double n, const UnitDef &from,
                                              const UnitDef &to) const {
-    // 1km to m
-    // 1000m to km
-
-    if (from.family == to.family) {
-      return n * from.factor / to.factor;
+    if (from.type == to.type) {
+      auto base = n * from.factor + from.offset;
+      return (base - to.offset) / to.factor;
     }
 
-    auto rel =
-        std::ranges::find_if(m_relations, [&](const UnitBaseRelation &rel) {
-          return (rel.lhs == from.family && rel.rhs == to.family) ||
-                 (rel.lhs == to.family && rel.rhs == from.family);
-        });
-
-    if (rel == m_relations.end()) {
-      return std::unexpected(
-          std::format("No idea how to convert {} to {}. You probably forgot to "
-                      "register the unit relation.",
-                      from.family, to.family));
-    }
-
-    return n * from.factor * rel->factor;
+    return std::unexpected(std::format(
+        "No idea how to convert {} to {}, as they are not of the same type.",
+        from.family, to.family));
   }
 
 private:
   std::vector<UnitDef> m_units;
-  std::vector<UnitBaseRelation> m_relations;
 };

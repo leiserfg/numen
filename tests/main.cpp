@@ -171,6 +171,22 @@ TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
   }
 }
 
+TEST_CASE("should convert between systems, with non base unit", "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("km to in");
+    REQUIRE(res);
+    REQUIRE(std::round(res->n) == 39370);
+  }
+
+  {
+    auto res = calc.compute("15000 in to km");
+    REQUIRE(res);
+    REQUIRE(res->n == 0.381);
+  }
+}
+
 TEST_CASE("no unit after conversion operator should error", "[unit]") {
   abacus::Abacus calc;
 

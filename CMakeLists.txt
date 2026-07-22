@@ -4,6 +4,8 @@ project(${PROJECT_NAME})
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(BUILD_REPL "Build the repl program" ON)
+
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
 	vendor/tinyexpr/tinyexpr.cpp
@@ -16,6 +18,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_include_directories(${PROJECT_NAME} PRIVATE ./include/tinyexpr)
+
+if (BUILD_REPL)
+	set(REPL_TARGET repl)
+	add_executable(${REPL_TARGET} src/repl.cpp)
+	target_compile_features(${REPL_TARGET} PRIVATE cxx_std_23)
+	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME})
+	target_include_directories(${REPL_TARGET} PRIVATE ./include)
+endif()
 
 if (BUILD_TESTS)
 	set(TEST_TARGET abacus-tests)

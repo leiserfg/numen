@@ -3,7 +3,6 @@
 #include "parser.hpp"
 #include <cassert>
 #include <expected>
-#include <functional>
 #include <iostream>
 #include <ostream>
 
@@ -33,6 +32,7 @@ public:
       if (be->op == "^") {
         return computeExpr(*be->lhs).pow(computeExpr(*be->rhs));
       }
+
       throw std::runtime_error(std::format("Unhandled operator {}", be->op));
     }
 
