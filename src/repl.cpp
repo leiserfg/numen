@@ -2,14 +2,19 @@
 #include <iostream>
 #include <string>
 
-int main(int ac, char **av) {
+void process(const std::string &s) {
+  std::string_view line{s};
   abacus::Abacus calc;
 
-  std::string line;
+  bool ast = false;
+  if (line.starts_with("/ast")) {
+    line = line.substr(4);
+    ast = true;
+  }
 
-  std::cout << "$> ";
-
-  while (std::getline(std::cin, line)) {
+  if (ast) {
+    calc.printAST(std::string{line});
+  } else {
     auto res = calc.compute(line);
 
     if (!res) {
@@ -17,7 +22,21 @@ int main(int ac, char **av) {
     } else {
       std::cout << res->n << res->unitRaw.value_or("") << "\n";
     }
+  }
+}
 
+int main(int ac, char **av) {
+  if (ac == 2) {
+    process(av[1]);
+    return 0;
+  }
+
+  std::string line;
+
+  std::cout << "$> ";
+
+  while (std::getline(std::cin, line)) {
+    process(line);
     std::cout << "$> ";
   }
 }

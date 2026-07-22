@@ -67,6 +67,8 @@ TEST_CASE("division operator") {
   // assertExpr("100 div 10 / 2", "5")
 }
 
+TEST_CASE("expression support") {}
+
 TEST_CASE("unit should tag any expression", "[unit]") {
   abacus::Abacus calc;
   {
@@ -168,6 +170,17 @@ TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
     auto res = calc.compute("km to m");
     REQUIRE(res);
     REQUIRE(res->n == 1000);
+  }
+}
+
+TEST_CASE("unit should always apply to everything to the left of it",
+          "[unit]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("2^8 km to m");
+    REQUIRE(res);
+    REQUIRE(res->n == 256000);
   }
 }
 

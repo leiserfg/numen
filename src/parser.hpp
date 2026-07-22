@@ -156,11 +156,15 @@ public:
     throw std::runtime_error("Expected a number");
   }
 
+  // 2^(8m to km)
   std::unique_ptr<Expression> pratParse(int minPrec = 0) {
     auto left = parseTerm();
 
     while (auto tok = m_lexer.peak()) {
       if (tok->raw == "to" || tok->raw == "in" | tok->raw == "->") {
+        if (minPrec > 0)
+          break;
+
         m_lexer.next();
         auto unit = parseUnit();
 

@@ -151,39 +151,31 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
   auto ident = [&]() {
     std::string s;
     for (int i = 0; i != depth; ++i)
-      s += '\t';
+      s += "  ";
     return s;
   };
 
   if (auto be = expr.asBinaryExpression()) {
-    os << "BinaryExpr {\n";
-    os << ident() << "operator " << be->op << "\n";
-    os << ident() << "lhs ";
+    os << ident() << "BinaryExpr " << be->op << " {\n";
     walkAST(os, *be->lhs, depth + 1);
-    os << "\n";
-    os << ident() << "rhs ";
     walkAST(os, *be->rhs, depth + 1);
-    os << ident() << "}\n\n";
+    os << ident() << "}\n";
   }
 
   else if (auto conv = expr.asConversion()) {
-    os << "Conversion {\n";
-    os << ident() << "to " << conv->target << "\n";
-    os << ident() << "lhs ";
+    os << ident() << "Conversion " << conv->target << " {\n";
     walkAST(os, *conv->b, depth + 1);
-    os << ident() << "}\n\n";
+    os << ident() << "}\n";
   }
 
   else if (auto n = std::get_if<NumberString>(&expr.data)) {
-    os << "Number " << *n << "\n";
+    os << ident() << "Number " << *n << "\n";
   }
 
   else if (auto ue = std::get_if<UnitExpression>(&expr.data)) {
-    os << "Unit {\n";
-    os << ident() << "unit " << ue->unit << "\n";
-    os << ident() << "lhs ";
+    os << ident() << "Unit " << ue->unit << " {\n";
     walkAST(os, *ue->expr, depth + 1);
-    os << ident() << "\n}\n";
+    os << ident() << "}\n";
   }
 }
 
