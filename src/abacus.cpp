@@ -1,6 +1,7 @@
 #include "abacus/abacus.hpp"
 #include "abacus/unit.hpp"
 #include "parser.hpp"
+#include "rang/rang.hpp"
 #include <cassert>
 #include <expected>
 #include <iostream>
@@ -162,31 +163,36 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
   };
 
   if (auto be = expr.asBinaryExpression()) {
-    os << ident() << "Binary " << be->op << " {\n";
+    os << ident() << "Binary " << rang::fg::green << be->op << rang::fg::reset
+       << " {\n";
     walkAST(os, *be->lhs, depth + 1);
     walkAST(os, *be->rhs, depth + 1);
     os << ident() << "}\n";
   }
 
   else if (auto ue = expr.asUnaryExpression()) {
-    os << ident() << "Unary " << ue->op << " {\n";
+    os << ident() << "Unary " << rang::fg::green << ue->op << rang::fg::reset
+       << " {\n";
     walkAST(os, *ue->lhs, depth + 1);
     os << ident() << "}\n";
 
   }
 
   else if (auto conv = expr.asConversion()) {
-    os << ident() << "Convert " << conv->target << " {\n";
+    os << ident() << "Convert " << rang::fg::green << conv->target
+       << rang::fg::reset << " {\n";
     walkAST(os, *conv->b, depth + 1);
     os << ident() << "}\n";
   }
 
   else if (auto n = std::get_if<NumberString>(&expr.data)) {
-    os << ident() << "Number " << *n << "\n";
+    os << ident() << "Number " << rang::fg::yellow << *n << rang::fg::reset
+       << "\n";
   }
 
   else if (auto ue = std::get_if<UnitExpression>(&expr.data)) {
-    os << ident() << "Unit " << ue->unit << " {\n";
+    os << ident() << "Unit " << rang::fg::green << ue->unit << rang::fg::reset
+       << " {\n";
     walkAST(os, *ue->expr, depth + 1);
     os << ident() << "}\n";
   }
