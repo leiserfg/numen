@@ -1,6 +1,7 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -46,6 +47,10 @@ struct Expression {
 
   const BinaryExpression *asBinaryExpression() const {
     return std::get_if<BinaryExpression>(&data);
+  }
+
+  const UnaryExpression *asUnaryExpression() const {
+    return std::get_if<UnaryExpression>(&data);
   }
 
   const ConversionExpression *asConversion() const {
@@ -118,6 +123,18 @@ public:
 
   std::unique_ptr<Expression> parseTerm() {
     auto expr = std::unique_ptr<Expression>();
+
+    if (auto tok = m_lexer.peak()) {
+      bool unary = std::ranges::contains(
+          std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
+      if (unary) {
+        m_lexer.next();
+        return std::make_unique<Expression>(UnaryExpression{
+            .op = tok->raw,
+            .lhs = parseTerm(),
+        });
+      }
+    }
 
     if (m_lexer.peak() && m_lexer.peak()->raw == "(") {
       m_lexer.next();

@@ -49,6 +49,26 @@ TEST_CASE("modulo operator") {
 
 TEST_CASE("addition operator") { assertExpr("1 + 1", "2"); }
 
+TEST_CASE("should support negative number", "[unary]") {
+  assertExpr("-1", "-1");
+  assertExpr("-1 + -1", "-2");
+  assertExpr("-1 - 1", "-2");
+  assertExpr("-1 - 1", "-2");
+  assertExpr("-1 + - 1", "-2");
+}
+
+TEST_CASE("unary should apply to parenthesized term", "[unary]") {
+  assertExpr("-(150 * 2 / 2 + 1)", "-151");
+}
+
+TEST_CASE("two negative signs could yield positive", "[unary]") {
+  assertExpr("--(2^8)", "256");
+}
+
+TEST_CASE("as many unary operators can be used", "[unary]") {
+  assertExpr("--++ ++ ++++++ - -123 + 1", "124");
+}
+
 TEST_CASE("minus operator") {
   assertExpr("1 - 1", "0");
   assertExpr("1 - 5", "-4");
@@ -214,7 +234,7 @@ TEST_CASE("in should work as a conversion operator in the right context, and a "
           "[unit]") {
   abacus::Abacus calc;
   auto res = calc.compute("1m in in"); // 1 meter to inches, here the middle
-                                       // in is an alias for the 'to' operator
+                                       // in is an alias for the 'go' operator
   REQUIRE(res);
   REQUIRE(std::round(res->n) == 39);
   REQUIRE(res->unitRaw == "in");

@@ -13,7 +13,13 @@ public:
   Interpreter(const UnitDatabase &db) : m_db(db) {}
 
   ComputedValue computeExpr(const Expression &expr) const {
-    if (auto be = expr.asBinaryExpression()) {
+    if (auto ue = expr.asUnaryExpression()) {
+      auto c = computeExpr(*ue->lhs);
+      if (ue->op == "-") {
+        c.n *= -1;
+      }
+      return c;
+    } else if (auto be = expr.asBinaryExpression()) {
       if (be->op == "+") {
         return computeExpr(*be->lhs) + computeExpr(*be->rhs);
       }
@@ -156,14 +162,21 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
   };
 
   if (auto be = expr.asBinaryExpression()) {
-    os << ident() << "BinaryExpr " << be->op << " {\n";
+    os << ident() << "Binary " << be->op << " {\n";
     walkAST(os, *be->lhs, depth + 1);
     walkAST(os, *be->rhs, depth + 1);
     os << ident() << "}\n";
   }
 
+  else if (auto ue = expr.asUnaryExpression()) {
+    os << ident() << "Unary " << ue->op << " {\n";
+    walkAST(os, *ue->lhs, depth + 1);
+    os << ident() << "}\n";
+
+  }
+
   else if (auto conv = expr.asConversion()) {
-    os << ident() << "Conversion " << conv->target << " {\n";
+    os << ident() << "Convert " << conv->target << " {\n";
     walkAST(os, *conv->b, depth + 1);
     os << ident() << "}\n";
   }
