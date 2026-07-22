@@ -2,7 +2,6 @@
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
 #include <algorithm>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -78,7 +77,10 @@ struct OperatorDefinition {
 };
 
 static std::vector<OperatorDefinition> operators{
-    OperatorDefinition{.id = "to", .aliases = {"to", "in"}, .precedence = 1},
+    OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 1},
+    OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
+    OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
+    OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 1},
     OperatorDefinition{
         .id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
     OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
@@ -210,7 +212,6 @@ public:
     throw std::runtime_error("Expected a number");
   }
 
-  // 2^(8m to km)
   std::unique_ptr<Expression> pratParse(int minPrec = 0) {
     auto left = parseTerm();
 
@@ -220,15 +221,16 @@ public:
           break;
 
         m_lexer.next();
-        auto unit = parseUnit();
 
-        if (!unit)
+        auto unit = m_lexer.peak();
+
+        if (!unit || unit->type != Lexer::TokenType::String)
           throw std::runtime_error("expected unit after conversion operator");
 
         m_lexer.next();
 
         left = std::make_unique<Expression>(
-            ConversionExpression{.b = std::move(left), .target = *unit});
+            ConversionExpression{.b = std::move(left), .target = unit->raw});
 
         continue;
       }

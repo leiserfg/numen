@@ -15,12 +15,12 @@ void process(const std::string &s) {
   if (ast) {
     calc.printAST(std::string{line});
   } else {
-    auto res = calc.compute(line);
+    auto res = calc.evaluate(line);
 
     if (!res) {
       std::cout << "Error: " << res.error() << "\n";
     } else {
-      std::cout << res->value << res->unitRaw.value_or("") << "\n";
+      std::cout << res.value() << "\n";
     }
   }
 }

@@ -286,6 +286,22 @@ TEST_CASE("Function call in function argument", "function") {
   assertExpr("max(min(1, 10),max(1, 5))", "5");
 }
 
+TEST_CASE("leftshit works", "[bitwise]") {
+  assertExpr("1 << 8", "256");
+  assertExpr("1 << 16", "65536");
+}
+
+TEST_CASE("righshift works", "[bitwise]") {
+  assertExpr("256 >> 1", "128");
+  assertExpr("256 >> 2", "64");
+}
+
+TEST_CASE("hex formatting", "[format]") { assertExpr("256 to hex", "0x100"); }
+
+TEST_CASE("binary formatting", "[format]") {
+  assertExpr("256 to binary", "0b100000000");
+}
+
 /*
 TEST_CASE("Basic percentage") {
   {

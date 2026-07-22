@@ -8,7 +8,6 @@ option(BUILD_REPL "Build the repl program" ON)
 
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
-	vendor/tinyexpr/tinyexpr.cpp
 	${SRCS}
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -17,7 +16,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
-target_include_directories(${PROJECT_NAME} PRIVATE ./include/tinyexpr)
 
 if (BUILD_REPL)
 	set(REPL_TARGET repl)

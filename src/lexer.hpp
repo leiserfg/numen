@@ -112,7 +112,7 @@ public:
         }
         if (!std::isalnum(c)) {
           state = State::Operator;
-          break;
+          continue;
         }
         break;
       }
@@ -126,7 +126,24 @@ public:
       }
         // TODO: we will probably want multichar operators...
       case State::Operator: {
-        return tryCommit();
+        if (m_cursor - startPos == 0) {
+          switch (c) {
+          case '(':
+          case ')':
+          case '-':
+          case '+':
+          case ',':
+            ++m_cursor;
+            return tryCommit();
+          default:
+            break;
+          }
+        }
+
+        if (std::isalnum(c) || std::isspace(c)) {
+          return tryCommit();
+        }
+        break;
       }
       case State::String: {
         if (!std::isalpha(c)) {

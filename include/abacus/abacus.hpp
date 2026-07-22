@@ -1,55 +1,26 @@
 #pragma once
 #include "abacus/unit.hpp"
-#include <cmath>
+#include <chrono>
 #include <expected>
 #include <string>
 #include <string_view>
+#include <variant>
 
 namespace abacus {
 
+using DateTime = std::chrono::time_point<std::chrono::system_clock>;
+using ValueType = std::variant<double, bool, DateTime>;
+
+enum class OutputFormat { Decimal, Hexadecimal, Binary, Octal };
+
 struct ComputedValue {
   double value;
+  OutputFormat format = OutputFormat::Decimal;
 
   // TODO: maybe we want the pointer in the db, idk...
   // optional is convenient, and no lifetime issues by copying...
   std::optional<UnitDef> unit;
   std::optional<std::string_view> unitRaw;
-
-  ComputedValue operator+(const ComputedValue &rhs) const {
-    return output(value + rhs.value, rhs);
-  }
-
-  ComputedValue operator-(const ComputedValue &rhs) const {
-    return output(value - rhs.value, rhs);
-  }
-
-  ComputedValue operator*(const ComputedValue &rhs) const {
-    return output(value * rhs.value, rhs);
-  }
-
-  ComputedValue operator/(const ComputedValue &rhs) const {
-    return output(value / rhs.value, rhs);
-  }
-
-  ComputedValue operator%(const ComputedValue &rhs) const {
-    return output(static_cast<int>(value) % static_cast<int>(rhs.value), rhs);
-  }
-
-  ComputedValue pow(const ComputedValue &rhs) const {
-    return output(std::pow(value, rhs.value), rhs);
-  }
-
-private:
-  ComputedValue output(double n, const ComputedValue &rhs) const {
-    return ComputedValue{.value = n,
-                         .unit = foldUnit(rhs),
-                         .unitRaw =
-                             rhs.unitRaw.or_else([&]() { return unitRaw; })};
-  }
-
-  std::optional<UnitDef> foldUnit(const ComputedValue &rhs) const {
-    return rhs.unit.or_else([&]() { return unit; });
-  }
 };
 
 class Abacus {
