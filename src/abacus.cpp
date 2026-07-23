@@ -4,6 +4,7 @@
 #include "rang/rang.hpp"
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <expected>
 #include <format>
@@ -12,6 +13,8 @@
 #include <ostream>
 #include <ranges>
 #include <stdexcept>
+#include <string_view>
+#include <variant>
 
 namespace abacus {
 
@@ -28,6 +31,20 @@ struct FunctionCtx {
     return [&]<std::size_t... I>(std::index_sequence<I...>) {
       return std::tuple{(args[I].value)...};
     }(std::index_sequence_for<Ts...>{});
+  }
+
+  // unwraps all argument while asserting that they are indeed of type T
+  template <typename T> std::vector<const T *> unpackAll() {
+    std::vector<const T *> unpacked;
+    for (const auto &arg : args) {
+      if (auto n = std::get_if<T>(&arg.value)) {
+        unpacked.emplace_back(n);
+      } else {
+        throw std::runtime_error("Found an argument with invalid type");
+      }
+    }
+
+    return unpacked;
   }
 
   FunctionCtx(std::span<const ComputedValue> args) : args(args) {}
@@ -48,26 +65,27 @@ public:
     registerFunction("min", [&](FunctionCtx ctx) {
       if (ctx.args.empty())
         throw std::runtime_error("min: at least 1 argument is required.");
-      auto min =
-          std::ranges::min(ctx.args, std::less{}, [](const ComputedValue &a) {
-            return a.value;
-          }).value;
+      auto nn = ctx.unpackAll<Number>();
+      auto min = std::ranges::min(nn, std::less{},
+                                  [](const Number *a) { return a->n; });
 
-      return ComputedValue{.value = min};
+      return ComputedValue{.value = *min};
     });
     registerFunction("max", [&](FunctionCtx ctx) {
       if (ctx.args.empty())
         throw std::runtime_error("min: at least 1 argument is required.");
-      auto max =
-          std::ranges::min(ctx.args, std::greater{},
-                           [](const ComputedValue &a) { return a.value; })
-              .value;
-      return ComputedValue{.value = max};
+      auto nn = ctx.unpackAll<Number>();
+      auto max = std::ranges::max(nn, std::less{},
+                                  [](const Number *a) { return a->n; });
+
+      return ComputedValue{.value = *max};
     });
-    registerFunction("sin", [&](FunctionCtx ctx) {
-      auto [lhs] = ctx.unpack<double>();
-      return ComputedValue{.value = std::sin(lhs)};
-    });
+    /*
+registerFunction("sin", [&](FunctionCtx ctx) {
+  auto [lhs] = ctx.unpack<double>();
+  return ComputedValue{.value = std::sin(lhs)};
+});
+    */
   }
 
   void registerFunction(std::string_view name, FunctionHandler handler) {
@@ -97,11 +115,17 @@ public:
 
   ComputedValue computeExpr(const Expression &expr) const {
     auto visitor = overloads{
-        [&](const UnaryExpression &ue) {
+        [&](const UnaryExpression &ue) -> ComputedValue {
           auto c = computeExpr(*ue.lhs);
-          if (ue.op == "-") {
-            c.value *= -1;
+
+          if (auto n = c.asNumber()) {
+            auto c = *n;
+            if (ue.op == "-") {
+              c.n *= -1;
+            }
+            return {c};
           }
+
           return c;
         },
         [&](const BinaryExpression &be) {
@@ -139,157 +163,194 @@ public:
           throw std::runtime_error(std::format("Unhandled operator {}", be.op));
         },
         [&](const ConversionExpression &conv) -> ComputedValue {
-          auto value = computeExpr(*conv.b);
+          auto v = computeExpr(*conv.b);
 
-          if (conv.target == "hex" || conv.target == "hexadecimal") {
-            value.format = OutputFormat::Hexadecimal;
-            return value;
-          }
+          if (auto n = v.asNumber()) {
+            auto value = *n;
 
-          if (conv.target == "binary") {
-            value.format = OutputFormat::Binary;
-            return value;
-          }
-
-          if (conv.target == "octal") {
-            value.format = OutputFormat::Octal;
-            return value;
-          }
-
-          auto targetCandidates = m_db.findUnitCandidates(conv.target);
-
-          // if converted expression has no unit there is nothing to do, just
-          // tag it with the target unit... 1m to s 1m to in
-          if (!value.unitRaw)
-            return {.value = value.value, .unitRaw = conv.target};
-
-          auto valueCandidates = m_db.findUnitCandidates(*value.unitRaw);
-
-          auto convert = [&](double n, const UnitDef &lhs,
-                             const UnitDef &rhs) -> ComputedValue {
-            if (lhs.type != rhs.type) {
-              throw std::runtime_error(
-                  std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
+            if (conv.target == "hex" || conv.target == "hexadecimal") {
+              value.format = NumberOutputFormat::Hexadecimal;
+              return ComputedValue{value};
             }
 
-            auto res = m_db.convert(value.value, lhs, rhs);
-
-            if (!res)
-              throw std::runtime_error(res.error());
-
-            return {.value = res.value(), .unitRaw = conv.target};
-          };
-
-          // only one choice on both sides, there is no ambiguity
-          if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
-            auto lhs = valueCandidates.front();
-            auto rhs = targetCandidates.front();
-            return convert(value.value, lhs, rhs);
-          }
-
-          // we are unable to infer what unit should be used, we need to wait
-          // for more info...
-          if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-            return {.value = value.value, .unitRaw = conv.target};
-          }
-
-          // 1s to 1m
-          if (valueCandidates.size() > targetCandidates.size()) {
-            auto rhs = targetCandidates.front();
-            auto lhs =
-                std::ranges::find_if(valueCandidates, [&](const UnitDef &unit) {
-                  return unit.type == rhs.type;
-                });
-            if (lhs == valueCandidates.end()) {
-              throw std::runtime_error(
-                  std::format("Incompatible units: no common family"));
+            if (conv.target == "binary") {
+              value.format = NumberOutputFormat::Binary;
+              return ComputedValue{value};
             }
-            return convert(value.value, *lhs, rhs);
-          }
 
-          if (targetCandidates.size() > valueCandidates.size()) {
-            auto lhs = valueCandidates.front();
-            auto rhs = std::ranges::find_if(
-                targetCandidates,
-                [&](const UnitDef &unit) { return unit.type == lhs.type; });
-            if (rhs == targetCandidates.end()) {
-              throw std::runtime_error(
-                  std::format("Incompatible units: no common type"));
+            if (conv.target == "octal") {
+              value.format = NumberOutputFormat::Octal;
+              return ComputedValue{value};
             }
-            return convert(value.value, lhs, *rhs);
+
+            auto targetCandidates = m_db.findUnitCandidates(conv.target);
+
+            // if converted expression has no unit there is nothing to do, just
+            // tag it with the target unit... 1m to s 1m to in
+            if (!v.unitRaw)
+              return ComputedValue{.value = value, .unitRaw = conv.target};
+
+            auto valueCandidates = m_db.findUnitCandidates(*v.unitRaw);
+
+            auto convert = [&](double n, const UnitDef &lhs,
+                               const UnitDef &rhs) -> ComputedValue {
+              if (lhs.type != rhs.type) {
+                throw std::runtime_error(std::format(
+                    "Incompatible units ({} to {})", lhs.id, rhs.id));
+              }
+
+              auto res = m_db.convert(value.n, lhs, rhs);
+
+              if (!res)
+                throw std::runtime_error(res.error());
+
+              return {.value = Number{res.value()}, .unitRaw = conv.target};
+            };
+
+            // only one choice on both sides, there is no ambiguity
+            if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
+              auto lhs = valueCandidates.front();
+              auto rhs = targetCandidates.front();
+              return convert(value.n, lhs, rhs);
+            }
+
+            // we are unable to infer what unit should be used, we need to wait
+            // for more info...
+            if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
+              return ComputedValue{.value = value, .unitRaw = conv.target};
+            }
+
+            // 1s to 1m
+            if (valueCandidates.size() > targetCandidates.size()) {
+              auto rhs = targetCandidates.front();
+              auto lhs = std::ranges::find_if(
+                  valueCandidates,
+                  [&](const UnitDef &unit) { return unit.type == rhs.type; });
+              if (lhs == valueCandidates.end()) {
+                throw std::runtime_error(
+                    std::format("Incompatible units: no common family"));
+              }
+              return convert(value.n, *lhs, rhs);
+            }
+
+            if (targetCandidates.size() > valueCandidates.size()) {
+              auto lhs = valueCandidates.front();
+              auto rhs = std::ranges::find_if(
+                  targetCandidates,
+                  [&](const UnitDef &unit) { return unit.type == lhs.type; });
+              if (rhs == targetCandidates.end()) {
+                throw std::runtime_error(
+                    std::format("Incompatible units: no common type"));
+              }
+              return convert(value.n, lhs, *rhs);
+            }
           }
           throw std::runtime_error("unexpected conversion flow");
         },
-        [](NumberString n) { return ComputedValue{.value = n}; },
+        [](NumberString n) { return ComputedValue{.value = Number{n}}; },
         [&](const UnitExpression &ue) {
-          double n = computeExpr(*ue.expr).value;
+          auto n = computeExpr(*ue.expr).value;
+
           // since we unitify the expression, we discard any unit the expr might
           // have had
           return ComputedValue{.value = n, .unitRaw = ue.unit};
         },
-        [&](const FunctionCall &fn) { return executeFunction(fn); }};
+        [&](const FunctionCall &fn) { return executeFunction(fn); },
+        [&](const DateString &fn) {
+          if (auto s = std::get_if<std::string_view>(&fn.value)) {
+            if (*s == "time" || *s == "now" || *s == "date") {
+              auto now = std::chrono::system_clock::now();
+              return ComputedValue{.value = DateTime{.time = now}};
+            }
+          }
+
+          return ComputedValue{};
+        }};
 
     return std::visit(visitor, expr.data);
   }
 
 private:
+  template <typename T, typename U = T>
+  static void assertBinary(const ComputedValue &lhs, const ComputedValue &rhs) {
+    bool ok = std::holds_alternative<T>(lhs.value) &&
+              std::holds_alternative<U>(rhs.value);
+    if (!ok)
+      throw std::runtime_error("Invalid operands");
+  }
+
   static ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) {
-    return output(lhs.value + rhs.value, lhs, rhs);
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(lhs.asNumber()->n + rhs.asNumber()->n, lhs, rhs);
   }
 
   static ComputedValue subtract(const ComputedValue &lhs,
                                 const ComputedValue &rhs) {
-    return output(lhs.value - rhs.value, lhs, rhs);
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(lhs.asNumber()->n - rhs.asNumber()->n, lhs, rhs);
   }
 
   static ComputedValue multiply(const ComputedValue &lhs,
                                 const ComputedValue &rhs) {
-    return output(lhs.value * rhs.value, lhs, rhs);
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(lhs.asNumber()->n * rhs.asNumber()->n, lhs, rhs);
   }
 
   static ComputedValue div(const ComputedValue &lhs, const ComputedValue &rhs) {
-    return output(lhs.value / rhs.value, lhs, rhs);
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(lhs.asNumber()->n / rhs.asNumber()->n, lhs, rhs);
   }
 
   static ComputedValue modulo(const ComputedValue &lhs,
                               const ComputedValue &rhs) {
-    return output(static_cast<int>(lhs.value) % static_cast<int>(rhs.value),
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) %
+                      static_cast<int>(rhs.asNumber()->n),
                   lhs, rhs);
   }
 
   static ComputedValue pow(const ComputedValue &lhs, const ComputedValue &rhs) {
-    return output(std::pow(lhs.value, rhs.value), lhs, rhs);
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(std::pow(lhs.asNumber()->n, rhs.asNumber()->n), lhs, rhs);
   }
 
   static ComputedValue leftshift(const ComputedValue &lhs,
                                  const ComputedValue &rhs) {
-    return output(static_cast<int>(lhs.value) << static_cast<int>(rhs.value),
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n)
+                      << static_cast<int>(rhs.asNumber()->n),
                   lhs, rhs);
   }
 
   static ComputedValue rightshift(const ComputedValue &lhs,
                                   const ComputedValue &rhs) {
-    return output(static_cast<int>(lhs.value) >> static_cast<int>(rhs.value),
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) >>
+                      static_cast<int>(rhs.asNumber()->n),
                   lhs, rhs);
   }
 
   static ComputedValue bitwiseor(const ComputedValue &lhs,
                                  const ComputedValue &rhs) {
-    return output(static_cast<int>(lhs.value) | static_cast<int>(rhs.value),
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) |
+                      static_cast<int>(rhs.asNumber()->n),
                   lhs, rhs);
   }
 
   static ComputedValue bitwiseAnd(const ComputedValue &lhs,
                                   const ComputedValue &rhs) {
-    return output(static_cast<int>(lhs.value) & static_cast<int>(rhs.value),
+    assertBinary<Number, Number>(lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) &
+                      static_cast<int>(rhs.asNumber()->n),
                   lhs, rhs);
   }
 
   static ComputedValue output(double n, const ComputedValue &lhs,
                               const ComputedValue &rhs) {
-    return ComputedValue{.value = n, .unitRaw = rhs.unitRaw.or_else([&]() {
-                           return lhs.unitRaw;
-                         })};
+    return ComputedValue{
+        .value = Number{n},
+        .unitRaw = rhs.unitRaw.or_else([&]() { return lhs.unitRaw; })};
   }
 
   ComputedValue executeFunction(const FunctionCall &fn) const {
@@ -331,20 +392,29 @@ Abacus::evaluate(const std::string_view expr) {
   Interpreter i{m_unitDb};
   auto result = i.computeExpr(*ast.root);
 
-  const auto formatNumber = [](const ComputedValue &v) -> std::string {
+  const auto formatNumber = [](const Number &v) -> std::string {
     switch (v.format) {
-    case abacus::OutputFormat::Hexadecimal:
-      return std::format("{:#x}", static_cast<int>(std::round(v.value)));
-    case abacus::OutputFormat::Octal:
-      return std::format("{:#o}", static_cast<int>(std::round(v.value)));
-    case abacus::OutputFormat::Binary:
-      return std::format("{:#b}", static_cast<int>(std::round(v.value)));
+    case abacus::NumberOutputFormat::Hexadecimal:
+      return std::format("{:#x}", static_cast<int>(std::round(v.n)));
+    case abacus::NumberOutputFormat::Octal:
+      return std::format("{:#o}", static_cast<int>(std::round(v.n)));
+    case abacus::NumberOutputFormat::Binary:
+      return std::format("{:#b}", static_cast<int>(std::round(v.n)));
     default:
-      return std::format("{:.6g}", v.value);
+      return std::format("{:.6g}", v.n);
     };
   };
 
-  return std::format("{}{}", formatNumber(result), result.unitRaw.value_or(""));
+  auto visitor = overloads{
+      [&](const Number &number) -> std::string { return formatNumber(number); },
+      [](const DateTime &date) -> std::string {
+        return std::format("{:%Y-%m-%d %H:%M}", date.time);
+      },
+      [](const bool &v) -> std::string { return v ? "true" : "false"; },
+  };
+
+  return std::format("{}{}", std::visit(visitor, result.value),
+                     result.unitRaw.value_or(""));
 }
 
 void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
@@ -387,6 +457,20 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
     os << ident() << "Unit " << rang::fg::green << ue->unit << rang::fg::reset
        << " {\n";
     walkAST(os, *ue->expr, depth + 1);
+    os << ident() << "}\n";
+  }
+
+  else if (auto ds = std::get_if<DateString>(&expr.data)) {
+    os << ident() << "Date " << " {\n";
+
+    if (auto str = std::get_if<std::string_view>(&ds->value)) {
+      os << ident() << "\tvalue " << *str << "\n";
+    }
+
+    if (ds->timezone) {
+      os << ident() << "\ttimezone " << ds->timezone.value() << "\n";
+    }
+
     os << ident() << "}\n";
   }
 

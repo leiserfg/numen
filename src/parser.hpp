@@ -29,6 +29,29 @@ struct ConversionExpression {
   OpaqueUnit target;
 };
 
+// now in new york
+// 5:03pm utc
+
+enum class Meridiem { AM, PM };
+
+// now = "time" | "date" | "now"
+// time_lit = <hour>[:<min>:<sec>][am|pm]
+// date = [now|time_lit] [in <TZ>]
+
+struct RelativeDateString {};
+
+struct DateTimeLiteral {
+  int hour;
+  std::optional<int> min;
+  std::optional<int> sec;
+  std::optional<Meridiem> meridiem;
+};
+
+struct DateString {
+  std::variant<DateTimeLiteral, std::string_view> value;
+  std::optional<std::string_view> timezone;
+};
+
 struct UnaryExpression {
   std::string_view op;
   std::unique_ptr<Expression> lhs;
@@ -45,8 +68,8 @@ struct UnitExpression {
 };
 
 struct Expression {
-  std::variant<BinaryExpression, UnaryExpression, NumberString, UnitExpression,
-               ConversionExpression, FunctionCall>
+  std::variant<BinaryExpression, UnaryExpression, NumberString, DateString,
+               UnitExpression, ConversionExpression, FunctionCall>
       data;
 
   const BinaryExpression *asBinaryExpression() const {
@@ -132,8 +155,33 @@ public:
     return std::nullopt;
   }
 
+  bool isRelativeDateToken(std::string_view name) const {
+    // handle more relative expressions, e.g "last week" etc...
+    return name == "time" || name == "date" || name == "now" ||
+           name == "yesterday";
+  }
+
+  bool isTimezoneToken(std::string_view name) {
+    // TODO: do something thorough
+    return name == "Paris" || name == "NYC";
+  }
+
   std::unique_ptr<Expression> parseTerm() {
     auto expr = std::unique_ptr<Expression>();
+
+    if (auto tok = m_lexer.peak()) {
+      if (isRelativeDateToken(tok->raw)) {
+        m_lexer.next();
+        DateString ds{.value = tok->raw};
+
+        if (auto tz = m_lexer.peak(); tz && isTimezoneToken(tz->raw)) {
+          ds.timezone = tz->raw;
+          m_lexer.next();
+        }
+
+        return std::make_unique<Expression>(ds);
+      }
+    }
 
     if (auto tok = m_lexer.peak()) {
       bool unary = std::ranges::contains(

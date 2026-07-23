@@ -8,19 +8,39 @@
 
 namespace abacus {
 
-using DateTime = std::chrono::time_point<std::chrono::system_clock>;
-using ValueType = std::variant<double, bool, DateTime>;
+using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-enum class OutputFormat { Decimal, Hexadecimal, Binary, Octal };
+enum class DateTimeOutputFormat { DateTime, Time, Date };
+
+struct DateTime {
+  TimePoint time;
+  DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
+};
+
+enum class NumberOutputFormat { Decimal, Hexadecimal, Binary, Octal };
+
+struct Number {
+  double n;
+  NumberOutputFormat format;
+};
+
+using ValueType = std::variant<Number, DateTime, bool>;
 
 struct ComputedValue {
-  double value;
-  OutputFormat format = OutputFormat::Decimal;
+
+  ValueType value;
 
   // TODO: maybe we want the pointer in the db, idk...
   // optional is convenient, and no lifetime issues by copying...
   std::optional<UnitDef> unit;
   std::optional<std::string_view> unitRaw;
+
+  bool isNumber() const { return std::holds_alternative<Number>(value); }
+
+  bool isDateTime() const { return std::holds_alternative<DateTime>(value); }
+  bool isBool() const { return std::holds_alternative<bool>(value); }
+
+  const Number *asNumber() const { return std::get_if<Number>(&value); }
 };
 
 class Abacus {

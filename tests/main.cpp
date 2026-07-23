@@ -95,7 +95,7 @@ TEST_CASE("unit should tag any expression", "[unit]") {
     auto res = calc.compute("5 * 2 + 10 usd");
     REQUIRE(res.has_value());
     REQUIRE(res->unitRaw == "usd");
-    REQUIRE(res->value == 20);
+    REQUIRE(res->asNumber()->n == 20);
   }
 }
 
@@ -104,7 +104,7 @@ TEST_CASE("right unit should take precedence over left unit", "[unit]") {
   {
     auto res = calc.compute("5 * 2 + 10 usd * 100 gbp");
     REQUIRE(res.has_value());
-    REQUIRE(res->value == 1010);
+    REQUIRE(res->asNumber()->n == 1010);
     REQUIRE(res->unitRaw == "gbp");
   }
 }
@@ -116,7 +116,7 @@ TEST_CASE("unit should apply to parenthesized term", "[unit]") {
     auto res = calc.compute("(5 * 2 + 10) usd * 100 gbp");
     REQUIRE(res.has_value());
     REQUIRE(res->unitRaw == "gbp");
-    REQUIRE(res->value == 2000);
+    REQUIRE(res->asNumber()->n == 2000);
   }
 }
 
@@ -126,7 +126,7 @@ TEST_CASE("unit can be converted using the 'to' operator", "[unit]") {
   {
     auto res = calc.compute("1 km to m");
     REQUIRE(res);
-    REQUIRE(res->value == 1000);
+    REQUIRE(res->asNumber()->n == 1000);
     REQUIRE(res->unitRaw == "m");
   }
 }
@@ -137,7 +137,7 @@ TEST_CASE("unit can be converted using the 'in' operator", "[unit]") {
   {
     auto res = calc.compute("1 km in m");
     REQUIRE(res);
-    REQUIRE(res->value == 1000);
+    REQUIRE(res->asNumber()->n == 1000);
     REQUIRE(res->unitRaw == "m");
   }
 }
@@ -148,7 +148,7 @@ TEST_CASE("unit can be converted many times in a row", "[unit]") {
   {
     auto res = calc.compute("1 km in m to km");
     REQUIRE(res);
-    REQUIRE(res->value == 1);
+    REQUIRE(res->asNumber()->n == 1);
     REQUIRE(res->unitRaw == "km");
   }
 }
@@ -158,7 +158,7 @@ TEST_CASE("artithmetic can be used on a converted unit", "[unit]") {
   {
     auto res = calc.compute("1km to m to km * 10 + 5");
     REQUIRE(res);
-    REQUIRE(res->value == 15);
+    REQUIRE(res->asNumber()->n == 15);
     REQUIRE(res->unitRaw == "km");
   }
 }
@@ -169,7 +169,7 @@ TEST_CASE("unit name should be inferred from context", "[unit]") {
   {
     auto res = calc.compute("1m to s");
     REQUIRE(res);
-    REQUIRE(res->value == 60);
+    REQUIRE(res->asNumber()->n == 60);
     REQUIRE(res->unitRaw == "s");
   }
 }
@@ -189,7 +189,7 @@ TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
   {
     auto res = calc.compute("km to m");
     REQUIRE(res);
-    REQUIRE(res->value == 1000);
+    REQUIRE(res->asNumber()->n == 1000);
   }
 }
 
@@ -200,7 +200,7 @@ TEST_CASE("unit should always apply to everything to the left of it",
   {
     auto res = calc.compute("2^8 km to m");
     REQUIRE(res);
-    REQUIRE(res->value == 256000);
+    REQUIRE(res->asNumber()->n == 256000);
   }
 }
 
@@ -210,13 +210,13 @@ TEST_CASE("should convert between systems, with non base unit", "[unit]") {
   {
     auto res = calc.compute("km to in");
     REQUIRE(res);
-    REQUIRE(std::round(res->value) == 39370);
+    REQUIRE(std::round(res->asNumber()->n) == 39370);
   }
 
   {
     auto res = calc.compute("15000 in to km");
     REQUIRE(res);
-    REQUIRE(res->value == 0.381);
+    REQUIRE(res->asNumber()->n == 0.381);
   }
 }
 
@@ -236,7 +236,7 @@ TEST_CASE("in should work as a conversion operator in the right context, and a "
   auto res = calc.compute("1m in in"); // 1 meter to inches, here the middle
                                        // in is an alias for the 'go' operator
   REQUIRE(res);
-  REQUIRE(std::round(res->value) == 39);
+  REQUIRE(std::round(res->asNumber()->n) == 39);
   REQUIRE(res->unitRaw == "in");
 }
 
