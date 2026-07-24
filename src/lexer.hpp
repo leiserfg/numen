@@ -48,6 +48,35 @@ public:
     return tok;
   }
 
+  // get as much string as we can and return that portion
+  std::optional<std::string_view> peakString(int n = 1) {
+    auto old = m_cursor;
+    int i = 0;
+
+    while (m_cursor < m_data.size() && std::isspace(m_data[m_cursor])) {
+      ++m_cursor;
+    }
+    auto start = m_cursor;
+
+    while (auto tok = peakIf(TokenType::String)) {
+      if (i >= n) {
+        break;
+      }
+      ++i;
+      next();
+    }
+
+    // couldn't peak n consecutive strings
+    if (i < n) {
+      m_cursor = old;
+      return std::nullopt;
+    }
+
+    auto str = m_data.substr(start, m_cursor - start);
+    m_cursor = old;
+    return str;
+  }
+
   // e.g can check whether "to the power of" is next
   bool isWordSequence(std::span<const std::string_view> words) {
     auto old = m_cursor;

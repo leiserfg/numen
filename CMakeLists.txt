@@ -30,13 +30,10 @@ if (BUILD_TESTS)
 	set(FIXTURE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fixtures)
 	find_package(Catch2 3 REQUIRED)
 	add_compile_options(-g3)
-	add_executable(${TEST_TARGET} tests/main.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp)
 	target_compile_features(${TEST_TARGET} PRIVATE cxx_std_23)
-	target_compile_definitions(${TEST_TARGET} PRIVATE
-		XDGPP_FIXTURE_DIR="${FIXTURE_DIR}"
-	)
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
-	target_include_directories(${TEST_TARGET} PRIVATE ./include)
+	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
 endif()
 
 #target_link_libraries(${PROJECT_NAME} PRIVATE)

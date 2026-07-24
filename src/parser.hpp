@@ -1,8 +1,12 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
+#include "timezone.hpp"
 #include <algorithm>
+#include <cassert>
+#include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -24,9 +28,24 @@ struct BinaryExpression {
 // while "1m to in" should be "1 meter to inches"
 using OpaqueUnit = std::string_view;
 
+struct NamedTimezone {
+  std::string_view name;
+};
+
+struct NamedUnit {
+  std::string_view name;
+};
+
+struct NamedNumberFormat {
+  std::string_view name;
+};
+
+using ConversionTarget =
+    std::variant<NamedUnit, NamedTimezone, NamedNumberFormat>;
+
 struct ConversionExpression {
   std::unique_ptr<Expression> b;
-  OpaqueUnit target;
+  ConversionTarget target;
 };
 
 // now in new york
@@ -49,7 +68,7 @@ struct DateTimeLiteral {
 
 struct DateString {
   std::variant<DateTimeLiteral, std::string_view> value;
-  std::optional<std::string_view> timezone;
+  std::optional<NamedTimezone> timezone;
 };
 
 struct UnaryExpression {
@@ -163,7 +182,39 @@ public:
 
   bool isTimezoneToken(std::string_view name) {
     // TODO: do something thorough
-    return name == "Paris" || name == "NYC";
+    return TimezoneDB{}.query(name);
+  }
+
+  std::optional<NamedTimezone> parseTimezone() {
+    return greedyParse(
+               3, [&](std::string_view word) { return isTimezoneToken(word); })
+        .transform([](auto &&str) { return NamedTimezone(str); });
+  }
+
+  std::optional<NamedNumberFormat> parseNumberFormat() {
+    return greedyParse(3,
+                       [&](std::string_view word) {
+                         return std::ranges::contains(
+                             std::initializer_list{"hex", "octal", "binary",
+                                                   "hexadecimal"},
+                             word);
+                       })
+        .transform([](auto &&str) { return NamedNumberFormat(str); });
+  }
+
+  template <typename F>
+  std::optional<std::string_view> greedyParse(int n, F fn) {
+    assert(n >= 0);
+    for (int i = 0; i != n; ++i) {
+      auto str = m_lexer.peakString(n - i);
+      if (str && fn(*str)) {
+        int consumable = n - i;
+        for (int j = 0; j != consumable; ++j)
+          m_lexer.next();
+        return str;
+      }
+    }
+    return std::nullopt;
   }
 
   std::unique_ptr<Expression> parseTerm() {
@@ -174,9 +225,10 @@ public:
         m_lexer.next();
         DateString ds{.value = tok->raw};
 
-        if (auto tz = m_lexer.peak(); tz && isTimezoneToken(tz->raw)) {
-          ds.timezone = tz->raw;
-          m_lexer.next();
+        if (auto tz = m_lexer.peak()) {
+          if (auto result = parseTimezone()) {
+            ds.timezone = result.value();
+          }
         }
 
         return std::make_unique<Expression>(ds);
@@ -270,6 +322,18 @@ public:
 
         m_lexer.next();
 
+        if (auto tz = parseTimezone()) {
+          left = std::make_unique<Expression>(
+              ConversionExpression{.b = std::move(left), .target = tz.value()});
+          continue;
+        }
+
+        if (auto fmt = parseNumberFormat()) {
+          left = std::make_unique<Expression>(ConversionExpression{
+              .b = std::move(left), .target = fmt.value()});
+          continue;
+        }
+
         auto unit = m_lexer.peak();
 
         if (!unit || unit->type != Lexer::TokenType::String)
@@ -277,8 +341,8 @@ public:
 
         m_lexer.next();
 
-        left = std::make_unique<Expression>(
-            ConversionExpression{.b = std::move(left), .target = unit->raw});
+        left = std::make_unique<Expression>(ConversionExpression{
+            .b = std::move(left), .target = NamedUnit{unit->raw}});
 
         continue;
       }

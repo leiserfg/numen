@@ -14,6 +14,7 @@ enum class DateTimeOutputFormat { DateTime, Time, Date };
 
 struct DateTime {
   TimePoint time;
+  const std::chrono::time_zone *tz = nullptr;
   DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
 };
 
