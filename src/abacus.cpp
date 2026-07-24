@@ -10,6 +10,7 @@
 #include <format>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <ostream>
 #include <ranges>
 #include <stdexcept>
@@ -279,7 +280,31 @@ private:
       throw std::runtime_error("Invalid operands");
   }
 
-  static ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) {
+  ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
+    if (lhs.isDateTime() && rhs.isNumber()) {
+      auto d = lhs.asDateTime();
+      auto n = rhs.asNumber();
+
+      if (rhs.unitRaw) {
+        auto candidates = m_db.findUnitCandidates(rhs.unitRaw.value());
+        auto it = std::ranges::find_if(candidates, [](const UnitDef &u) {
+          return u.type == UnitType::Duration;
+        });
+        auto second = m_db.findUnit("second");
+
+        if (it != candidates.end()) {
+          // convert everything to seconds, then add it to time
+          auto diff = m_db.convert(n->n, *it, *second);
+          auto time =
+              d->time + std::chrono::seconds(static_cast<int>(diff.value()));
+
+          DateTime dt = *d;
+          dt.time = time;
+          return ComputedValue{dt};
+        }
+      }
+    }
+
     assertBinary<Number, Number>(lhs, rhs);
     return output(lhs.asNumber()->n + rhs.asNumber()->n, lhs, rhs);
   }

@@ -41,6 +41,7 @@ struct ComputedValue {
   bool isBool() const { return std::holds_alternative<bool>(value); }
 
   const Number *asNumber() const { return std::get_if<Number>(&value); }
+  const DateTime *asDateTime() const { return std::get_if<DateTime>(&value); }
 };
 
 class Abacus {
