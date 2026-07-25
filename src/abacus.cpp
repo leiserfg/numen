@@ -450,10 +450,8 @@ Abacus::evaluate(const std::string_view expr) {
     };
 
     auto visitor = overloads{
-        [&](const Number &number) -> std::string {
-          return formatNumber(number);
-        },
-        [](const DateTime &date) -> std::string {
+        [&](const Number &number) { return formatNumber(number); },
+        [](const DateTime &date) {
           std::chrono::zoned_time tm{date.tz, date.time};
           return std::format("{:%Y-%m-%d %H:%M} ({})", tm, date.tz->name());
         },

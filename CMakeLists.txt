@@ -8,6 +8,7 @@ option(BUILD_REPL "Build the repl program" ON)
 
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
+	src/timezone.cpp
 	${SRCS}
 )
 target_include_directories(${PROJECT_NAME} PRIVATE

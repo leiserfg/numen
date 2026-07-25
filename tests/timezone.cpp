@@ -92,3 +92,19 @@ TEST_CASE("Resolve timezone links", "timezone") {
     REQUIRE(tz->name() == link.target());
   }
 }
+
+TEST_CASE("resolve custom tz link", "[timezone]") {
+  TimezoneDB db;
+
+  {
+    auto tz = db.query("nyc");
+    REQUIRE(tz);
+    REQUIRE(tz->name() == "America/New_York");
+  }
+
+  {
+    auto tz = db.query("europe");
+    REQUIRE(tz);
+    REQUIRE(tz->name() == "Europe/Paris");
+  }
+}
