@@ -4,6 +4,13 @@
 #include <ranges>
 #include <string_view>
 
+namespace {
+bool equalsLowerCase(std::string_view a, std::string_view b) {
+  return std::ranges::equal(
+      a, b, [](auto a, auto b) { return std::tolower(a) == std::tolower(b); });
+};
+}; // namespace
+
 class TimezoneDB {
 public:
   // search the timezone database in a relaxed way, e.g a query of "new york"
@@ -41,17 +48,48 @@ public:
 
             return std::ranges::equal(
                 queryWords, words, [](auto &&w1, auto &&w2) {
-                  return std::ranges::equal(w1, w2, [](auto a, auto b) {
-                    return std::tolower(a) == std::tolower(b);
-                  });
+                  return equalsLowerCase(std::string_view{w1},
+                                         std::string_view{w2});
                 });
           }
 
           return false;
         });
 
-    if (it == db.zones.end())
+    if (it == db.zones.end()) {
+      auto linkIt = std::ranges::find_if(
+          db.links,
+          [&query, splitOnAny](const std::chrono::time_zone_link &link) {
+            if (equalsLowerCase(link.name(), query)) {
+              return true;
+            }
+
+            auto parts = link.name() | std::views::split(std::string_view{"/"});
+            auto last = std::ranges::fold_left(
+                parts, std::string_view{}, [](auto &&, auto &&x) { return x; });
+
+            if (!last.empty()) {
+              std::string_view delims{"_/ "};
+              auto queryWords = splitOnAny(query, delims);
+              auto words = splitOnAny(last, delims);
+
+              return std::ranges::equal(
+                  queryWords, words, [](auto &&w1, auto &&w2) {
+                    return std::ranges::equal(w1, w2, [](auto a, auto b) {
+                      return std::tolower(a) == std::tolower(b);
+                    });
+                  });
+            }
+
+            return false;
+          });
+
+      if (linkIt != db.links.end()) {
+        return std::chrono::locate_zone(linkIt->target());
+      }
+
       return nullptr;
+    }
 
     return &*it;
   }

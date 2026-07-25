@@ -7,6 +7,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <exception>
 #include <expected>
 #include <format>
 #include <functional>
@@ -429,35 +430,41 @@ Abacus::compute(std::string_view expr) {
 
 std::expected<std::string, std::string>
 Abacus::evaluate(const std::string_view expr) {
-  Parser parser{expr, m_unitDb};
-  auto ast = parser.parse();
-  Interpreter i{m_unitDb};
-  auto result = i.computeExpr(*ast.root);
+  try {
+    Parser parser{expr, m_unitDb};
+    auto ast = parser.parse();
+    Interpreter i{m_unitDb};
+    auto result = i.computeExpr(*ast.root);
 
-  const auto formatNumber = [](const Number &v) -> std::string {
-    switch (v.format) {
-    case abacus::NumberOutputFormat::Hexadecimal:
-      return std::format("{:#x}", static_cast<int>(std::round(v.n)));
-    case abacus::NumberOutputFormat::Octal:
-      return std::format("{:#o}", static_cast<int>(std::round(v.n)));
-    case abacus::NumberOutputFormat::Binary:
-      return std::format("{:#b}", static_cast<int>(std::round(v.n)));
-    default:
-      return std::format("{:.6g}", v.n);
+    const auto formatNumber = [](const Number &v) -> std::string {
+      switch (v.format) {
+      case abacus::NumberOutputFormat::Hexadecimal:
+        return std::format("{:#x}", static_cast<int>(std::round(v.n)));
+      case abacus::NumberOutputFormat::Octal:
+        return std::format("{:#o}", static_cast<int>(std::round(v.n)));
+      case abacus::NumberOutputFormat::Binary:
+        return std::format("{:#b}", static_cast<int>(std::round(v.n)));
+      default:
+        return std::format("{:.6g}", v.n);
+      };
     };
-  };
 
-  auto visitor = overloads{
-      [&](const Number &number) -> std::string { return formatNumber(number); },
-      [](const DateTime &date) -> std::string {
-        std::chrono::zoned_time tm{date.tz, date.time};
-        return std::format("{:%Y-%m-%d %H:%M} ({})", tm, date.tz->name());
-      },
-      [](const bool &v) -> std::string { return v ? "true" : "false"; },
-  };
+    auto visitor = overloads{
+        [&](const Number &number) -> std::string {
+          return formatNumber(number);
+        },
+        [](const DateTime &date) -> std::string {
+          std::chrono::zoned_time tm{date.tz, date.time};
+          return std::format("{:%Y-%m-%d %H:%M} ({})", tm, date.tz->name());
+        },
+        [](const bool &v) -> std::string { return v ? "true" : "false"; },
+    };
 
-  return std::format("{}{}", std::visit(visitor, result.value),
-                     result.unitRaw.value_or(""));
+    return std::format("{}{}", std::visit(visitor, result.value),
+                       result.unitRaw.value_or(""));
+  } catch (const std::exception &e) {
+    return std::unexpected(e.what());
+  }
 }
 
 void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {

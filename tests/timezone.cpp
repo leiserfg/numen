@@ -1,5 +1,7 @@
 #include "timezone.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
+#include <iostream>
 
 TEST_CASE("should find timezone using fully qualifed name", "timezone") {
   TimezoneDB db;
@@ -78,5 +80,15 @@ TEST_CASE("should handle famous european timezones") {
     auto tz = db.query("rome");
     REQUIRE(tz);
     REQUIRE(tz->name() == "Europe/Rome");
+  }
+}
+
+TEST_CASE("Resolve timezone links", "timezone") {
+  TimezoneDB db;
+
+  for (const auto &link : std::chrono::get_tzdb().links) {
+    auto tz = db.query(link.name());
+    REQUIRE(tz);
+    REQUIRE(tz->name() == link.target());
   }
 }
