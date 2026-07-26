@@ -11,6 +11,7 @@ set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
+	src/parser.cpp
 	src/timezone.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
