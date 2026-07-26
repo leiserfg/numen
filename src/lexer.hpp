@@ -27,6 +27,10 @@ public:
     std::string_view raw;
     TokenType type;
     std::variant<Number, String, Operator> data;
+    std::string_view::size_type start = 0;
+    std::string_view::size_type end = 0;
+
+    bool isAdjacent(const Token &rhs) const { return end == rhs.start; }
   };
 
   Lexer(std::string_view data) : m_data(data), m_cursor(0) {}
@@ -106,7 +110,10 @@ public:
     };
 
     const auto makeToken = [&](TokenType type) {
-      return Token{getSelection(), type};
+      return Token{.raw = getSelection(),
+                   .type = type,
+                   .start = startPos,
+                   .end = m_cursor};
     };
 
     auto tryCommit = [&]() -> std::optional<Token> {

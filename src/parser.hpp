@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
-#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -227,10 +226,87 @@ public:
     return TimezoneDB{}.query(name);
   }
 
+  std::optional<DateTimeLiteral> parseYYYYMMDD() {
+    auto ns1 = m_lexer.peak(0);
+
+    if (!ns1 || ns1->type != Lexer::TokenType::Number) {
+      return std::nullopt;
+    }
+
+    if (auto tok = m_lexer.peak(1);
+        !tok || !ns1->isAdjacent(*tok) || tok->raw != "/") {
+      return std::nullopt;
+    }
+
+    auto ns2 = m_lexer.peak(2);
+
+    if (!ns2 || ns2->type != Lexer::TokenType::Number) {
+      return std::nullopt;
+    }
+
+    if (auto tok = m_lexer.peak(3);
+        !tok || !ns2->isAdjacent(*tok) || tok->raw != "/") {
+      return std::nullopt;
+    }
+
+    auto ns3 = m_lexer.peak(4);
+
+    if (!ns3 || ns3->type != Lexer::TokenType::Number) {
+      return std::nullopt;
+    }
+
+    auto [n1, n2, n3] =
+        std::tuple{toNumber(ns1->raw), toNumber(ns2->raw), toNumber(ns3->raw)};
+
+    const auto isMonth = [](auto n) { return n >= 1 && n <= 12; };
+    const auto isDay = [](auto n) { return n >= 1 && n <= 31; };
+    const auto isYear = [](auto n) { return n >= 0 && n <= 2100; };
+    const auto commit = [&](DateTimeLiteral lit) {
+      for (int i = 0; i != 5; ++i) {
+        m_lexer.next();
+      }
+      return lit;
+    };
+
+    DateTimeLiteral d;
+
+    // YYYY/MM/DD
+    if (isYear(n1) && isMonth(n2) && isDay(n3)) {
+      d.year = std::chrono::year(n1);
+      d.month = std::chrono::month(n2);
+      d.day = std::chrono::day(n3);
+      return commit(d);
+    }
+
+    // DD/MM/YYYY
+    if (isDay(n1) && isMonth(n2) && isYear(n3)) {
+      d.day = std::chrono::day(n1);
+      d.month = std::chrono::month(n2);
+      d.year = std::chrono::year(n3);
+      return commit(d);
+    }
+
+    // MM/DD/YYYY
+    if (isMonth(n1) && isDay(n2) && isYear(n3)) {
+      d.month = std::chrono::month(n1);
+      d.day = std::chrono::day(n2);
+      d.year = std::chrono::year(n3);
+      return commit(d);
+    }
+
+    return std::nullopt;
+  }
+
   std::optional<DateTimeLiteral> parseDate() {
+    if (auto d = parseYYYYMMDD()) {
+      d->time = parseTime();
+      return d;
+    }
+
     // 12 Jan 2026 18:50
     if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
       if (auto m = m_lexer.peak(1)) {
+
         if (auto month = parseMonth(m->raw)) {
           DateTimeLiteral d;
           d.day = std::chrono::day{static_cast<unsigned>(toNumber(tok->raw))};
