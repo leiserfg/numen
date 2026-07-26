@@ -25,6 +25,67 @@ template <class... Ts> struct overloads : Ts... {
   using Ts::operator()...;
 };
 
+TimePoint parseDateTimeLiteral(const DateTimeLiteral &d,
+                               const std::chrono::time_zone &tz,
+                               TimePoint now) {
+  std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
+  std::chrono::year_month_day date{d.year.value_or(today.year()),
+                                   d.month.value_or(today.month()),
+                                   d.day.value_or(today.day())};
+
+  std::chrono::local_seconds t{std::chrono::local_days{date}};
+
+  if (auto time = d.time) {
+    if (auto h = time->hours)
+      t += *h;
+    if (auto min = time->minutes)
+      t += *min;
+    if (auto secs = time->seconds)
+      t += *secs;
+  }
+
+  return tz.to_sys(t);
+}
+
+DateTime parseDateTime(const DateString &d,
+                       const std::chrono::time_zone &userTz, TimePoint now) {
+  auto tz =
+      d.timezone
+          .and_then(
+              [](auto &&t) -> std::optional<const std::chrono::time_zone *> {
+                if (auto n = std::get_if<NamedTimezone>(&t)) {
+                  return TimezoneDB{}.query(n->name);
+                }
+                return std::nullopt;
+              })
+          .value_or(&userTz);
+
+  auto visitor = overloads{[&](const DateTimeLiteral &date) -> TimePoint {
+                             return parseDateTimeLiteral(date, *tz, now);
+                           },
+                           [&](const std::string_view s) -> TimePoint {
+                             return std::chrono::system_clock::now();
+                           }};
+
+  auto instant = std::visit(visitor, d.value);
+
+  return DateTime{.time = instant, .tz = tz};
+}
+
+std::string formatDate(const DateTime &dt) {
+  if (!dt.tz) {
+    return std::format("{:%Y-%m-%d %H:%M:%S} (UTC)", dt.time);
+  }
+
+  const auto userTz = std::chrono::current_zone();
+  const auto zt =
+      userTz == dt.tz
+          ? std::chrono::zoned_time{dt.tz, userTz->to_local(dt.time)}
+          : std::chrono::zoned_time{dt.tz, dt.time};
+
+  return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, dt.tz->name());
+}
+
 struct FunctionCtx {
   template <typename... Ts> std::tuple<Ts...> unpack() {
     if (args.size() != sizeof...(Ts))
@@ -114,7 +175,8 @@ struct OperationHandler {};
 
 class Interpreter {
 public:
-  Interpreter(const UnitDatabase &db) : m_db(db) {}
+  Interpreter(const UnitDatabase &db, const EvalConfig &opts)
+      : m_db(db), m_opts(opts) {}
 
   ComputedValue computeExpr(const Expression &expr) const {
     auto visitor = overloads{
@@ -168,13 +230,20 @@ public:
         [&](const ConversionExpression &conv) -> ComputedValue {
           auto v = computeExpr(*conv.b);
 
-          if (auto ntz = std::get_if<NamedTimezone>(&conv.target)) {
+          if (auto tzl = std::get_if<TimezoneLike>(&conv.target)) {
             if (!v.isDateTime())
               throw std::runtime_error("Only datetime expressions can be "
                                        "converted to another timezone");
 
             auto d = *v.asDateTime();
-            d.tz = TimezoneDB{}.query(ntz->name);
+
+            if (auto ntz = std::get_if<NamedTimezone>(tzl)) {
+              d.tz = TimezoneDB{}.query(ntz->name);
+            } else if (auto otz = std::get_if<TimezoneOffset>(tzl)) {
+              d.tz = std::chrono::locate_zone(otz->name);
+              d.offset = otz->offset;
+            }
+
             return ComputedValue{d};
           }
 
@@ -274,16 +343,12 @@ public:
           return ComputedValue{.value = n, .unitRaw = ue.unit};
         },
         [&](const FunctionCall &fn) { return executeFunction(fn); },
-        [&](const DateString &fn) {
-          if (auto s = std::get_if<std::string_view>(&fn.value)) {
-            if (*s == "time" || *s == "now" || *s == "date") {
-              auto now = std::chrono::system_clock::now();
-              auto tz = TimezoneDB{}.userTz();
-              return ComputedValue{.value = DateTime{.time = now, .tz = tz}};
-            }
-          }
-
-          return ComputedValue{};
+        [&](const DateString &ds) {
+          auto &tz =
+              m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
+          auto dt = parseDateTime(
+              ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
+          return ComputedValue{.value = dt};
         }};
 
     return std::visit(visitor, expr.data);
@@ -299,6 +364,14 @@ private:
   }
 
   ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
+    if (rhs.isDateTime() && lhs.isNumber()) {
+      return add(rhs, lhs);
+    }
+
+    // TODO: handle date + time.
+    // We need a way to discriminate datetime from time alone, because
+    // adding two dates together obviously makes no sense
+
     if (lhs.isDateTime() && rhs.isNumber()) {
       auto d = lhs.asDateTime();
       auto n = rhs.asNumber();
@@ -413,14 +486,15 @@ private:
   }
 
   const UnitDatabase &m_db;
+  const EvalConfig &m_opts;
 };
 
 std::expected<ComputedValue, std::string>
-Abacus::compute(std::string_view expr) {
+Abacus::compute(std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
-    Interpreter i{m_unitDb};
+    Interpreter i{m_unitDb, opts};
 
     return i.computeExpr(*ast.root);
   } catch (const std::exception &e) {
@@ -429,11 +503,11 @@ Abacus::compute(std::string_view expr) {
 }
 
 std::expected<std::string, std::string>
-Abacus::evaluate(const std::string_view expr) {
+Abacus::evaluate(const std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
-    Interpreter i{m_unitDb};
+    Interpreter i{m_unitDb, opts};
     auto result = i.computeExpr(*ast.root);
 
     const auto formatNumber = [](const Number &v) -> std::string {
@@ -451,10 +525,7 @@ Abacus::evaluate(const std::string_view expr) {
 
     auto visitor = overloads{
         [&](const Number &number) { return formatNumber(number); },
-        [](const DateTime &date) {
-          std::chrono::zoned_time tm{date.tz, date.time};
-          return std::format("{:%Y-%m-%d %H:%M} ({})", tm, date.tz->name());
-        },
+        [](const DateTime &date) { return formatDate(date); },
         [](const bool &v) -> std::string { return v ? "true" : "false"; },
     };
 
@@ -491,8 +562,16 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
 
   else if (auto conv = expr.asConversion()) {
     auto visitor =
-        overloads{[](const NamedTimezone &tz) {
-                    return std::format("Timezone({})", tz.name);
+        overloads{[](const TimezoneLike &tz) {
+                    auto v =
+                        overloads{[](const TimezoneOffset &tz) {
+                                    return std::format("Timezone({})", tz.name);
+                                  },
+                                  [](const NamedTimezone &tz) {
+                                    return std::format("Timezone({})", tz.name);
+                                  }};
+
+                    return std::visit(v, tz);
                   },
                   [](const NamedUnit &unit) {
                     return std::format("Unit({})", unit.name);
@@ -526,9 +605,24 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
     if (auto str = std::get_if<std::string_view>(&ds->value)) {
       os << ident() << "\tvalue " << *str << "\n";
     }
+    if (auto str = std::get_if<DateTimeLiteral>(&ds->value)) {
+      os << ident() << "\tvalue "
+         << formatDate(parseDateTime({.value = *str, .timezone = ds->timezone},
+                                     *std::chrono::current_zone(),
+                                     std::chrono::system_clock::now()))
+         << "\n";
+    }
 
     if (ds->timezone) {
-      os << ident() << "\ttimezone " << ds->timezone->name << "\n";
+      auto v = overloads{[](const TimezoneOffset &tz) {
+                           return std::format("Timezone({}+{})", tz.name,
+                                              tz.offset.count());
+                         },
+                         [](const NamedTimezone &tz) {
+                           return std::format("Timezone({})", tz.name);
+                         }};
+
+      os << ident() << "\ttimezone " << std::visit(v, *ds->timezone) << "\n";
     }
 
     os << ident() << "}\n";

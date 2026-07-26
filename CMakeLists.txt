@@ -5,15 +5,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_REPL "Build the repl program" ON)
+option(BUILD_TESTS "Build the test suite" ON)
+
+set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
 	src/timezone.cpp
-	${SRCS}
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_SOURCE_DIR}/vendor
+	${VENDOR_DIR}
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
@@ -31,7 +33,7 @@ if (BUILD_TESTS)
 	set(FIXTURE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/fixtures)
 	find_package(Catch2 3 REQUIRED)
 	add_compile_options(-g3)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/datetime.cpp)
 	target_compile_features(${TEST_TARGET} PRIVATE cxx_std_23)
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
 	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)

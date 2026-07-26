@@ -1,4 +1,5 @@
 #include "timezone.hpp"
+#include "utils.hpp"
 #include <array>
 #include <bits/ranges_algo.h>
 #include <chrono>
@@ -6,11 +7,6 @@
 #include <string_view>
 
 namespace {
-bool equalsLowerCase(std::string_view a, std::string_view b) {
-  return std::ranges::equal(
-      a, b, [](auto a, auto b) { return std::tolower(a) == std::tolower(b); });
-};
-
 auto splitOnAny(auto s, std::string_view delims) {
   return s | std::views::chunk_by([delims](char a, char b) {
            return delims.contains(a) == delims.contains(b);
@@ -21,7 +17,7 @@ auto splitOnAny(auto s, std::string_view delims) {
 };
 
 bool matchesTz(std::string_view query, std::string_view name) {
-  if (equalsLowerCase(name, query)) {
+  if (equalsIgnoreCase(name, query)) {
     return true;
   }
 
@@ -35,7 +31,7 @@ bool matchesTz(std::string_view query, std::string_view name) {
     auto words = splitOnAny(last, delims);
 
     return std::ranges::equal(queryWords, words, [](auto &&w1, auto &&w2) {
-      return equalsLowerCase(std::string_view{w1}, std::string_view{w2});
+      return equalsIgnoreCase(std::string_view{w1}, std::string_view{w2});
     });
   }
 

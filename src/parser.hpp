@@ -2,8 +2,11 @@
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
 #include "timezone.hpp"
+#include "utils.hpp"
 #include <algorithm>
 #include <cassert>
+#include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -13,6 +16,14 @@
 struct Expression;
 
 using NumberString = double;
+
+namespace {
+double toNumber(std::string_view s) {
+  double n;
+  std::from_chars(s.data(), s.data() + s.size(), n);
+  return n;
+};
+} // namespace
 
 struct BinaryExpression {
   std::string op;
@@ -32,6 +43,13 @@ struct NamedTimezone {
   std::string_view name;
 };
 
+struct TimezoneOffset {
+  std::string_view name;
+  std::chrono::seconds offset = std::chrono::seconds(0);
+};
+
+using TimezoneLike = std::variant<NamedTimezone, TimezoneOffset>;
+
 struct NamedUnit {
   std::string_view name;
 };
@@ -41,7 +59,7 @@ struct NamedNumberFormat {
 };
 
 using ConversionTarget =
-    std::variant<NamedUnit, NamedTimezone, NamedNumberFormat>;
+    std::variant<NamedUnit, TimezoneLike, NamedNumberFormat>;
 
 struct ConversionExpression {
   std::unique_ptr<Expression> b;
@@ -59,16 +77,22 @@ enum class Meridiem { AM, PM };
 
 struct RelativeDateString {};
 
+struct ParsedTime {
+  std::optional<std::chrono::hours> hours;
+  std::optional<std::chrono::minutes> minutes;
+  std::optional<std::chrono::seconds> seconds;
+};
+
 struct DateTimeLiteral {
-  int hour;
-  std::optional<int> min;
-  std::optional<int> sec;
-  std::optional<Meridiem> meridiem;
+  std::optional<std::chrono::day> day;
+  std::optional<std::chrono::month> month;
+  std::optional<std::chrono::year> year;
+  std::optional<ParsedTime> time;
 };
 
 struct DateString {
   std::variant<DateTimeLiteral, std::string_view> value;
-  std::optional<NamedTimezone> timezone;
+  std::optional<TimezoneLike> timezone;
 };
 
 struct UnaryExpression {
@@ -118,20 +142,20 @@ struct OperatorDefinition {
   int precedence;
 };
 
-static std::vector<OperatorDefinition> operators{
-    OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 1},
-    OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
-    OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
-    OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 1},
-    OperatorDefinition{
-        .id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
-    OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
-    OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 3},
-    OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 3},
-    OperatorDefinition{
-        .id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
-    OperatorDefinition{
-        .id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}};
+static auto operators = std::to_array<OperatorDefinition>(
+    {OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 1},
+     OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
+     OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
+     OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 1},
+     OperatorDefinition{
+         .id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
+     OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
+     OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 3},
+     OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 3},
+     OperatorDefinition{
+         .id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
+     OperatorDefinition{
+         .id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}});
 
 class Parser {
 public:
@@ -174,6 +198,24 @@ public:
     return std::nullopt;
   }
 
+  std::optional<std::chrono::weekday> parseWeekday(std::string_view s) {
+    std::istringstream is{std::string{s}};
+    std::chrono::weekday m;
+    is >> std::chrono::parse("{:L%a}", m);
+    if (!is)
+      return std::nullopt;
+    return m;
+  }
+
+  std::optional<std::chrono::month> parseMonth(std::string_view s) {
+    std::istringstream is{std::string{s}};
+    std::chrono::month m;
+    is >> std::chrono::parse("%b", m);
+    if (!is)
+      return std::nullopt;
+    return m;
+  }
+
   bool isRelativeDateToken(std::string_view name) const {
     // handle more relative expressions, e.g "last week" etc...
     return name == "time" || name == "date" || name == "now" ||
@@ -185,13 +227,111 @@ public:
     return TimezoneDB{}.query(name);
   }
 
-  std::optional<NamedTimezone> parseTimezone() {
+  std::optional<DateTimeLiteral> parseDate() {
+    // 12 Jan 2026 18:50
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
+      if (auto m = m_lexer.peak(1)) {
+        if (auto month = parseMonth(m->raw)) {
+          DateTimeLiteral d;
+          d.day = std::chrono::day{static_cast<unsigned>(toNumber(tok->raw))};
+          d.month = month;
+
+          m_lexer.next();
+          m_lexer.next();
+          if (auto year = m_lexer.peakIf(Lexer::TokenType::Number)) {
+            d.year = std::chrono::year{static_cast<int>(toNumber(year->raw))};
+            m_lexer.next();
+          }
+
+          d.time = parseTime();
+          return d;
+        }
+      }
+
+      if (auto time = parseTime()) {
+        return DateTimeLiteral{.time = time};
+      }
+    }
+
+    return std::nullopt;
+  }
+
+  // [<hour>]:[minute]:[second]
+  std::optional<ParsedTime> parseTime() {
+    std::chrono::hours hrs;
+
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
+      hrs = std::chrono::hours{static_cast<unsigned>(toNumber(tok->raw))};
+    }
+
+    using IV = std::initializer_list<std::string_view>;
+
+    if (auto tok = m_lexer.peak(1);
+        !tok || !std::ranges::contains(IV{":", "h"}, tok->raw))
+      return std::nullopt;
+    m_lexer.next();
+
+    ParsedTime time;
+
+    time.hours = hrs;
+
+    m_lexer.next();
+
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
+      time.minutes =
+          std::chrono::minutes{static_cast<unsigned>(toNumber(tok->raw))};
+      m_lexer.next();
+    }
+
+    if (auto tok = m_lexer.peak(); !tok || tok->raw != ":")
+      return time;
+    m_lexer.next();
+
+    if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
+      time.seconds =
+          std::chrono::seconds{static_cast<unsigned>(toNumber(tok->raw))};
+      m_lexer.next();
+    }
+
+    return time;
+  }
+
+  std::optional<TimezoneLike> parseTimezone() {
+    if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
+      auto isRelativeOffsetTz = std::ranges::any_of(
+          std::initializer_list<std::string_view>({"gmt", "utc"}),
+          [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
+
+      if (isRelativeOffsetTz) {
+        TimezoneOffset tz;
+        tz.name = str->raw;
+        m_lexer.next();
+        if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
+          if (str->raw == "+" || str->raw == "-") {
+            m_lexer.next();
+            if (auto time = parseTime()) {
+              if (auto h = time->hours) {
+                tz.offset += std::chrono::hours(*h);
+              }
+              if (auto m = time->minutes)
+                tz.offset += std::chrono::minutes(*m);
+              if (auto s = time->seconds)
+                tz.offset += std::chrono::seconds(*s);
+            }
+          }
+        }
+
+        return tz;
+      }
+    }
+
     return greedyParse(
                3, [&](std::string_view word) { return isTimezoneToken(word); })
         .transform([](auto &&str) { return NamedTimezone(str); });
   }
 
   std::optional<NamedNumberFormat> parseNumberFormat() {
+
     return greedyParse(3,
                        [&](std::string_view word) {
                          return std::ranges::contains(
@@ -221,6 +361,14 @@ public:
     auto expr = std::unique_ptr<Expression>();
 
     if (auto tok = m_lexer.peak()) {
+      if (auto date = parseDate()) {
+        DateString ds{.value = *date};
+        if (auto result = parseTimezone()) {
+          ds.timezone = result.value();
+        }
+        return std::make_unique<Expression>(ds);
+      }
+
       if (isRelativeDateToken(tok->raw)) {
         m_lexer.next();
         DateString ds{.value = tok->raw};

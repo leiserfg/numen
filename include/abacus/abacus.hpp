@@ -1,6 +1,7 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include <chrono>
+#include <ctime>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -15,6 +16,8 @@ enum class DateTimeOutputFormat { DateTime, Time, Date };
 struct DateTime {
   TimePoint time;
   const std::chrono::time_zone *tz = nullptr;
+  std::chrono::seconds offset = std::chrono::seconds(0);
+
   DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
 };
 
@@ -45,12 +48,19 @@ struct ComputedValue {
   const DateTime *asDateTime() const { return std::get_if<DateTime>(&value); }
 };
 
+struct EvalConfig {
+  std::optional<TimePoint> now;
+  const std::chrono::time_zone *timzone;
+};
+
 class Abacus {
 public:
   Abacus() = default;
 
-  std::expected<std::string, std::string> evaluate(std::string_view expr);
-  std::expected<ComputedValue, std::string> compute(std::string_view expr);
+  std::expected<std::string, std::string> evaluate(std::string_view expr,
+                                                   const EvalConfig &opts = {});
+  std::expected<ComputedValue, std::string>
+  compute(std::string_view expr, const EvalConfig &opts = {});
   void printAST(const std::string &expr) const;
 
 private:
