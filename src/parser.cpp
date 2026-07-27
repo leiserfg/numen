@@ -344,35 +344,36 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     m_lexer.next();
   }
 
-  if (m_lexer.peakIf(Lexer::TokenType::Number)) {
-    expr = parseNumber();
-  }
-
-  else if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (auto next = m_lexer.peak(1); next && next->raw == "(") {
+  if (auto tok = m_lexer.peak()) {
+    if (auto n = tok->asNumber()) {
       m_lexer.next();
-      m_lexer.next();
-
-      FunctionCall fn{.name = tok->raw};
-
-      while (true) {
-        auto tok = m_lexer.peak();
-        if (tok->raw == ")")
-          break;
-        fn.args.emplace_back(pratParse());
-        tok = m_lexer.peak();
-
-        if (tok->raw == ")") {
-          break;
-        }
-        if (tok->raw != ",") {
-          throw std::runtime_error("Expected , to add another argument");
-        }
+      expr = makeNumberExpr(n->n);
+    } else if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
+      if (auto next = m_lexer.peak(1); next && next->raw == "(") {
         m_lexer.next();
-      }
+        m_lexer.next();
 
-      m_lexer.next();
-      return std::make_unique<Expression>(std::move(fn));
+        FunctionCall fn{.name = tok->raw};
+
+        while (true) {
+          auto tok = m_lexer.peak();
+          if (tok->raw == ")")
+            break;
+          fn.args.emplace_back(pratParse());
+          tok = m_lexer.peak();
+
+          if (tok->raw == ")") {
+            break;
+          }
+          if (tok->raw != ",") {
+            throw std::runtime_error("Expected , to add another argument");
+          }
+          m_lexer.next();
+        }
+
+        m_lexer.next();
+        return std::make_unique<Expression>(std::move(fn));
+      }
     }
   }
 

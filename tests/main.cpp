@@ -1,8 +1,6 @@
 #include "abacus/abacus.hpp"
 #include <catch2/catch_test_macros.hpp>
-#include <chrono>
 #include <cmath>
-#include <numbers>
 #include <string_view>
 
 auto inline evaluate(std::string_view expr) {
@@ -302,6 +300,24 @@ TEST_CASE("hex formatting", "[format]") { assertExpr("256 to hex", "0x100"); }
 
 TEST_CASE("binary formatting", "[format]") {
   assertExpr("256 to binary", "0b100000000");
+}
+
+TEST_CASE("Numbers can be written in hex", "[base]") {
+  assertExpr("0xFF", "255");
+  assertExpr("0xFF + 10 + 0xA", "275");
+}
+
+TEST_CASE("Numbers can be written in octal", "[base]") {
+  assertExpr("0o777", "511");
+}
+
+TEST_CASE("Numbers can be written in binary", "[base]") {
+  assertExpr("0b10", "2");
+  assertExpr("0b1111", "15");
+}
+
+TEST_CASE("Numbers from different bases can be combined", "[base]") {
+  assertExpr("0b1111 * 0xF + 0o777 - 36", "700");
 }
 
 /*

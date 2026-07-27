@@ -1,19 +1,24 @@
 #pragma once
 #include <cctype>
+#include <cmath>
 #include <optional>
 #include <span>
 #include <string_view>
 #include <variant>
 
+namespace {
+constexpr std::string_view BASE_CHARS = "0123456789abcdef";
+}; // namespace
+
 class Lexer {
 public:
   struct Number {
-    std::string_view n;
+    double n;
+    int fromBase = 10;
   };
 
   enum class OperatorType { Add, Subtract, Multiply, Divide, Pow };
-  enum class State { Reset, Number, Operator, String };
-
+  enum class State { Reset, Number, Operator, NumberBase, String };
   enum class TokenType { String, Number, Operator };
 
   struct String {
@@ -23,14 +28,18 @@ public:
     char c;
   };
 
+  using TokenData = std::variant<Number, String, Operator>;
+
   struct Token {
     std::string_view raw;
     TokenType type;
-    std::variant<Number, String, Operator> data;
+    TokenData data;
     std::string_view::size_type start = 0;
     std::string_view::size_type end = 0;
 
     bool isAdjacent(const Token &rhs) const { return end == rhs.start; }
+
+    const Number *asNumber() const { return std::get_if<Number>(&data); }
   };
 
   Lexer(std::string_view data) : m_data(data), m_cursor(0) {}
@@ -104,26 +113,31 @@ public:
   std::optional<Token> next() {
     State state = State::Reset;
     size_t startPos = m_cursor;
+    double n = 0;
+    int base = 10;
+    bool nfrac = 0;
 
     const auto getSelection = [&]() -> std::string_view {
       return m_data.substr(startPos, m_cursor - startPos);
     };
 
-    const auto makeToken = [&](TokenType type) {
+    const auto makeToken = [&](TokenType type, TokenData data) {
       return Token{.raw = getSelection(),
                    .type = type,
+                   .data = data,
                    .start = startPos,
                    .end = m_cursor};
     };
 
     auto tryCommit = [&]() -> std::optional<Token> {
       switch (state) {
-      case State::Number:
-        return makeToken(TokenType::Number);
+      case State::Number: {
+        return makeToken(TokenType::Number, Number{.n = n, .fromBase = base});
+      }
       case State::String:
-        return makeToken(TokenType::String);
+        return makeToken(TokenType::String, String{});
       case State::Operator:
-        return makeToken(TokenType::Operator);
+        return makeToken(TokenType::Operator, Operator{});
       default:
         return std::nullopt;
       }
@@ -135,6 +149,10 @@ public:
       switch (state) {
       case State::Reset: {
         if (std::isdigit(c)) {
+          if (c == '0') {
+            state = State::NumberBase;
+            break;
+          }
           state = State::Number;
           continue;
         }
@@ -152,15 +170,50 @@ public:
         }
         break;
       }
-      case State::Number: {
-        // TODO: we probably want to only allow one '.' for a valid digit of
-        // course. And we will also want to localize it at some point.
-        if (!std::isdigit(c) && c != '.') {
-          return tryCommit();
+      case State::NumberBase: {
+        // we always expect a '0<char>' syntax for base prefixes
+        // we don't parse '0777' as octal because the leading zero
+        // can create a lot of ambiguity.
+        state = State::Number;
+        switch (std::tolower(c)) {
+        case 'x':
+          base = 16;
+          break;
+        case 'b':
+          base = 2;
+          break;
+        case 'o':
+          base = 8;
+          break;
+        default:
+          continue;
         }
+
         break;
       }
-        // TODO: we will probably want multichar operators...
+      case State::Number: {
+        if (c == '.') {
+          if (base == 10 && nfrac == 0) {
+            nfrac = 1;
+          }
+          break;
+        }
+
+        const auto pos = BASE_CHARS.find(std::tolower(c));
+
+        if (pos == std::string_view::npos || pos >= base) {
+          return tryCommit();
+        }
+
+        if (nfrac) {
+          n = n + pos / std::pow(base, nfrac);
+          nfrac += 1;
+        } else {
+          n = n * base + pos;
+        }
+
+        break;
+      }
       case State::Operator: {
         if (m_cursor - startPos == 0) {
           switch (c) {
