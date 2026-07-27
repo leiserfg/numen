@@ -441,6 +441,17 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       left =
           makeBinExpr(std::move(left), std::move(right), std::string{it->id});
     } else {
+      if (3 < minPrec) {
+        break;
+      }
+
+      if (auto tok = m_lexer.peak()) {
+        if (tok->raw == "(") {
+          left = makeBinExpr(std::move(left), std::move(parseTerm()),
+                             std::string{"*"});
+          continue;
+        }
+      }
       break;
     }
   }

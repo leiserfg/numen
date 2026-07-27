@@ -320,6 +320,15 @@ TEST_CASE("Numbers from different bases can be combined", "[base]") {
   assertExpr("0b1111 * 0xF + 0o777 - 36", "700");
 }
 
+TEST_CASE("parenthesized term without a leading operand should be interpreted "
+          "as multiplication",
+          "[priority]") {
+  assertExpr("2(1+5)", "12");
+  assertExpr("2 (1 + 5)", "12");
+  assertExpr("2^2(1+5)", "24");
+  assertExpr("2 ^ 2 (1 + 5)", "24");
+}
+
 /*
 TEST_CASE("Basic percentage") {
   {
