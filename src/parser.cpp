@@ -300,6 +300,19 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       throw std::runtime_error("expected closing parenthesis");
     }
     m_lexer.next();
+
+    if (auto tok = m_lexer.peak(); tok && tok->type != Lexer::TokenType::Operator) {
+      if (auto unit = parseUnit()) {
+        if (!expr)
+          expr = makeUnit(makeNumberExpr(1), unit.value());
+        else
+          expr = makeUnit(std::move(expr), unit.value());
+        m_lexer.next();
+      } else {
+        // implict multiplication, e.g "(150 * 2)4
+        expr = makeBinExpr(std::move(expr), pratParse(3), "*");
+      }
+    }
   }
 
   if (auto tok = m_lexer.peak()) {
