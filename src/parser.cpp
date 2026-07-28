@@ -2,8 +2,18 @@
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
+#include <array>
+#include <initializer_list>
+#include <numbers>
+#include <string_view>
 
-static auto operators = std::to_array<OperatorDefinition>(
+struct OperatorDefinition {
+  std::string_view id;
+  std::initializer_list<std::string_view> aliases;
+  int precedence;
+};
+
+const auto OPERATORS = std::to_array<OperatorDefinition>(
     {OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 1},
      OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
      OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
@@ -15,14 +25,36 @@ static auto operators = std::to_array<OperatorDefinition>(
      OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
      OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}});
 
-namespace {
-std::unique_ptr<Expression> makeNumberExpr(double n) { return std::make_unique<Expression>(NumberString{n}); }
-
-std::unique_ptr<Expression> makeNumberExpr(const std::string &ns) {
+struct ConstantDef {
+  std::string_view name;
   double n;
-  std::from_chars(ns.data(), ns.data() + ns.size(), n);
-  return makeNumberExpr(n);
+  bool caseSensitive = false;
+};
+
+// clang-format off
+constexpr auto CONSTANTS = std::to_array<ConstantDef>({
+		{"pi", std::numbers::pi},
+		{"e", std::numbers::e, false},
+		{"phi", std::numbers::phi},
+});
+// clang-format on
+
+namespace {
+
+bool isOperatorToken(std::string_view tok) {
+  return std::ranges::any_of(OPERATORS, [&](auto &&op) { return std::ranges::contains(op.aliases, tok); });
 }
+
+std::optional<double> parseConstant(std::string_view tok) {
+  auto it = std::ranges::find_if(CONSTANTS, [&](const ConstantDef &def) {
+    return def.caseSensitive ? (tok == def.name) : equalsIgnoreCase(def.name, tok);
+  });
+
+  if (it == CONSTANTS.end()) return std::nullopt;
+  return it->n;
+}
+
+std::unique_ptr<Expression> makeNumberExpr(double n) { return std::make_unique<Expression>(NumberString{n}); }
 
 std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs,
                                         const std::string &op) {
@@ -252,18 +284,23 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
       .transform([](auto &&str) { return NamedNumberFormat(str); });
 }
 
-std::unique_ptr<Expression> Parser::parseNumber() {
-  if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    m_lexer.next();
-    return makeNumberExpr(std::string{tok->raw});
-  }
-  throw std::runtime_error("Expected a number");
-}
-
 std::unique_ptr<Expression> Parser::parseTerm() {
   auto expr = std::unique_ptr<Expression>();
 
   if (auto tok = m_lexer.peak()) {
+    if (auto constant = parseConstant(tok->raw)) {
+      m_lexer.next();
+
+      auto lhs = makeNumberExpr(*constant);
+
+      // pi2 = pi * 2
+      if (auto n = m_lexer.peak(); n && !isOperatorToken(n->raw) && n->raw != ")") {
+        return makeBinExpr(std::move(lhs), parseMul(), "*");
+      }
+
+      return lhs;
+    }
+
     if (auto date = parseDate()) {
       DateString ds{.value = *date};
       if (auto result = parseTimezone()) { ds.timezone = result.value(); }
@@ -310,7 +347,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         m_lexer.next();
       } else {
         // implict multiplication, e.g "(150 * 2)4
-        expr = makeBinExpr(std::move(expr), pratParse(3), "*");
+        expr = makeBinExpr(std::move(expr), parseMul(), "*");
       }
     }
   }
@@ -391,18 +428,20 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
     }
 
     auto it = std::ranges::find_if(
-        operators, [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
+        OPERATORS, [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
 
-    if (it != operators.end()) {
+    if (it != OPERATORS.end()) {
       if (it->precedence < minPrec) break;
       m_lexer.next();
       auto right = pratParse(it->precedence + 1);
       left = makeBinExpr(std::move(left), std::move(right), std::string{it->id});
     } else {
-      if (3 < minPrec) { break; }
-
-      if (auto tok = m_lexer.peak()) {
-        if (tok->raw == "(") {
+      if (!(3 < minPrec)) {
+        if (auto constant = parseConstant(tok->raw)) {
+          m_lexer.next();
+          left = makeBinExpr(std::move(left), std::move(makeNumberExpr(*constant)), std::string{"*"});
+          continue;
+        } else if (tok->raw == "(") {
           left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});
           continue;
         }

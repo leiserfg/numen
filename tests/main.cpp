@@ -2,6 +2,7 @@
 #include "catch2/matchers/catch_matchers.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
+#include <numbers>
 #include <string_view>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -346,6 +347,104 @@ TEST_CASE("implicit multiplication for parenthesized terms", "[priority]") {
   assertExpr("( 1 + 5 ) 2", "12");
   assertExpr("( 1 + 5 ) 2^2", "24");
   assertExpr("( 1 + 5 ) (1+1+1+1)", "24");
+}
+
+TEST_CASE("support common constants", "[constant]") {
+  std::initializer_list<std::tuple<std::string_view, double>> constants{
+      {"pi", std::numbers::pi},
+      {"e", std::numbers::e},
+      {"phi", std::numbers::phi},
+  };
+  abacus::Abacus calc;
+
+  for (auto [name, value] : constants) {
+    auto res = calc.compute(name);
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    REQUIRE(res->asNumber()->n == value);
+  }
+}
+
+TEST_CASE("support operations with constants", "[constant]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("pi");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, 3.14, 2);
+  }
+
+  {
+    auto res = calc.compute("pi*2");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, 6.28, 2);
+  }
+
+  {
+    auto res = calc.compute("2*pi");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, 6.28, 2);
+  }
+
+  {
+    auto res = calc.compute("2(pi)");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, 6.28, 2);
+  }
+}
+
+TEST_CASE("implicit multiplication of constants") {
+  abacus::Abacus calc;
+  constexpr auto pi2 = std::numbers::pi * 2;
+  constexpr auto pi4 = std::numbers::pi * 4;
+
+  {
+    auto res = calc.compute("2pi");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, pi2, 2);
+  }
+
+  {
+    auto res = calc.compute("pi2");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, pi2, 2);
+  }
+
+  {
+    auto res = calc.compute("4 * 2pi + 1");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, 4 * std::numbers::pi * 2 + 1, 2);
+  }
+
+  {
+    auto res = calc.compute("pi(1+1)");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, pi2, 2);
+  }
+
+  {
+    auto res = calc.compute("(1+1)pi");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    assertPrecision(res->asNumber()->n, pi2, 2);
+  }
+
+  {
+    for (auto s : {"pi2^2", "2^2pi"}) {
+      auto res = calc.compute(s);
+      REQUIRE(res);
+      REQUIRE(res->isNumber());
+      assertPrecision(res->asNumber()->n, pi4, 2);
+    }
+  }
 }
 
 /*

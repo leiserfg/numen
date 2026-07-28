@@ -122,12 +122,6 @@ struct AST {
   std::unique_ptr<Expression> root;
 };
 
-struct OperatorDefinition {
-  std::string_view id;
-  std::vector<std::string_view> aliases;
-  int precedence;
-};
-
 class Parser {
 public:
   Parser(std::string_view data, const UnitDatabase &unitDb);
@@ -156,10 +150,13 @@ public:
     return std::nullopt;
   }
 
+  AST parse();
+
+protected:
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);
-  AST parse();
+  std::unique_ptr<Expression> parseMul() { return pratParse(3); }
 
 private:
   Lexer m_lexer;
