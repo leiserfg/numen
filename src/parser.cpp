@@ -8,20 +8,15 @@ static auto operators = std::to_array<OperatorDefinition>(
      OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
      OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
      OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 1},
-     OperatorDefinition{
-         .id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
+     OperatorDefinition{.id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
      OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
      OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 3},
      OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 3},
-     OperatorDefinition{
-         .id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
-     OperatorDefinition{
-         .id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}});
+     OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
+     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}});
 
 namespace {
-std::unique_ptr<Expression> makeNumberExpr(double n) {
-  return std::make_unique<Expression>(NumberString{n});
-}
+std::unique_ptr<Expression> makeNumberExpr(double n) { return std::make_unique<Expression>(NumberString{n}); }
 
 std::unique_ptr<Expression> makeNumberExpr(const std::string &ns) {
   double n;
@@ -29,8 +24,7 @@ std::unique_ptr<Expression> makeNumberExpr(const std::string &ns) {
   return makeNumberExpr(n);
 }
 
-std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs,
-                                        std::unique_ptr<Expression> rhs,
+std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs,
                                         const std::string &op) {
   auto expr = std::make_unique<Expression>();
 
@@ -38,8 +32,7 @@ std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs,
       BinaryExpression{.op = op, .lhs = std::move(lhs), .rhs = std::move(rhs)});
 }
 
-std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner,
-                                     std::string_view unit) {
+std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner, std::string_view unit) {
   return std::make_unique<Expression>(UnitExpression{
       .unit = unit,
       .expr = std::move(inner),
@@ -50,8 +43,7 @@ std::optional<std::chrono::weekday> parseWeekday(std::string_view s) {
   std::istringstream is{std::string{s}};
   std::chrono::weekday m;
   is >> std::chrono::parse("{:L%a}", m);
-  if (!is)
-    return std::nullopt;
+  if (!is) return std::nullopt;
   return m;
 }
 
@@ -59,20 +51,17 @@ std::optional<std::chrono::month> parseMonth(std::string_view s) {
   std::istringstream is{std::string{s}};
   std::chrono::month m;
   is >> std::chrono::parse("%b", m);
-  if (!is)
-    return std::nullopt;
+  if (!is) return std::nullopt;
   return m;
 }
 
 bool isRelativeDateToken(std::string_view name) {
   // handle more relative expressions, e.g "last week" etc...
-  return name == "time" || name == "date" || name == "now" ||
-         name == "yesterday";
+  return name == "time" || name == "date" || name == "now" || name == "yesterday";
 }
 }; // namespace
 
-Parser::Parser(std::string_view data, const UnitDatabase &unitDb)
-    : m_lexer(data), m_unitDb(unitDb) {}
+Parser::Parser(std::string_view data, const UnitDatabase &unitDb) : m_lexer(data), m_unitDb(unitDb) {}
 
 AST Parser::parse() {
   AST ast;
@@ -87,9 +76,7 @@ bool Parser::isTimezoneToken(std::string_view name) {
 
 std::optional<std::string_view> Parser::parseUnit() {
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (auto unit = m_unitDb.findUnit(std::string{tok->raw})) {
-      return tok->raw;
-    }
+    if (auto unit = m_unitDb.findUnit(std::string{tok->raw})) { return tok->raw; }
   }
   return std::nullopt;
 }
@@ -101,34 +88,25 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
   auto ns1 = m_lexer.peak(0);
   constexpr auto dateDelim = "/";
 
-  if (!ns1 || ns1->type != Lexer::TokenType::Number) {
-    return std::nullopt;
-  }
+  if (!ns1 || ns1->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  if (auto tok = m_lexer.peak(1);
-      !tok || !ns1->isAdjacent(*tok) || tok->raw != dateDelim) {
+  if (auto tok = m_lexer.peak(1); !tok || !ns1->isAdjacent(*tok) || tok->raw != dateDelim) {
     return std::nullopt;
   }
 
   auto ns2 = m_lexer.peak(2);
 
-  if (!ns2 || ns2->type != Lexer::TokenType::Number) {
-    return std::nullopt;
-  }
+  if (!ns2 || ns2->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  if (auto tok = m_lexer.peak(3);
-      !tok || !ns2->isAdjacent(*tok) || tok->raw != dateDelim) {
+  if (auto tok = m_lexer.peak(3); !tok || !ns2->isAdjacent(*tok) || tok->raw != dateDelim) {
     return std::nullopt;
   }
 
   auto ns3 = m_lexer.peak(4);
 
-  if (!ns3 || ns3->type != Lexer::TokenType::Number) {
-    return std::nullopt;
-  }
+  if (!ns3 || ns3->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  auto [n1, n2, n3] =
-      std::tuple{toNumber(ns1->raw), toNumber(ns2->raw), toNumber(ns3->raw)};
+  auto [n1, n2, n3] = std::tuple{toNumber(ns1->raw), toNumber(ns2->raw), toNumber(ns3->raw)};
 
   const auto isMonth = [](auto n) { return n >= 1 && n <= 12; };
   const auto isDay = [](auto n) { return n >= 1 && n <= 31; };
@@ -196,9 +174,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
       }
     }
 
-    if (auto time = parseTime()) {
-      return DateTimeLiteral{.time = time};
-    }
+    if (auto time = parseTime()) { return DateTimeLiteral{.time = time}; }
   }
 
   return std::nullopt;
@@ -213,9 +189,7 @@ std::optional<ParsedTime> Parser::parseTime() {
 
   using IV = std::initializer_list<std::string_view>;
 
-  if (auto tok = m_lexer.peak(1);
-      !tok || !std::ranges::contains(IV{":", "h"}, tok->raw))
-    return std::nullopt;
+  if (auto tok = m_lexer.peak(1); !tok || !std::ranges::contains(IV{":", "h"}, tok->raw)) return std::nullopt;
   m_lexer.next();
 
   ParsedTime time;
@@ -225,18 +199,15 @@ std::optional<ParsedTime> Parser::parseTime() {
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    time.minutes =
-        std::chrono::minutes{static_cast<unsigned>(toNumber(tok->raw))};
+    time.minutes = std::chrono::minutes{static_cast<unsigned>(toNumber(tok->raw))};
     m_lexer.next();
   }
 
-  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":")
-    return time;
+  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") return time;
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    time.seconds =
-        std::chrono::seconds{static_cast<unsigned>(toNumber(tok->raw))};
+    time.seconds = std::chrono::seconds{static_cast<unsigned>(toNumber(tok->raw))};
     m_lexer.next();
   }
 
@@ -245,9 +216,8 @@ std::optional<ParsedTime> Parser::parseTime() {
 
 std::optional<TimezoneLike> Parser::parseTimezone() {
   if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
-    auto isRelativeOffsetTz = std::ranges::any_of(
-        std::initializer_list<std::string_view>({"gmt", "utc"}),
-        [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
+    auto isRelativeOffsetTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
+                                                  [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
 
     if (isRelativeOffsetTz) {
       TimezoneOffset tz;
@@ -257,13 +227,9 @@ std::optional<TimezoneLike> Parser::parseTimezone() {
         if (str->raw == "+" || str->raw == "-") {
           m_lexer.next();
           if (auto time = parseTime()) {
-            if (auto h = time->hours) {
-              tz.offset += std::chrono::hours(*h);
-            }
-            if (auto m = time->minutes)
-              tz.offset += std::chrono::minutes(*m);
-            if (auto s = time->seconds)
-              tz.offset += std::chrono::seconds(*s);
+            if (auto h = time->hours) { tz.offset += std::chrono::hours(*h); }
+            if (auto m = time->minutes) tz.offset += std::chrono::minutes(*m);
+            if (auto s = time->seconds) tz.offset += std::chrono::seconds(*s);
           }
         }
       }
@@ -272,8 +238,7 @@ std::optional<TimezoneLike> Parser::parseTimezone() {
     }
   }
 
-  return greedyParse(
-             3, [&](std::string_view word) { return isTimezoneToken(word); })
+  return greedyParse(3, [&](std::string_view word) { return isTimezoneToken(word); })
       .transform([](auto &&str) { return NamedTimezone(str); });
 }
 
@@ -282,9 +247,7 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
   return greedyParse(3,
                      [&](std::string_view word) {
                        return std::ranges::contains(
-                           std::initializer_list{"hex", "octal", "binary",
-                                                 "hexadecimal"},
-                           word);
+                           std::initializer_list{"hex", "octal", "binary", "hexadecimal"}, word);
                      })
       .transform([](auto &&str) { return NamedNumberFormat(str); });
 }
@@ -303,9 +266,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   if (auto tok = m_lexer.peak()) {
     if (auto date = parseDate()) {
       DateString ds{.value = *date};
-      if (auto result = parseTimezone()) {
-        ds.timezone = result.value();
-      }
+      if (auto result = parseTimezone()) { ds.timezone = result.value(); }
       return std::make_unique<Expression>(ds);
     }
 
@@ -314,9 +275,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       DateString ds{.value = tok->raw};
 
       if (auto tz = m_lexer.peak()) {
-        if (auto result = parseTimezone()) {
-          ds.timezone = result.value();
-        }
+        if (auto result = parseTimezone()) { ds.timezone = result.value(); }
       }
 
       return std::make_unique<Expression>(ds);
@@ -324,8 +283,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   if (auto tok = m_lexer.peak()) {
-    bool unary = std::ranges::contains(
-        std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
+    bool unary = std::ranges::contains(std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
     if (unary) {
       m_lexer.next();
       return std::make_unique<Expression>(UnaryExpression{
@@ -357,17 +315,12 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
         while (true) {
           auto tok = m_lexer.peak();
-          if (tok->raw == ")")
-            break;
+          if (tok->raw == ")") break;
           fn.args.emplace_back(pratParse());
           tok = m_lexer.peak();
 
-          if (tok->raw == ")") {
-            break;
-          }
-          if (tok->raw != ",") {
-            throw std::runtime_error("Expected , to add another argument");
-          }
+          if (tok->raw == ")") { break; }
+          if (tok->raw != ",") { throw std::runtime_error("Expected , to add another argument"); }
           m_lexer.next();
         }
 
@@ -386,9 +339,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     m_lexer.next();
   }
 
-  if (!expr) {
-    throw std::runtime_error("Expected term");
-  }
+  if (!expr) { throw std::runtime_error("Expected term"); }
 
   return expr;
 }
@@ -398,20 +349,18 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
   while (auto tok = m_lexer.peak()) {
     if (tok->raw == "to" || tok->raw == "in" | tok->raw == "->") {
-      if (minPrec > 0)
-        break;
+      if (minPrec > 0) break;
 
       m_lexer.next();
 
       if (auto tz = parseTimezone()) {
-        left = std::make_unique<Expression>(
-            ConversionExpression{.b = std::move(left), .target = tz.value()});
+        left = std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = tz.value()});
         continue;
       }
 
       if (auto fmt = parseNumberFormat()) {
-        left = std::make_unique<Expression>(
-            ConversionExpression{.b = std::move(left), .target = fmt.value()});
+        left =
+            std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = fmt.value()});
         continue;
       }
 
@@ -422,33 +371,26 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
       m_lexer.next();
 
-      left = std::make_unique<Expression>(ConversionExpression{
-          .b = std::move(left), .target = NamedUnit{unit->raw}});
+      left = std::make_unique<Expression>(
+          ConversionExpression{.b = std::move(left), .target = NamedUnit{unit->raw}});
 
       continue;
     }
 
-    auto it =
-        std::ranges::find_if(operators, [&](const OperatorDefinition &op) {
-          return std::ranges::contains(op.aliases, tok->raw);
-        });
+    auto it = std::ranges::find_if(
+        operators, [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
 
     if (it != operators.end()) {
-      if (it->precedence < minPrec)
-        break;
+      if (it->precedence < minPrec) break;
       m_lexer.next();
       auto right = pratParse(it->precedence + 1);
-      left =
-          makeBinExpr(std::move(left), std::move(right), std::string{it->id});
+      left = makeBinExpr(std::move(left), std::move(right), std::string{it->id});
     } else {
-      if (3 < minPrec) {
-        break;
-      }
+      if (3 < minPrec) { break; }
 
       if (auto tok = m_lexer.peak()) {
         if (tok->raw == "(") {
-          left = makeBinExpr(std::move(left), std::move(parseTerm()),
-                             std::string{"*"});
+          left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});
           continue;
         }
       }

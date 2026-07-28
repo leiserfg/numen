@@ -8,12 +8,12 @@ auto inline evaluate(std::string_view expr) {
   return calc.evaluate(expr);
 }
 
-#define assertExpr(expr, expected)                                             \
-  {                                                                            \
-    abacus::Abacus calc;                                                       \
-    auto res = calc.evaluate(std::string{expr});                               \
-    REQUIRE(res);                                                              \
-    REQUIRE(res.value() == expected);                                          \
+#define assertExpr(expr, expected)                                                                           \
+  {                                                                                                          \
+    abacus::Abacus calc;                                                                                     \
+    auto res = calc.evaluate(std::string{expr});                                                             \
+    REQUIRE(res);                                                                                            \
+    REQUIRE(res.value() == expected);                                                                        \
   }
 
 TEST_CASE("Should compute basic expression") {
@@ -57,13 +57,9 @@ TEST_CASE("should support negative number", "[unary]") {
   assertExpr("-1 + - 1", "-2");
 }
 
-TEST_CASE("unary should apply to parenthesized term", "[unary]") {
-  assertExpr("-(150 * 2 / 2 + 1)", "-151");
-}
+TEST_CASE("unary should apply to parenthesized term", "[unary]") { assertExpr("-(150 * 2 / 2 + 1)", "-151"); }
 
-TEST_CASE("two negative signs could yield positive", "[unary]") {
-  assertExpr("--(2^8)", "256");
-}
+TEST_CASE("two negative signs could yield positive", "[unary]") { assertExpr("--(2^8)", "256"); }
 
 TEST_CASE("as many unary operators can be used", "[unary]") {
   assertExpr("--++ ++ ++++++ - -123 + 1", "124");
@@ -193,8 +189,7 @@ TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
   }
 }
 
-TEST_CASE("unit should always apply to everything to the left of it",
-          "[unit]") {
+TEST_CASE("unit should always apply to everything to the left of it", "[unit]") {
   abacus::Abacus calc;
 
   {
@@ -282,9 +277,7 @@ TEST_CASE("expressions can be used inside function parameters", "[function]") {
   assertExpr("max(1 km to m, 100)", "1000");
 }
 
-TEST_CASE("Function call in function argument", "function") {
-  assertExpr("max(min(1, 10),max(1, 5))", "5");
-}
+TEST_CASE("Function call in function argument", "function") { assertExpr("max(min(1, 10),max(1, 5))", "5"); }
 
 TEST_CASE("leftshit works", "[bitwise]") {
   assertExpr("1 << 8", "256");
@@ -298,18 +291,14 @@ TEST_CASE("righshift works", "[bitwise]") {
 
 TEST_CASE("hex formatting", "[format]") { assertExpr("256 to hex", "0x100"); }
 
-TEST_CASE("binary formatting", "[format]") {
-  assertExpr("256 to binary", "0b100000000");
-}
+TEST_CASE("binary formatting", "[format]") { assertExpr("256 to binary", "0b100000000"); }
 
 TEST_CASE("Numbers can be written in hex", "[base]") {
   assertExpr("0xFF", "255");
   assertExpr("0xFF + 10 + 0xA", "275");
 }
 
-TEST_CASE("Numbers can be written in octal", "[base]") {
-  assertExpr("0o777", "511");
-}
+TEST_CASE("Numbers can be written in octal", "[base]") { assertExpr("0o777", "511"); }
 
 TEST_CASE("Numbers can be written in binary", "[base]") {
   assertExpr("0b10", "2");

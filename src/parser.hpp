@@ -53,8 +53,7 @@ struct NamedNumberFormat {
   std::string_view name;
 };
 
-using ConversionTarget =
-    std::variant<NamedUnit, TimezoneLike, NamedNumberFormat>;
+using ConversionTarget = std::variant<NamedUnit, TimezoneLike, NamedNumberFormat>;
 
 struct ConversionExpression {
   std::unique_ptr<Expression> b;
@@ -106,25 +105,17 @@ struct UnitExpression {
 };
 
 struct Expression {
-  std::variant<BinaryExpression, UnaryExpression, NumberString, DateString,
-               UnitExpression, ConversionExpression, FunctionCall>
+  std::variant<BinaryExpression, UnaryExpression, NumberString, DateString, UnitExpression,
+               ConversionExpression, FunctionCall>
       data;
 
-  const BinaryExpression *asBinaryExpression() const {
-    return std::get_if<BinaryExpression>(&data);
-  }
+  const BinaryExpression *asBinaryExpression() const { return std::get_if<BinaryExpression>(&data); }
 
-  const UnaryExpression *asUnaryExpression() const {
-    return std::get_if<UnaryExpression>(&data);
-  }
+  const UnaryExpression *asUnaryExpression() const { return std::get_if<UnaryExpression>(&data); }
 
-  const ConversionExpression *asConversion() const {
-    return std::get_if<ConversionExpression>(&data);
-  }
+  const ConversionExpression *asConversion() const { return std::get_if<ConversionExpression>(&data); }
 
-  const FunctionCall *asFunction() const {
-    return std::get_if<FunctionCall>(&data);
-  }
+  const FunctionCall *asFunction() const { return std::get_if<FunctionCall>(&data); }
 };
 
 struct AST {
@@ -151,8 +142,7 @@ public:
   std::optional<TimezoneLike> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
 
-  template <typename F>
-  std::optional<std::string_view> greedyParse(int n, F fn) {
+  template <typename F> std::optional<std::string_view> greedyParse(int n, F fn) {
     assert(n >= 0);
     for (int i = 0; i != n; ++i) {
       auto str = m_lexer.peakString(n - i);

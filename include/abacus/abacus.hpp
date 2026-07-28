@@ -57,10 +57,8 @@ class Abacus {
 public:
   Abacus() = default;
 
-  std::expected<std::string, std::string> evaluate(std::string_view expr,
-                                                   const EvalConfig &opts = {});
-  std::expected<ComputedValue, std::string>
-  compute(std::string_view expr, const EvalConfig &opts = {});
+  std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
+  std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
   void printAST(const std::string &expr) const;
 
 private:

@@ -8,8 +8,7 @@ constexpr auto TAG = "[datetime]";
 
 const abacus::EvalConfig evalOpts = []() {
   // freeze "now" so that tests stay valid
-  std::chrono::year_month_day now{std::chrono::year{2026},
-                                  std::chrono::month{7}, std::chrono::day(26)};
+  std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{7}, std::chrono::day(26)};
 
   return abacus::EvalConfig{
       .now = std::chrono::sys_days(now),

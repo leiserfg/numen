@@ -8,22 +8,16 @@
 
 namespace {
 auto splitOnAny(auto s, std::string_view delims) {
-  return s | std::views::chunk_by([delims](char a, char b) {
-           return delims.contains(a) == delims.contains(b);
-         }) |
-         std::views::filter([delims](auto &&chunk) {
-           return !delims.contains(chunk.front());
-         });
+  return s |
+         std::views::chunk_by([delims](char a, char b) { return delims.contains(a) == delims.contains(b); }) |
+         std::views::filter([delims](auto &&chunk) { return !delims.contains(chunk.front()); });
 };
 
 bool matchesTz(std::string_view query, std::string_view name) {
-  if (equalsIgnoreCase(name, query)) {
-    return true;
-  }
+  if (equalsIgnoreCase(name, query)) { return true; }
 
   auto parts = name | std::views::split(std::string_view{"/"});
-  auto last = std::ranges::fold_left(parts, std::string_view{},
-                                     [](auto &&, auto &&x) { return x; });
+  auto last = std::ranges::fold_left(parts, std::string_view{}, [](auto &&, auto &&x) { return x; });
 
   if (!last.empty()) {
     std::string_view delims{"_/ "};
@@ -57,43 +51,30 @@ constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
 });
 // clang-format on
 
-const std::chrono::time_zone *TimezoneDB::userTz() const {
-  return std::chrono::get_tzdb().current_zone();
-}
+const std::chrono::time_zone *TimezoneDB::userTz() const { return std::chrono::get_tzdb().current_zone(); }
 
 const std::chrono::time_zone *TimezoneDB::query(std::string_view query) const {
   const auto &db = std::chrono::get_tzdb();
 
   {
-    auto it = std::ranges::find_if(db.zones,
-                                   [&query](const std::chrono::time_zone &tz) {
-                                     return matchesTz(query, tz.name());
-                                   });
+    auto it = std::ranges::find_if(
+        db.zones, [&query](const std::chrono::time_zone &tz) { return matchesTz(query, tz.name()); });
 
-    if (it != db.zones.end()) {
-      return &*it;
-    }
+    if (it != db.zones.end()) { return &*it; }
   }
 
   {
-    auto linkIt = std::ranges::find_if(
-        db.links, [&query](const std::chrono::time_zone_link &link) {
-          return matchesTz(query, link.name());
-        });
+    auto linkIt = std::ranges::find_if(db.links, [&query](const std::chrono::time_zone_link &link) {
+      return matchesTz(query, link.name());
+    });
 
-    if (linkIt != db.links.end()) {
-      return std::chrono::locate_zone(linkIt->target());
-    }
+    if (linkIt != db.links.end()) { return std::chrono::locate_zone(linkIt->target()); }
   }
 
-  auto linkIt =
-      std::ranges::find_if(CUSTOM_LINKS, [&query](const CustomTzLink &link) {
-        return matchesTz(query, link.name);
-      });
+  auto linkIt = std::ranges::find_if(
+      CUSTOM_LINKS, [&query](const CustomTzLink &link) { return matchesTz(query, link.name); });
 
-  if (linkIt != CUSTOM_LINKS.end()) {
-    return std::chrono::locate_zone(linkIt->target);
-  }
+  if (linkIt != CUSTOM_LINKS.end()) { return std::chrono::locate_zone(linkIt->target); }
 
   return nullptr;
 }

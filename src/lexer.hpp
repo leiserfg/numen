@@ -45,9 +45,7 @@ public:
   Lexer(std::string_view data) : m_data(data), m_cursor(0) {}
 
   std::optional<Token> peakIf(TokenType type) {
-    if (auto tok = peak(); tok && tok->type == type) {
-      return tok;
-    }
+    if (auto tok = peak(); tok && tok->type == type) { return tok; }
     return std::nullopt;
   }
 
@@ -72,9 +70,7 @@ public:
     auto start = m_cursor;
 
     while (auto tok = peakIf(TokenType::String)) {
-      if (i >= n) {
-        break;
-      }
+      if (i >= n) { break; }
       ++i;
       next();
     }
@@ -96,12 +92,8 @@ public:
     size_t i = 0;
 
     while (auto tok = peakIf(TokenType::String)) {
-      if (i == words.size()) {
-        break;
-      }
-      if (tok->raw != words[i]) {
-        break;
-      }
+      if (i == words.size()) { break; }
+      if (tok->raw != words[i]) { break; }
       ++i;
       next();
     }
@@ -115,18 +107,14 @@ public:
     size_t startPos = m_cursor;
     double n = 0;
     int base = 10;
-    bool nfrac = 0;
+    double nfrac = 0;
 
     const auto getSelection = [&]() -> std::string_view {
       return m_data.substr(startPos, m_cursor - startPos);
     };
 
     const auto makeToken = [&](TokenType type, TokenData data) {
-      return Token{.raw = getSelection(),
-                   .type = type,
-                   .data = data,
-                   .start = startPos,
-                   .end = m_cursor};
+      return Token{.raw = getSelection(), .type = type, .data = data, .start = startPos, .end = m_cursor};
     };
 
     auto tryCommit = [&]() -> std::optional<Token> {
@@ -193,17 +181,13 @@ public:
       }
       case State::Number: {
         if (c == '.') {
-          if (base == 10 && nfrac == 0) {
-            nfrac = 1;
-          }
+          if (base == 10 && nfrac == 0) { nfrac = 1; }
           break;
         }
 
         const auto pos = BASE_CHARS.find(std::tolower(c));
 
-        if (pos == std::string_view::npos || pos >= base) {
-          return tryCommit();
-        }
+        if (pos == std::string_view::npos || pos >= base) { return tryCommit(); }
 
         if (nfrac) {
           n = n + pos / std::pow(base, nfrac);
@@ -229,15 +213,11 @@ public:
           }
         }
 
-        if (std::isalnum(c) || std::isspace(c)) {
-          return tryCommit();
-        }
+        if (std::isalnum(c) || std::isspace(c)) { return tryCommit(); }
         break;
       }
       case State::String: {
-        if (!std::isalpha(c)) {
-          return tryCommit();
-        }
+        if (!std::isalpha(c)) { return tryCommit(); }
         break;
       }
       }

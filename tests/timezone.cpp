@@ -26,8 +26,7 @@ TEST_CASE("city name alone should match unique timezone", "timezone") {
   REQUIRE(tz->name() == "America/New_York");
 }
 
-TEST_CASE("city name alone should match unique timezone, case insensitively",
-          "timezone") {
+TEST_CASE("city name alone should match unique timezone, case insensitively", "timezone") {
   TimezoneDB db;
   auto tz = db.query("new_york");
 
@@ -62,9 +61,7 @@ TEST_CASE("city name for a timezone with many /") {
   auto tz = db.query("buenos aires");
 
   REQUIRE(tz);
-  REQUIRE(std::ranges::contains(
-      SI{"America/Argentina/Buenos_Aires", "America/Buenos_Aires"},
-      tz->name()));
+  REQUIRE(std::ranges::contains(SI{"America/Argentina/Buenos_Aires", "America/Buenos_Aires"}, tz->name()));
 }
 
 TEST_CASE("should handle famous european timezones") {

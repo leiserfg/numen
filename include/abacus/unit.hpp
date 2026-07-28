@@ -29,21 +29,12 @@ struct UnitBaseRelation {
 class UnitDatabase {
 public:
   UnitDatabase() noexcept {
-    registerUnit(UnitDef{.id = "inch",
-                         .aliases = {"in"},
-                         .factor = 0.0254,
-                         .family = "imperial",
-                         .type = UnitType::Distance});
-    registerUnit(UnitDef{.id = "meter",
-                         .aliases = {"m"},
-                         .factor = 1,
-                         .family = "metric",
-                         .type = UnitType::Distance});
-    registerUnit(UnitDef{.id = "kilometer",
-                         .aliases = {"km"},
-                         .factor = 1e3,
-                         .family = "metric",
-                         .type = UnitType::Distance});
+    registerUnit(UnitDef{
+        .id = "inch", .aliases = {"in"}, .factor = 0.0254, .family = "imperial", .type = UnitType::Distance});
+    registerUnit(UnitDef{
+        .id = "meter", .aliases = {"m"}, .factor = 1, .family = "metric", .type = UnitType::Distance});
+    registerUnit(UnitDef{
+        .id = "kilometer", .aliases = {"km"}, .factor = 1e3, .family = "metric", .type = UnitType::Distance});
 
     registerUnit(UnitDef{.id = "second",
                          .aliases = {"s", "sec", "secs", "seconds"},
@@ -66,10 +57,7 @@ public:
                          .family = "duration",
                          .type = UnitType::Duration});
 
-    registerUnit(UnitDef{.id = "kelvin",
-                         .factor = 1,
-                         .family = "degree",
-                         .type = UnitType::Temperature});
+    registerUnit(UnitDef{.id = "kelvin", .factor = 1, .family = "degree", .type = UnitType::Temperature});
     registerUnit(UnitDef{
         .id = "celsius",
         .aliases = {"cel", "c"},
@@ -97,33 +85,29 @@ public:
   // units can share a same identifier, e.g 'm' can stand for 'meter' or
   // 'minute'.
   std::vector<UnitDef> findUnitCandidates(std::string_view q) const {
-    auto units =
-        m_units | std::views::filter([&](const UnitDef &unit) {
-          return unit.id == q || std::ranges::contains(unit.aliases, q);
-        }) |
-        std::ranges::to<std::vector>();
+    auto units = m_units | std::views::filter([&](const UnitDef &unit) {
+                   return unit.id == q || std::ranges::contains(unit.aliases, q);
+                 }) |
+                 std::ranges::to<std::vector>();
     assert(!units.empty());
     return units;
   }
 
   const UnitDef *findUnit(const std::string &id) const {
-    auto it = std::ranges::find_if(m_units, [&](const UnitDef &u) {
-      return u.id == id || std::ranges::contains(u.aliases, id);
-    });
+    auto it = std::ranges::find_if(
+        m_units, [&](const UnitDef &u) { return u.id == id || std::ranges::contains(u.aliases, id); });
 
     return it != m_units.end() ? &*it : nullptr;
   }
 
-  std::expected<double, std::string> convert(double n, const UnitDef &from,
-                                             const UnitDef &to) const {
+  std::expected<double, std::string> convert(double n, const UnitDef &from, const UnitDef &to) const {
     if (from.type == to.type) {
       auto base = n * from.factor + from.offset;
       return (base - to.offset) / to.factor;
     }
 
-    return std::unexpected(std::format(
-        "No idea how to convert {} to {}, as they are not of the same type.",
-        from.family, to.family));
+    return std::unexpected(std::format("No idea how to convert {} to {}, as they are not of the same type.",
+                                       from.family, to.family));
   }
 
 private:

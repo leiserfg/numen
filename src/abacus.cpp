@@ -22,40 +22,29 @@
 
 namespace abacus {
 
-TimePoint parseDateTimeLiteral(const DateTimeLiteral &d,
-                               const std::chrono::time_zone &tz,
-                               TimePoint now) {
+TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time_zone &tz, TimePoint now) {
   std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
-  std::chrono::year_month_day date{d.year.value_or(today.year()),
-                                   d.month.value_or(today.month()),
+  std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()),
                                    d.day.value_or(today.day())};
 
   std::chrono::local_seconds t{std::chrono::local_days{date}};
 
   if (auto time = d.time) {
-    if (auto h = time->hours)
-      t += *h;
-    if (auto min = time->minutes)
-      t += *min;
-    if (auto secs = time->seconds)
-      t += *secs;
+    if (auto h = time->hours) t += *h;
+    if (auto min = time->minutes) t += *min;
+    if (auto secs = time->seconds) t += *secs;
   }
 
   return tz.to_sys(t);
 }
 
-DateTime parseDateTime(const DateString &d,
-                       const std::chrono::time_zone &userTz, TimePoint now) {
-  auto tz =
-      d.timezone
-          .and_then(
-              [](auto &&t) -> std::optional<const std::chrono::time_zone *> {
-                if (auto n = std::get_if<NamedTimezone>(&t)) {
-                  return TimezoneDB{}.query(n->name);
-                }
-                return std::nullopt;
-              })
-          .value_or(&userTz);
+DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now) {
+  auto tz = d.timezone
+                .and_then([](auto &&t) -> std::optional<const std::chrono::time_zone *> {
+                  if (auto n = std::get_if<NamedTimezone>(&t)) { return TimezoneDB{}.query(n->name); }
+                  return std::nullopt;
+                })
+                .value_or(&userTz);
 
   auto visitor = [&](const auto &value) -> TimePoint {
     using T = std::remove_cvref_t<decltype(value)>;
@@ -72,15 +61,11 @@ DateTime parseDateTime(const DateString &d,
 }
 
 std::string formatDate(const DateTime &dt) {
-  if (!dt.tz) {
-    return std::format("{:%Y-%m-%d %H:%M:%S} (UTC)", dt.time);
-  }
+  if (!dt.tz) { return std::format("{:%Y-%m-%d %H:%M:%S} (UTC)", dt.time); }
 
   const auto userTz = std::chrono::current_zone();
-  const auto zt =
-      userTz == dt.tz
-          ? std::chrono::zoned_time{dt.tz, userTz->to_local(dt.time)}
-          : std::chrono::zoned_time{dt.tz, dt.time};
+  const auto zt = userTz == dt.tz ? std::chrono::zoned_time{dt.tz, userTz->to_local(dt.time)}
+                                  : std::chrono::zoned_time{dt.tz, dt.time};
 
   return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, dt.tz->name());
 }
@@ -88,8 +73,7 @@ std::string formatDate(const DateTime &dt) {
 struct FunctionCtx {
   template <typename... Ts> std::tuple<Ts...> unpack() {
     if (args.size() != sizeof...(Ts))
-      throw std::runtime_error("expected " + std::to_string(sizeof...(Ts)) +
-                               " argument(s), got " +
+      throw std::runtime_error("expected " + std::to_string(sizeof...(Ts)) + " argument(s), got " +
                                std::to_string(args.size()));
     return [&]<std::size_t... I>(std::index_sequence<I...>) {
       return std::tuple{(args[I].value)...};
@@ -126,20 +110,16 @@ class FunctionDatabase {
 public:
   FunctionDatabase() {
     registerFunction("min", [&](FunctionCtx ctx) {
-      if (ctx.args.empty())
-        throw std::runtime_error("min: at least 1 argument is required.");
+      if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
       auto nn = ctx.unpackAll<Number>();
-      auto min = std::ranges::min(nn, std::less{},
-                                  [](const Number *a) { return a->n; });
+      auto min = std::ranges::min(nn, std::less{}, [](const Number *a) { return a->n; });
 
       return ComputedValue{.value = *min};
     });
     registerFunction("max", [&](FunctionCtx ctx) {
-      if (ctx.args.empty())
-        throw std::runtime_error("min: at least 1 argument is required.");
+      if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
       auto nn = ctx.unpackAll<Number>();
-      auto max = std::ranges::max(nn, std::less{},
-                                  [](const Number *a) { return a->n; });
+      auto max = std::ranges::max(nn, std::less{}, [](const Number *a) { return a->n; });
 
       return ComputedValue{.value = *max};
     });
@@ -152,17 +132,13 @@ registerFunction("sin", [&](FunctionCtx ctx) {
   }
 
   void registerFunction(std::string_view name, FunctionHandler handler) {
-    m_fns.emplace_back(
-        FunctionDefinition{.name = name, .fn = std::move(handler)});
+    m_fns.emplace_back(FunctionDefinition{.name = name, .fn = std::move(handler)});
   }
 
-  void registerFunction(FunctionDefinition def) {
-    m_fns.emplace_back(std::move(def));
-  }
+  void registerFunction(FunctionDefinition def) { m_fns.emplace_back(std::move(def)); }
 
   FunctionHandler *findFunction(std::string_view name) {
-    auto it =
-        std::ranges::find_if(m_fns, [&](auto &&fn) { return fn.name == name; });
+    auto it = std::ranges::find_if(m_fns, [&](auto &&fn) { return fn.name == name; });
     return it == m_fns.end() ? nullptr : &it->fn;
   }
 
@@ -174,8 +150,7 @@ struct OperationHandler {};
 
 class Interpreter {
 public:
-  Interpreter(const UnitDatabase &db, const EvalConfig &opts)
-      : m_db(db), m_opts(opts) {}
+  Interpreter(const UnitDatabase &db, const EvalConfig &opts) : m_db(db), m_opts(opts) {}
 
   ComputedValue computeExpr(const Expression &expr) const {
     auto visitor = [&](const auto &value) -> ComputedValue {
@@ -186,45 +161,23 @@ public:
 
         if (auto n = c.asNumber()) {
           auto c = *n;
-          if (ue.op == "-") {
-            c.n *= -1;
-          }
+          if (ue.op == "-") { c.n *= -1; }
           return {c};
         }
 
         return c;
       } else if constexpr (std::is_same_v<T, BinaryExpression>) {
         const auto &be = value;
-        if (be.op == "+") {
-          return add(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "-") {
-          return subtract(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "*") {
-          return multiply(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "/") {
-          return div(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "%") {
-          return modulo(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "^") {
-          return pow(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "<<") {
-          return leftshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == ">>") {
-          return rightshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "&") {
-          return bitwiseAnd(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
-        if (be.op == "|") {
-          return bitwiseor(computeExpr(*be.lhs), computeExpr(*be.rhs));
-        }
+        if (be.op == "+") { return add(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "-") { return subtract(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "*") { return multiply(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "/") { return div(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "%") { return modulo(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "^") { return pow(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "<<") { return leftshift(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == ">>") { return rightshift(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "&") { return bitwiseAnd(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        if (be.op == "|") { return bitwiseor(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
 
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
@@ -274,22 +227,18 @@ public:
 
             // if converted expression has no unit there is nothing to do,
             // just tag it with the target unit... 1m to s 1m to in
-            if (!v.unitRaw)
-              return ComputedValue{.value = value, .unitRaw = unit->name};
+            if (!v.unitRaw) return ComputedValue{.value = value, .unitRaw = unit->name};
 
             auto valueCandidates = m_db.findUnitCandidates(*v.unitRaw);
 
-            auto convert = [&](double n, const UnitDef &lhs,
-                               const UnitDef &rhs) -> ComputedValue {
+            auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
               if (lhs.type != rhs.type) {
-                throw std::runtime_error(std::format(
-                    "Incompatible units ({} to {})", lhs.id, rhs.id));
+                throw std::runtime_error(std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
               }
 
               auto res = m_db.convert(value.n, lhs, rhs);
 
-              if (!res)
-                throw std::runtime_error(res.error());
+              if (!res) throw std::runtime_error(res.error());
 
               return {.value = Number{res.value()}, .unitRaw = unit->name};
             };
@@ -310,24 +259,20 @@ public:
             // 1s to 1m
             if (valueCandidates.size() > targetCandidates.size()) {
               auto rhs = targetCandidates.front();
-              auto lhs = std::ranges::find_if(
-                  valueCandidates,
-                  [&](const UnitDef &unit) { return unit.type == rhs.type; });
+              auto lhs = std::ranges::find_if(valueCandidates,
+                                              [&](const UnitDef &unit) { return unit.type == rhs.type; });
               if (lhs == valueCandidates.end()) {
-                throw std::runtime_error(
-                    std::format("Incompatible units: no common family"));
+                throw std::runtime_error(std::format("Incompatible units: no common family"));
               }
               return convert(value.n, *lhs, rhs);
             }
 
             if (targetCandidates.size() > valueCandidates.size()) {
               auto lhs = valueCandidates.front();
-              auto rhs = std::ranges::find_if(
-                  targetCandidates,
-                  [&](const UnitDef &unit) { return unit.type == lhs.type; });
+              auto rhs = std::ranges::find_if(targetCandidates,
+                                              [&](const UnitDef &unit) { return unit.type == lhs.type; });
               if (rhs == targetCandidates.end()) {
-                throw std::runtime_error(
-                    std::format("Incompatible units: no common type"));
+                throw std::runtime_error(std::format("Incompatible units: no common type"));
               }
               return convert(value.n, lhs, *rhs);
             }
@@ -348,10 +293,8 @@ public:
       } else {
         static_assert(std::is_same_v<T, DateString>);
         const auto &ds = value;
-        auto &tz =
-            m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
-        auto dt = parseDateTime(
-            ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
+        auto &tz = m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
+        auto dt = parseDateTime(ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
         return ComputedValue{.value = dt};
       }
     };
@@ -362,16 +305,12 @@ public:
 private:
   template <typename T, typename U = T>
   static void assertBinary(const ComputedValue &lhs, const ComputedValue &rhs) {
-    bool ok = std::holds_alternative<T>(lhs.value) &&
-              std::holds_alternative<U>(rhs.value);
-    if (!ok)
-      throw std::runtime_error("Invalid operands");
+    bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
+    if (!ok) throw std::runtime_error("Invalid operands");
   }
 
   ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
-    if (rhs.isDateTime() && lhs.isNumber()) {
-      return add(rhs, lhs);
-    }
+    if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
 
     // TODO: handle date + time.
     // We need a way to discriminate datetime from time alone, because
@@ -383,16 +322,14 @@ private:
 
       if (rhs.unitRaw) {
         auto candidates = m_db.findUnitCandidates(rhs.unitRaw.value());
-        auto it = std::ranges::find_if(candidates, [](const UnitDef &u) {
-          return u.type == UnitType::Duration;
-        });
+        auto it =
+            std::ranges::find_if(candidates, [](const UnitDef &u) { return u.type == UnitType::Duration; });
         auto second = m_db.findUnit("second");
 
         if (it != candidates.end()) {
           // convert everything to seconds, then add it to time
           auto diff = m_db.convert(n->n, *it, *second);
-          auto time =
-              d->time + std::chrono::seconds(static_cast<int>(diff.value()));
+          auto time = d->time + std::chrono::seconds(static_cast<int>(diff.value()));
 
           DateTime dt = *d;
           dt.time = time;
@@ -405,14 +342,12 @@ private:
     return output(lhs.asNumber()->n + rhs.asNumber()->n, lhs, rhs);
   }
 
-  static ComputedValue subtract(const ComputedValue &lhs,
-                                const ComputedValue &rhs) {
+  static ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
     return output(lhs.asNumber()->n - rhs.asNumber()->n, lhs, rhs);
   }
 
-  static ComputedValue multiply(const ComputedValue &lhs,
-                                const ComputedValue &rhs) {
+  static ComputedValue multiply(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
     return output(lhs.asNumber()->n * rhs.asNumber()->n, lhs, rhs);
   }
@@ -422,12 +357,9 @@ private:
     return output(lhs.asNumber()->n / rhs.asNumber()->n, lhs, rhs);
   }
 
-  static ComputedValue modulo(const ComputedValue &lhs,
-                              const ComputedValue &rhs) {
+  static ComputedValue modulo(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) %
-                      static_cast<int>(rhs.asNumber()->n),
-                  lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) % static_cast<int>(rhs.asNumber()->n), lhs, rhs);
   }
 
   static ComputedValue pow(const ComputedValue &lhs, const ComputedValue &rhs) {
@@ -435,52 +367,35 @@ private:
     return output(std::pow(lhs.asNumber()->n, rhs.asNumber()->n), lhs, rhs);
   }
 
-  static ComputedValue leftshift(const ComputedValue &lhs,
-                                 const ComputedValue &rhs) {
+  static ComputedValue leftshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n)
-                      << static_cast<int>(rhs.asNumber()->n),
-                  lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) << static_cast<int>(rhs.asNumber()->n), lhs, rhs);
   }
 
-  static ComputedValue rightshift(const ComputedValue &lhs,
-                                  const ComputedValue &rhs) {
+  static ComputedValue rightshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) >>
-                      static_cast<int>(rhs.asNumber()->n),
-                  lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) >> static_cast<int>(rhs.asNumber()->n), lhs, rhs);
   }
 
-  static ComputedValue bitwiseor(const ComputedValue &lhs,
-                                 const ComputedValue &rhs) {
+  static ComputedValue bitwiseor(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) |
-                      static_cast<int>(rhs.asNumber()->n),
-                  lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) | static_cast<int>(rhs.asNumber()->n), lhs, rhs);
   }
 
-  static ComputedValue bitwiseAnd(const ComputedValue &lhs,
-                                  const ComputedValue &rhs) {
+  static ComputedValue bitwiseAnd(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) &
-                      static_cast<int>(rhs.asNumber()->n),
-                  lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) & static_cast<int>(rhs.asNumber()->n), lhs, rhs);
   }
 
-  static ComputedValue output(double n, const ComputedValue &lhs,
-                              const ComputedValue &rhs) {
-    return ComputedValue{
-        .value = Number{n},
-        .unitRaw = rhs.unitRaw.or_else([&]() { return lhs.unitRaw; })};
+  static ComputedValue output(double n, const ComputedValue &lhs, const ComputedValue &rhs) {
+    return ComputedValue{.value = Number{n}, .unitRaw = rhs.unitRaw.or_else([&]() { return lhs.unitRaw; })};
   }
 
   ComputedValue executeFunction(const FunctionCall &fn) const {
     FunctionDatabase db;
 
-    auto computedArgs =
-        fn.args |
-        std::views::transform([&](auto &&expr) { return computeExpr(*expr); }) |
-        std::ranges::to<std::vector>();
+    auto computedArgs = fn.args | std::views::transform([&](auto &&expr) { return computeExpr(*expr); }) |
+                        std::ranges::to<std::vector>();
 
     if (auto handler = db.findFunction(fn.name)) {
       FunctionCtx ctx{computedArgs};
@@ -494,21 +409,18 @@ private:
   const EvalConfig &m_opts;
 };
 
-std::expected<ComputedValue, std::string>
-Abacus::compute(std::string_view expr, const EvalConfig &opts) {
+std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
     Interpreter i{m_unitDb, opts};
 
     return i.computeExpr(*ast.root);
-  } catch (const std::exception &e) {
-    return std::unexpected(e.what());
-  }
+  } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
-std::expected<std::string, std::string>
-Abacus::evaluate(const std::string_view expr, const EvalConfig &opts) {
+std::expected<std::string, std::string> Abacus::evaluate(const std::string_view expr,
+                                                         const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
@@ -540,14 +452,11 @@ Abacus::evaluate(const std::string_view expr, const EvalConfig &opts) {
       }
     };
 
-    return std::format("{}{}", std::visit(visitor, result.value),
-                       result.unitRaw.value_or(""));
-  } catch (const std::exception &e) {
-    return std::unexpected(e.what());
-  }
+    return std::format("{}{}", std::visit(visitor, result.value), result.unitRaw.value_or(""));
+  } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
-void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
+static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0) {
   auto ident = [&]() {
     std::string s;
     for (int i = 0; i != depth; ++i)
@@ -555,101 +464,86 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
     return s;
   };
 
-  if (auto be = expr.asBinaryExpression()) {
-    os << ident() << "Binary " << rang::fg::green << be->op << rang::fg::reset
-       << " {\n";
-    walkAST(os, *be->lhs, depth + 1);
-    walkAST(os, *be->rhs, depth + 1);
-    os << ident() << "}\n";
-  }
+  std::visit(
+      [&](const auto &value) {
+        using T = std::remove_cvref_t<decltype(value)>;
 
-  else if (auto ue = expr.asUnaryExpression()) {
-    os << ident() << "Unary " << rang::fg::green << ue->op << rang::fg::reset
-       << " {\n";
-    walkAST(os, *ue->lhs, depth + 1);
-    os << ident() << "}\n";
+        if constexpr (std::is_same_v<T, BinaryExpression>) {
+          os << ident() << "Binary " << rang::fg::green << value.op << rang::fg::reset << " {\n";
+          printASTNode(os, *value.lhs, depth + 1);
+          printASTNode(os, *value.rhs, depth + 1);
+          os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, UnaryExpression>) {
+          os << ident() << "Unary " << rang::fg::green << value.op << rang::fg::reset << " {\n";
+          printASTNode(os, *value.lhs, depth + 1);
+          os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, ConversionExpression>) {
+          auto visitor = [](const auto &value) -> std::string {
+            using T = std::remove_cvref_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, TimezoneLike>) {
+              return std::visit([](const auto &tz) { return std::format("Timezone({})", tz.name); }, value);
+            } else if constexpr (std::is_same_v<T, NamedUnit>) {
+              return std::format("Unit({})", value.name);
+            } else {
+              static_assert(std::is_same_v<T, NamedNumberFormat>);
+              return std::format("NumericFormat({})", value.name);
+            }
+          };
 
-  }
+          os << ident() << "Convert " << rang::fg::green << std::visit(visitor, value.target)
+             << rang::fg::reset << " {\n";
 
-  else if (auto conv = expr.asConversion()) {
-    auto visitor = [](const auto &value) -> std::string {
-      using T = std::remove_cvref_t<decltype(value)>;
-      if constexpr (std::is_same_v<T, TimezoneLike>) {
-        return std::visit(
-            [](const auto &tz) { return std::format("Timezone({})", tz.name); },
-            value);
-      } else if constexpr (std::is_same_v<T, NamedUnit>) {
-        return std::format("Unit({})", value.name);
-      } else {
-        static_assert(std::is_same_v<T, NamedNumberFormat>);
-        return std::format("NumericFormat({})", value.name);
-      }
-    };
+          printASTNode(os, *value.b, depth + 1);
+          os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, UnitExpression>) {
+          os << ident() << "Unit " << rang::fg::green << value.unit << rang::fg::reset << " {\n";
+          printASTNode(os, *value.expr, depth + 1);
+          os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, DateString>) {
+          os << ident() << "Date " << " {\n";
 
-    os << ident() << "Convert " << rang::fg::green
-       << std::visit(visitor, conv->target) << rang::fg::reset << " {\n";
+          if (auto str = std::get_if<std::string_view>(&value.value)) {
+            os << ident() << "\tvalue " << *str << "\n";
+          }
+          if (auto str = std::get_if<DateTimeLiteral>(&value.value)) {
+            os << ident() << "\tvalue "
+               << formatDate(parseDateTime({.value = *str, .timezone = value.timezone},
+                                           *std::chrono::current_zone(), std::chrono::system_clock::now()))
+               << "\n";
+          }
 
-    walkAST(os, *conv->b, depth + 1);
-    os << ident() << "}\n";
-  }
+          if (value.timezone) {
+            auto v = [](const auto &tz) -> std::string {
+              using T = std::remove_cvref_t<decltype(tz)>;
+              if constexpr (std::is_same_v<T, TimezoneOffset>) {
+                return std::format("Timezone({}+{})", tz.name, tz.offset.count());
+              } else {
+                static_assert(std::is_same_v<T, NamedTimezone>);
+                return std::format("Timezone({})", tz.name);
+              }
+            };
 
-  else if (auto n = std::get_if<NumberString>(&expr.data)) {
-    os << ident() << "Number " << rang::fg::yellow << *n << rang::fg::reset
-       << "\n";
-  }
+            os << ident() << "\ttimezone " << std::visit(v, *value.timezone) << "\n";
+          }
 
-  else if (auto ue = std::get_if<UnitExpression>(&expr.data)) {
-    os << ident() << "Unit " << rang::fg::green << ue->unit << rang::fg::reset
-       << " {\n";
-    walkAST(os, *ue->expr, depth + 1);
-    os << ident() << "}\n";
-  }
-
-  else if (auto ds = std::get_if<DateString>(&expr.data)) {
-    os << ident() << "Date " << " {\n";
-
-    if (auto str = std::get_if<std::string_view>(&ds->value)) {
-      os << ident() << "\tvalue " << *str << "\n";
-    }
-    if (auto str = std::get_if<DateTimeLiteral>(&ds->value)) {
-      os << ident() << "\tvalue "
-         << formatDate(parseDateTime({.value = *str, .timezone = ds->timezone},
-                                     *std::chrono::current_zone(),
-                                     std::chrono::system_clock::now()))
-         << "\n";
-    }
-
-    if (ds->timezone) {
-      auto v = [](const auto &tz) -> std::string {
-        using T = std::remove_cvref_t<decltype(tz)>;
-        if constexpr (std::is_same_v<T, TimezoneOffset>) {
-          return std::format("Timezone({}+{})", tz.name, tz.offset.count());
-        } else {
-          static_assert(std::is_same_v<T, NamedTimezone>);
-          return std::format("Timezone({})", tz.name);
+          os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, NumberString>) {
+          os << ident() << "Number " << rang::fg::yellow << value << rang::fg::reset << "\n";
+        } else if constexpr (std::is_same_v<T, FunctionCall>) {
+          os << ident() << "Fn " << rang::fg::green << value.name << rang::fg::reset << " {\n";
+          for (const auto &arg : value.args) {
+            printASTNode(os, *arg, depth + 1);
+          }
+          os << ident() << "}\n";
         }
-      };
-
-      os << ident() << "\ttimezone " << std::visit(v, *ds->timezone) << "\n";
-    }
-
-    os << ident() << "}\n";
-  }
-
-  else if (auto fn = expr.asFunction()) {
-    os << ident() << "Fn " << rang::fg::green << fn->name << rang::fg::reset
-       << " {\n";
-    for (const auto &arg : fn->args) {
-      walkAST(os, *arg, depth + 1);
-    }
-    os << ident() << "}\n";
-  }
+      },
+      expr.data);
 }
 
 void Abacus::printAST(const std::string &expr) const {
   Parser parser{expr, m_unitDb};
   auto ast = parser.parse();
-  walkAST(std::cout, *ast.root, 0);
+  printASTNode(std::cout, *ast.root, 0);
 }
 
 }; // namespace abacus
