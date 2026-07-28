@@ -43,3 +43,5 @@ heaptrack*
 
 .worktrees
 .envrc.local
+
+*.pdb
