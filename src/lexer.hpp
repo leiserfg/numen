@@ -14,7 +14,7 @@ class Lexer {
 public:
   struct Number {
     double n;
-    int fromBase = 10;
+    unsigned fromBase = 10;
   };
 
   enum class OperatorType { Add, Subtract, Multiply, Divide, Pow };
@@ -106,8 +106,8 @@ public:
     State state = State::Reset;
     size_t startPos = m_cursor;
     double n = 0;
-    int base = 10;
-    double nfrac = 0;
+    unsigned base = 10;
+    unsigned nfrac = 0;
 
     const auto getSelection = [&]() -> std::string_view {
       return m_data.substr(startPos, m_cursor - startPos);

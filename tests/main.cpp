@@ -1,7 +1,11 @@
 #include "abacus/abacus.hpp"
+#include "catch2/matchers/catch_matchers.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <string_view>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+
+using Catch::Matchers::WithinAbs;
 
 auto inline evaluate(std::string_view expr) {
   abacus::Abacus calc;
@@ -15,6 +19,9 @@ auto inline evaluate(std::string_view expr) {
     REQUIRE(res);                                                                                            \
     REQUIRE(res.value() == expected);                                                                        \
   }
+
+#define assertPrecision(a, b, precision)                                                                     \
+  { REQUIRE_THAT(a, WithinAbs(b, std::pow(10, -precision))); }
 
 TEST_CASE("Should compute basic expression") {
   auto eval = evaluate("1 + 1");
@@ -32,6 +39,24 @@ TEST_CASE("proper priority without parentheses") {
   auto eval = evaluate("1 + 2 * 4");
   REQUIRE(eval);
   REQUIRE(eval.value() == "9");
+}
+
+TEST_CASE("Should parse floating point numbers correctly") {
+  abacus::Abacus calc;
+  auto res = calc.compute("2.345678");
+
+  REQUIRE(res);
+  REQUIRE(res->isNumber());
+  assertPrecision(res->asNumber()->n, 2.345678, 7);
+}
+
+TEST_CASE("Should add floating point numbers correctly") {
+  abacus::Abacus calc;
+  auto res = calc.compute("2.345678 + 1.42");
+
+  REQUIRE(res);
+  REQUIRE(res->isNumber());
+  assertPrecision(res->asNumber()->n, 3.765678, 7);
 }
 
 TEST_CASE("priority with parentheses") {
