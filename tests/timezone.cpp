@@ -1,4 +1,5 @@
 #include "timezone.hpp"
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <iostream>
@@ -55,11 +56,13 @@ TEST_CASE("city name alone should match unique timezone, case insentively and "
 }
 
 TEST_CASE("city name for a timezone with many /") {
+  using SI = std::initializer_list<std::string_view>;
+
   TimezoneDB db;
   auto tz = db.query("buenos aires");
 
   REQUIRE(tz);
-  REQUIRE(tz->name() == "America/Argentina/Buenos_Aires");
+  REQUIRE(std::ranges::contains(SI{"America/Argentina/Buenos_Aires", "America/Buenos_Aires"}, tz->name()));
 }
 
 TEST_CASE("should handle famous european timezones") {

@@ -1,7 +1,7 @@
 #include "timezone.hpp"
 #include "utils.hpp"
-#include <array>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <ranges>
 #include <string_view>

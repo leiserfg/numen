@@ -17,13 +17,10 @@
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 
 namespace abacus {
-
-template <class... Ts> struct overloads : Ts... {
-  using Ts::operator()...;
-};
 
 TimePoint parseDateTimeLiteral(const DateTimeLiteral &d,
                                const std::chrono::time_zone &tz,
@@ -60,12 +57,14 @@ DateTime parseDateTime(const DateString &d,
               })
           .value_or(&userTz);
 
-  auto visitor = overloads{[&](const DateTimeLiteral &date) -> TimePoint {
-                             return parseDateTimeLiteral(date, *tz, now);
-                           },
-                           [&](const std::string_view s) -> TimePoint {
-                             return std::chrono::system_clock::now();
-                           }};
+  auto visitor = [&](const auto &value) -> TimePoint {
+    using T = std::remove_cvref_t<decltype(value)>;
+    if constexpr (std::is_same_v<T, DateTimeLiteral>) {
+      return parseDateTimeLiteral(value, *tz, now);
+    } else {
+      return std::chrono::system_clock::now();
+    }
+  };
 
   auto instant = std::visit(visitor, d.value);
 
@@ -179,177 +178,183 @@ public:
       : m_db(db), m_opts(opts) {}
 
   ComputedValue computeExpr(const Expression &expr) const {
-    auto visitor = overloads{
-        [&](const UnaryExpression &ue) -> ComputedValue {
-          auto c = computeExpr(*ue.lhs);
+    auto visitor = [&](const auto &value) -> ComputedValue {
+      using T = std::remove_cvref_t<decltype(value)>;
+      if constexpr (std::is_same_v<T, UnaryExpression>) {
+        const auto &ue = value;
+        auto c = computeExpr(*ue.lhs);
 
-          if (auto n = c.asNumber()) {
-            auto c = *n;
-            if (ue.op == "-") {
-              c.n *= -1;
-            }
-            return {c};
+        if (auto n = c.asNumber()) {
+          auto c = *n;
+          if (ue.op == "-") {
+            c.n *= -1;
+          }
+          return {c};
+        }
+
+        return c;
+      } else if constexpr (std::is_same_v<T, BinaryExpression>) {
+        const auto &be = value;
+        if (be.op == "+") {
+          return add(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "-") {
+          return subtract(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "*") {
+          return multiply(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "/") {
+          return div(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "%") {
+          return modulo(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "^") {
+          return pow(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "<<") {
+          return leftshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == ">>") {
+          return rightshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "&") {
+          return bitwiseAnd(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+        if (be.op == "|") {
+          return bitwiseor(computeExpr(*be.lhs), computeExpr(*be.rhs));
+        }
+
+        throw std::runtime_error(std::format("Unhandled operator {}", be.op));
+      } else if constexpr (std::is_same_v<T, ConversionExpression>) {
+        const auto &conv = value;
+        auto v = computeExpr(*conv.b);
+
+        if (auto tzl = std::get_if<TimezoneLike>(&conv.target)) {
+          if (!v.isDateTime())
+            throw std::runtime_error("Only datetime expressions can be "
+                                     "converted to another timezone");
+
+          auto d = *v.asDateTime();
+
+          if (auto ntz = std::get_if<NamedTimezone>(tzl)) {
+            d.tz = TimezoneDB{}.query(ntz->name);
+          } else if (auto otz = std::get_if<TimezoneOffset>(tzl)) {
+            // d.tz = std::chrono::locate_zone(otz->name);
+            d.offset = otz->offset;
           }
 
-          return c;
-        },
-        [&](const BinaryExpression &be) {
-          if (be.op == "+") {
-            return add(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "-") {
-            return subtract(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "*") {
-            return multiply(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "/") {
-            return div(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "%") {
-            return modulo(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "^") {
-            return pow(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "<<") {
-            return leftshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == ">>") {
-            return rightshift(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "&") {
-            return bitwiseAnd(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
-          if (be.op == "|") {
-            return bitwiseor(computeExpr(*be.lhs), computeExpr(*be.rhs));
-          }
+          return ComputedValue{d};
+        }
 
-          throw std::runtime_error(std::format("Unhandled operator {}", be.op));
-        },
-        [&](const ConversionExpression &conv) -> ComputedValue {
-          auto v = computeExpr(*conv.b);
+        if (auto n = v.asNumber()) {
+          auto value = *n;
 
-          if (auto tzl = std::get_if<TimezoneLike>(&conv.target)) {
-            if (!v.isDateTime())
-              throw std::runtime_error("Only datetime expressions can be "
-                                       "converted to another timezone");
-
-            auto d = *v.asDateTime();
-
-            if (auto ntz = std::get_if<NamedTimezone>(tzl)) {
-              d.tz = TimezoneDB{}.query(ntz->name);
-            } else if (auto otz = std::get_if<TimezoneOffset>(tzl)) {
-              d.tz = std::chrono::locate_zone(otz->name);
-              d.offset = otz->offset;
-            }
-
-            return ComputedValue{d};
-          }
-
-          if (auto n = v.asNumber()) {
-            auto value = *n;
-
-            if (auto fmt = std::get_if<NamedNumberFormat>(&conv.target)) {
-              if (fmt->name == "hex" || fmt->name == "hexadecimal") {
-                value.format = NumberOutputFormat::Hexadecimal;
-                return ComputedValue{value};
-              }
-
-              if (fmt->name == "binary") {
-                value.format = NumberOutputFormat::Binary;
-                return ComputedValue{value};
-              }
-
-              if (fmt->name == "octal") {
-                value.format = NumberOutputFormat::Octal;
-                return ComputedValue{value};
-              }
+          if (auto fmt = std::get_if<NamedNumberFormat>(&conv.target)) {
+            if (fmt->name == "hex" || fmt->name == "hexadecimal") {
+              value.format = NumberOutputFormat::Hexadecimal;
+              return ComputedValue{value};
             }
 
-            if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+            if (fmt->name == "binary") {
+              value.format = NumberOutputFormat::Binary;
+              return ComputedValue{value};
+            }
 
-              auto targetCandidates = m_db.findUnitCandidates(unit->name);
-
-              // if converted expression has no unit there is nothing to do,
-              // just tag it with the target unit... 1m to s 1m to in
-              if (!v.unitRaw)
-                return ComputedValue{.value = value, .unitRaw = unit->name};
-
-              auto valueCandidates = m_db.findUnitCandidates(*v.unitRaw);
-
-              auto convert = [&](double n, const UnitDef &lhs,
-                                 const UnitDef &rhs) -> ComputedValue {
-                if (lhs.type != rhs.type) {
-                  throw std::runtime_error(std::format(
-                      "Incompatible units ({} to {})", lhs.id, rhs.id));
-                }
-
-                auto res = m_db.convert(value.n, lhs, rhs);
-
-                if (!res)
-                  throw std::runtime_error(res.error());
-
-                return {.value = Number{res.value()}, .unitRaw = unit->name};
-              };
-
-              // only one choice on both sides, there is no ambiguity
-              if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
-                auto lhs = valueCandidates.front();
-                auto rhs = targetCandidates.front();
-                return convert(value.n, lhs, rhs);
-              }
-
-              // we are unable to infer what unit should be used, we need to
-              // wait for more info...
-              if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-                return ComputedValue{.value = value, .unitRaw = unit->name};
-              }
-
-              // 1s to 1m
-              if (valueCandidates.size() > targetCandidates.size()) {
-                auto rhs = targetCandidates.front();
-                auto lhs = std::ranges::find_if(
-                    valueCandidates,
-                    [&](const UnitDef &unit) { return unit.type == rhs.type; });
-                if (lhs == valueCandidates.end()) {
-                  throw std::runtime_error(
-                      std::format("Incompatible units: no common family"));
-                }
-                return convert(value.n, *lhs, rhs);
-              }
-
-              if (targetCandidates.size() > valueCandidates.size()) {
-                auto lhs = valueCandidates.front();
-                auto rhs = std::ranges::find_if(
-                    targetCandidates,
-                    [&](const UnitDef &unit) { return unit.type == lhs.type; });
-                if (rhs == targetCandidates.end()) {
-                  throw std::runtime_error(
-                      std::format("Incompatible units: no common type"));
-                }
-                return convert(value.n, lhs, *rhs);
-              }
+            if (fmt->name == "octal") {
+              value.format = NumberOutputFormat::Octal;
+              return ComputedValue{value};
             }
           }
-          throw std::runtime_error("unexpected conversion flow");
-        },
-        [](NumberString n) { return ComputedValue{.value = Number{n}}; },
-        [&](const UnitExpression &ue) {
-          auto n = computeExpr(*ue.expr).value;
 
-          // since we unitify the expression, we discard any unit the expr might
-          // have had
-          return ComputedValue{.value = n, .unitRaw = ue.unit};
-        },
-        [&](const FunctionCall &fn) { return executeFunction(fn); },
-        [&](const DateString &ds) {
-          auto &tz =
-              m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
-          auto dt = parseDateTime(
-              ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
-          return ComputedValue{.value = dt};
-        }};
+          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+
+            auto targetCandidates = m_db.findUnitCandidates(unit->name);
+
+            // if converted expression has no unit there is nothing to do,
+            // just tag it with the target unit... 1m to s 1m to in
+            if (!v.unitRaw)
+              return ComputedValue{.value = value, .unitRaw = unit->name};
+
+            auto valueCandidates = m_db.findUnitCandidates(*v.unitRaw);
+
+            auto convert = [&](double n, const UnitDef &lhs,
+                               const UnitDef &rhs) -> ComputedValue {
+              if (lhs.type != rhs.type) {
+                throw std::runtime_error(std::format(
+                    "Incompatible units ({} to {})", lhs.id, rhs.id));
+              }
+
+              auto res = m_db.convert(value.n, lhs, rhs);
+
+              if (!res)
+                throw std::runtime_error(res.error());
+
+              return {.value = Number{res.value()}, .unitRaw = unit->name};
+            };
+
+            // only one choice on both sides, there is no ambiguity
+            if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
+              auto lhs = valueCandidates.front();
+              auto rhs = targetCandidates.front();
+              return convert(value.n, lhs, rhs);
+            }
+
+            // we are unable to infer what unit should be used, we need to
+            // wait for more info...
+            if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
+              return ComputedValue{.value = value, .unitRaw = unit->name};
+            }
+
+            // 1s to 1m
+            if (valueCandidates.size() > targetCandidates.size()) {
+              auto rhs = targetCandidates.front();
+              auto lhs = std::ranges::find_if(
+                  valueCandidates,
+                  [&](const UnitDef &unit) { return unit.type == rhs.type; });
+              if (lhs == valueCandidates.end()) {
+                throw std::runtime_error(
+                    std::format("Incompatible units: no common family"));
+              }
+              return convert(value.n, *lhs, rhs);
+            }
+
+            if (targetCandidates.size() > valueCandidates.size()) {
+              auto lhs = valueCandidates.front();
+              auto rhs = std::ranges::find_if(
+                  targetCandidates,
+                  [&](const UnitDef &unit) { return unit.type == lhs.type; });
+              if (rhs == targetCandidates.end()) {
+                throw std::runtime_error(
+                    std::format("Incompatible units: no common type"));
+              }
+              return convert(value.n, lhs, *rhs);
+            }
+          }
+        }
+        throw std::runtime_error("unexpected conversion flow");
+      } else if constexpr (std::is_same_v<T, NumberString>) {
+        return ComputedValue{.value = Number{value}};
+      } else if constexpr (std::is_same_v<T, UnitExpression>) {
+        const auto &ue = value;
+        auto n = computeExpr(*ue.expr).value;
+
+        // since we unitify the expression, we discard any unit the expr might
+        // have had
+        return ComputedValue{.value = n, .unitRaw = ue.unit};
+      } else if constexpr (std::is_same_v<T, FunctionCall>) {
+        return executeFunction(value);
+      } else {
+        static_assert(std::is_same_v<T, DateString>);
+        const auto &ds = value;
+        auto &tz =
+            m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
+        auto dt = parseDateTime(
+            ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
+        return ComputedValue{.value = dt};
+      }
+    };
 
     return std::visit(visitor, expr.data);
   }
@@ -523,10 +528,16 @@ Abacus::evaluate(const std::string_view expr, const EvalConfig &opts) {
       };
     };
 
-    auto visitor = overloads{
-        [&](const Number &number) { return formatNumber(number); },
-        [](const DateTime &date) { return formatDate(date); },
-        [](const bool &v) -> std::string { return v ? "true" : "false"; },
+    auto visitor = [&](const auto &value) -> std::string {
+      using T = std::remove_cvref_t<decltype(value)>;
+      if constexpr (std::is_same_v<T, Number>) {
+        return formatNumber(value);
+      } else if constexpr (std::is_same_v<T, DateTime>) {
+        return formatDate(value);
+      } else {
+        static_assert(std::is_same_v<T, bool>);
+        return value ? "true" : "false";
+      }
     };
 
     return std::format("{}{}", std::visit(visitor, result.value),
@@ -561,24 +572,19 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
   }
 
   else if (auto conv = expr.asConversion()) {
-    auto visitor =
-        overloads{[](const TimezoneLike &tz) {
-                    auto v =
-                        overloads{[](const TimezoneOffset &tz) {
-                                    return std::format("Timezone({})", tz.name);
-                                  },
-                                  [](const NamedTimezone &tz) {
-                                    return std::format("Timezone({})", tz.name);
-                                  }};
-
-                    return std::visit(v, tz);
-                  },
-                  [](const NamedUnit &unit) {
-                    return std::format("Unit({})", unit.name);
-                  },
-                  [](const NamedNumberFormat &fmt) {
-                    return std::format("NumericFormat({})", fmt.name);
-                  }};
+    auto visitor = [](const auto &value) -> std::string {
+      using T = std::remove_cvref_t<decltype(value)>;
+      if constexpr (std::is_same_v<T, TimezoneLike>) {
+        return std::visit(
+            [](const auto &tz) { return std::format("Timezone({})", tz.name); },
+            value);
+      } else if constexpr (std::is_same_v<T, NamedUnit>) {
+        return std::format("Unit({})", value.name);
+      } else {
+        static_assert(std::is_same_v<T, NamedNumberFormat>);
+        return std::format("NumericFormat({})", value.name);
+      }
+    };
 
     os << ident() << "Convert " << rang::fg::green
        << std::visit(visitor, conv->target) << rang::fg::reset << " {\n";
@@ -614,13 +620,15 @@ void walkAST(std::ostream &os, const Expression &expr, int depth = 0) {
     }
 
     if (ds->timezone) {
-      auto v = overloads{[](const TimezoneOffset &tz) {
-                           return std::format("Timezone({}+{})", tz.name,
-                                              tz.offset.count());
-                         },
-                         [](const NamedTimezone &tz) {
-                           return std::format("Timezone({})", tz.name);
-                         }};
+      auto v = [](const auto &tz) -> std::string {
+        using T = std::remove_cvref_t<decltype(tz)>;
+        if constexpr (std::is_same_v<T, TimezoneOffset>) {
+          return std::format("Timezone({}+{})", tz.name, tz.offset.count());
+        } else {
+          static_assert(std::is_same_v<T, NamedTimezone>);
+          return std::format("Timezone({})", tz.name);
+        }
+      };
 
       os << ident() << "\ttimezone " << std::visit(v, *ds->timezone) << "\n";
     }

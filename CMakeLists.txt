@@ -37,8 +37,6 @@ if (MSVC)
 	add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
-
 if (BUILD_REPL)
 	set(REPL_TARGET repl)
 	add_executable(${REPL_TARGET} src/repl.cpp)
@@ -56,7 +54,7 @@ if (BUILD_TESTS)
 		FetchContent_Declare(
 		  Catch2
 		  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-		  GIT_TAG        v3.8.1 # or a later release
+		  GIT_TAG        v3.8.1
 		)
 		FetchContent_MakeAvailable(Catch2)
 	endif()
@@ -68,7 +66,6 @@ if (BUILD_TESTS)
 		add_compile_options(${TEST_TARGET} -g3)
 	endif()
 
-	target_compile_features(${TEST_TARGET} PRIVATE cxx_std_23)
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
 	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
 endif()

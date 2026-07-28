@@ -1,5 +1,4 @@
 #include "abacus/abacus.hpp"
-#include <chrono>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cmath>
