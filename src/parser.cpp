@@ -9,7 +9,7 @@
 
 struct OperatorDefinition {
   std::string_view id;
-  std::initializer_list<std::string_view> aliases;
+  std::vector<std::string_view> aliases;
   int precedence;
 };
 

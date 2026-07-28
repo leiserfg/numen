@@ -1,5 +1,7 @@
 CompileFlags:
   CompilationDatabase: build
+  Add:
+    - -std:c++latest
   Remove:
     - -mno-direct-extern-access
 

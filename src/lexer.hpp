@@ -8,6 +8,10 @@
 
 namespace {
 constexpr std::string_view BASE_CHARS = "0123456789abcdef";
+
+// we hardcode these, in order to avoid ambiguity. Only result strings are localized.
+constexpr char THOUSAND_DELIM = '_';
+constexpr char FRACTION_DELIM = '.';
 }; // namespace
 
 class Lexer {
@@ -180,10 +184,12 @@ public:
         break;
       }
       case State::Number: {
-        if (c == '.') {
+        if (c == FRACTION_DELIM) {
           if (base == 10 && nfrac == 0) { nfrac = 1; }
           break;
         }
+
+        if (c == THOUSAND_DELIM) break;
 
         const auto pos = BASE_CHARS.find(std::tolower(c));
 

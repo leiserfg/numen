@@ -447,6 +447,27 @@ TEST_CASE("implicit multiplication of constants") {
   }
 }
 
+TEST_CASE("Handle thousand separators", "[number]") {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.compute("1_000_000 + 1_000");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    REQUIRE(res->asNumber()->n == 1001000);
+  };
+}
+
+TEST_CASE("Any amount of separator should be ignored", "[number]") {
+  abacus::Abacus calc;
+  {
+    auto res = calc.compute("1_0_0______0");
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    REQUIRE(res->asNumber()->n == 1000);
+  }
+}
+
 /*
 TEST_CASE("Basic percentage") {
   {
