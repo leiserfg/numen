@@ -1,13 +1,11 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Formats the Vicinae source tree on Windows: clang-format (C++), qmlformat
-    (QML) and biome (TypeScript). PowerShell equivalent of `make format` for
-    contributors who do not have GNU make / a POSIX shell on PATH.
+    Formats the codebase
 
 .PARAMETER Check
     Verify C++ formatting instead of rewriting files (clang-format --dry-run
-    -Werror). Exits non-zero on drift. Mirrors `make check-format`.
+    -Werror).
 
 .EXAMPLE
     pwsh scripts/format.ps1

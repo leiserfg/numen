@@ -7,8 +7,6 @@ const auto UTC = std::chrono::locate_zone("UTC");
 constexpr auto TAG = "[datetime]";
 
 const abacus::EvalConfig evalOpts = []() {
-  using namespace std::chrono_literals;
-
   // freeze "now" so that tests stay valid
   std::chrono::year_month_day now{std::chrono::year{2026},
                                   std::chrono::month{7}, std::chrono::day(26)};
