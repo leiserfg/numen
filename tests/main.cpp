@@ -468,7 +468,6 @@ TEST_CASE("Any amount of separator should be ignored", "[number]") {
   }
 }
 
-/*
 TEST_CASE("Basic percentage") {
   {
     auto eval = evaluate("20% of 100");
@@ -494,8 +493,5 @@ TEST_CASE("Basic percentage") {
     REQUIRE(eval.value() == "22");
   }
 
-  {
-    assertExpr("40% of 10^2", "40");
-  }
+  { assertExpr("40% of 10^2", "40"); }
 }
-*/

@@ -4,7 +4,9 @@
 #include <algorithm>
 #include <array>
 #include <initializer_list>
+#include <iostream>
 #include <numbers>
+#include <ostream>
 #include <string_view>
 
 struct OperatorDefinition {
@@ -425,6 +427,22 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
           ConversionExpression{.b = std::move(left), .target = NamedUnit{unit->raw}});
 
       continue;
+    }
+
+    bool pctOf = false;
+
+    if (tok->raw == "%") {
+      if (auto tok = m_lexer.peak(1); tok && tok->raw == "of") {
+        if (3 < minPrec) { break; }
+
+        m_lexer.next();
+        m_lexer.next();
+
+        auto rhs = parseMul();
+        auto lhs = makeBinExpr(std::move(left), makeNumberExpr(100), "/");
+        left = makeBinExpr(std::move(lhs), std::move(rhs), std::string{"*"});
+        continue;
+      }
     }
 
     auto it = std::ranges::find_if(
