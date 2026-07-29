@@ -168,16 +168,23 @@ public:
         return c;
       } else if constexpr (std::is_same_v<T, BinaryExpression>) {
         const auto &be = value;
-        if (be.op == "+") { return add(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "-") { return subtract(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "*") { return multiply(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "/") { return div(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "%") { return modulo(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "^") { return pow(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "<<") { return leftshift(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == ">>") { return rightshift(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "&") { return bitwiseAnd(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
-        if (be.op == "|") { return bitwiseor(computeExpr(*be.lhs), computeExpr(*be.rhs)); }
+        auto lhs = computeExpr(*be.lhs);
+        auto rhs = computeExpr(*be.rhs);
+
+        if (lhs.unitRaw && rhs.unitRaw && lhs.asNumber() && rhs.asNumber()) {
+          lhs = convertToUnit(lhs.asNumber()->n, *lhs.unitRaw, *rhs.unitRaw);
+        }
+
+        if (be.op == "+") { return add(lhs, rhs); }
+        if (be.op == "-") { return subtract(lhs, rhs); }
+        if (be.op == "*") { return multiply(lhs, rhs); }
+        if (be.op == "/") { return div(lhs, rhs); }
+        if (be.op == "%") { return modulo(lhs, rhs); }
+        if (be.op == "^") { return pow(lhs, rhs); }
+        if (be.op == "<<") { return leftshift(lhs, rhs); }
+        if (be.op == ">>") { return rightshift(lhs, rhs); }
+        if (be.op == "&") { return bitwiseAnd(lhs, rhs); }
+        if (be.op == "|") { return bitwiseor(lhs, rhs); }
 
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
@@ -222,60 +229,10 @@ public:
           }
 
           if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-
-            auto targetCandidates = m_db.findUnitCandidates(unit->name);
-
             // if converted expression has no unit there is nothing to do,
             // just tag it with the target unit... 1m to s 1m to in
             if (!v.unitRaw) return ComputedValue{.value = value, .unitRaw = unit->name};
-
-            auto valueCandidates = m_db.findUnitCandidates(*v.unitRaw);
-
-            auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
-              if (lhs.type != rhs.type) {
-                throw std::runtime_error(std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
-              }
-
-              auto res = m_db.convert(value.n, lhs, rhs);
-
-              if (!res) throw std::runtime_error(res.error());
-
-              return {.value = Number{res.value()}, .unitRaw = unit->name};
-            };
-
-            // only one choice on both sides, there is no ambiguity
-            if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
-              auto lhs = valueCandidates.front();
-              auto rhs = targetCandidates.front();
-              return convert(value.n, lhs, rhs);
-            }
-
-            // we are unable to infer what unit should be used, we need to
-            // wait for more info...
-            if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-              return ComputedValue{.value = value, .unitRaw = unit->name};
-            }
-
-            // 1s to 1m
-            if (valueCandidates.size() > targetCandidates.size()) {
-              auto rhs = targetCandidates.front();
-              auto lhs = std::ranges::find_if(valueCandidates,
-                                              [&](const UnitDef &unit) { return unit.type == rhs.type; });
-              if (lhs == valueCandidates.end()) {
-                throw std::runtime_error(std::format("Incompatible units: no common family"));
-              }
-              return convert(value.n, *lhs, rhs);
-            }
-
-            if (targetCandidates.size() > valueCandidates.size()) {
-              auto lhs = valueCandidates.front();
-              auto rhs = std::ranges::find_if(targetCandidates,
-                                              [&](const UnitDef &unit) { return unit.type == lhs.type; });
-              if (rhs == targetCandidates.end()) {
-                throw std::runtime_error(std::format("Incompatible units: no common type"));
-              }
-              return convert(value.n, lhs, *rhs);
-            }
+            return convertToUnit(n->n, *v.unitRaw, unit->name);
           }
         }
         throw std::runtime_error("unexpected conversion flow");
@@ -303,6 +260,58 @@ public:
   }
 
 private:
+  ComputedValue convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
+    auto valueCandidates = m_db.findUnitCandidates(fromUnit);
+    auto targetCandidates = m_db.findUnitCandidates(toUnit);
+
+    auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
+      if (lhs.type != rhs.type) {
+        throw std::runtime_error(std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
+      }
+
+      auto res = m_db.convert(n, lhs, rhs);
+
+      if (!res) throw std::runtime_error(res.error());
+
+      return {.value = Number{res.value()}, .unitRaw = toUnit};
+    };
+
+    // only one choice on both sides, there is no ambiguity
+    if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
+      auto lhs = valueCandidates.front();
+      auto rhs = targetCandidates.front();
+      return convert(v, lhs, rhs);
+    }
+
+    // we are unable to infer what unit should be used, we need to
+    // wait for more info...
+    if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
+      return ComputedValue{.value = Number{v}, .unitRaw = toUnit};
+    }
+
+    // 1s to 1m
+    if (valueCandidates.size() > targetCandidates.size()) {
+      auto rhs = targetCandidates.front();
+      auto lhs =
+          std::ranges::find_if(valueCandidates, [&](const UnitDef &unit) { return unit.type == rhs.type; });
+      if (lhs == valueCandidates.end()) {
+        throw std::runtime_error(std::format("Incompatible units: no common family"));
+      }
+      return convert(v, *lhs, rhs);
+    }
+
+    if (targetCandidates.size() > valueCandidates.size()) {
+      auto lhs = valueCandidates.front();
+      auto rhs =
+          std::ranges::find_if(targetCandidates, [&](const UnitDef &unit) { return unit.type == lhs.type; });
+      if (rhs == targetCandidates.end()) {
+        throw std::runtime_error(std::format("Incompatible units: no common type"));
+      }
+      return convert(v, lhs, *rhs);
+    }
+    throw std::runtime_error("something bad happened");
+  }
+
   template <typename T, typename U = T>
   static void assertBinary(const ComputedValue &lhs, const ComputedValue &rhs) {
     bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
@@ -339,6 +348,7 @@ private:
     }
 
     assertBinary<Number, Number>(lhs, rhs);
+
     return output(lhs.asNumber()->n + rhs.asNumber()->n, lhs, rhs);
   }
 
@@ -348,6 +358,7 @@ private:
   }
 
   static ComputedValue multiply(const ComputedValue &lhs, const ComputedValue &rhs) {
+
     assertBinary<Number, Number>(lhs, rhs);
     return output(lhs.asNumber()->n * rhs.asNumber()->n, lhs, rhs);
   }
