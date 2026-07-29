@@ -36,6 +36,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 	${VENDOR_DIR}
 	${VENDOR_DIR}/boost-mp/include
 )
+target_link_libraries(${PROJECT_NAME} Boost::multiprecision)
 
 if (MSVC)
 	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /W3 /wd4996)
@@ -45,7 +46,6 @@ endif()
 if (BUILD_REPL)
 	set(REPL_TARGET repl)
 	add_executable(${REPL_TARGET} src/repl.cpp)
-	target_compile_features(${REPL_TARGET} PRIVATE cxx_std_23)
 	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME})
 	target_include_directories(${REPL_TARGET} PRIVATE ./include)
 endif()
