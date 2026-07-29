@@ -19,7 +19,7 @@ endif()
 option(USE_SYSTEM_CATCH "Use system catch2 for testing. Fetch it from GitHub otherwise." ${DEFAULT_USE_SYSTEM_CATCH})
 
 if (WIN32 AND NOT MSVC)
-	message(FATAL_ERROR "Windows builds are only supported with MSVC (got '${CMAKE_CXX_COMPILER_ID}'). Use the windows-* presets or set -DCMAKE_CXX_COMPILER=cl.")
+	message(FATAL_ERROR "Windows builds are only supported with MSVC (got '${CMAKE_CXX_COMPILER_ID}'). Please set -DCMAKE_CXX_COMPILER=cl.")
 endif()
 
 add_library(${PROJECT_NAME}
@@ -27,9 +27,14 @@ add_library(${PROJECT_NAME}
 	src/parser.cpp
 	src/timezone.cpp
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_MP_STANDALONE=1)
+add_subdirectory(${VENDOR_DIR}/boost-mp)
+
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${VENDOR_DIR}
+	${VENDOR_DIR}/boost-mp/include
 )
 
 if (MSVC)
