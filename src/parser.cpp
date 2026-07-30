@@ -1,13 +1,16 @@
 #include "parser.hpp"
+#include "abacus/abacus.hpp"
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <initializer_list>
 #include <iostream>
 #include <numbers>
 #include <ostream>
 #include <string_view>
+#include <type_traits>
 
 struct OperatorDefinition {
   std::string_view id;
@@ -99,6 +102,65 @@ std::optional<std::string_view> Parser::parseUnit() {
   return std::nullopt;
 }
 
+// Jan 18 2021
+// 18 Jan 2021
+// 18 Jan
+// Jan 18
+// a month can never appear in its numeric form here (very convenient)
+// <weekday_name | day_of_month> <month_name> <year> => 18 Jan 2024
+// <month_name> <weekday_name | day_of_month> <year> => Jan 18 2024
+std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
+  std::optional<std::chrono::weekday> weekday;
+  std::optional<std::chrono::day> day;
+  std::optional<std::chrono::month> month;
+  std::optional<std::chrono::year> year;
+
+  int i = 0;
+
+  while (i < 3) {
+    auto tok = m_lexer.peak(i);
+    if (!tok) break;
+
+    if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
+      if (it->n >= 1 && it->n <= 31) {
+        day = std::chrono::day{static_cast<unsigned>(it->n)};
+      } else {
+        year = std::chrono::year{static_cast<int>(it->n)};
+      }
+    } else if (auto m = m_dateStringVocab.asMonth(tok->raw)) {
+      month = *m;
+    } else if (auto week = m_dateStringVocab.asWeekday(tok->raw)) {
+      weekday = *week;
+    } else {
+      break;
+    }
+
+    ++i;
+  }
+
+  const bool hasDay = weekday || day;
+
+  if (month && year && !hasDay) { day = std::chrono::day{1}; }
+
+  if ((hasDay && (month || year)) || (month && year)) {
+    DateTimeLiteral lit;
+
+    lit.month = month;
+    lit.year = year;
+
+    if (weekday) lit.day = weekday;
+    if (day) lit.day = day;
+
+    for (int j = 0; j != i; ++j) {
+      m_lexer.next();
+    }
+
+    return lit;
+  }
+
+  return std::nullopt;
+}
+
 // parse YYYY/MM/DD or MM/DD/YYYY or DD/MM/YYYY
 // requires that the '/' separators are strictly adjacent
 // to the numbers (no spaces) in order to be considered a date literal
@@ -167,6 +229,11 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
 std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto d = parseYYYYMMDD()) {
+    d->time = parseTime();
+    return d;
+  }
+
+  if (auto d = parseNaturalDateLiteral()) {
     d->time = parseTime();
     return d;
   }

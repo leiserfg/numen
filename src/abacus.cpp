@@ -24,18 +24,31 @@ namespace abacus {
 
 TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time_zone &tz, TimePoint now) {
   std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
-  std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()),
-                                   d.day.value_or(today.day())};
 
-  std::chrono::local_seconds t{std::chrono::local_days{date}};
+  auto process = [&](auto &&date) {
+    std::chrono::local_seconds t{std::chrono::local_days{date}};
 
-  if (auto time = d.time) {
-    if (auto h = time->hours) t += *h;
-    if (auto min = time->minutes) t += *min;
-    if (auto secs = time->seconds) t += *secs;
-  }
+    if (auto time = d.time) {
+      if (auto h = time->hours) t += *h;
+      if (auto min = time->minutes) t += *min;
+      if (auto secs = time->seconds) t += *secs;
+    }
+    return tz.to_sys(t);
+  };
 
-  return tz.to_sys(t);
+  return std::visit(
+      [&](const auto &v) {
+        using T = std::remove_cvref_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::chrono::weekday>) {
+          std::chrono::year_month_weekday date{d.year.value_or(today.year()), d.month.value_or(today.month()),
+                                               v[0]};
+          return process(date);
+        } else if constexpr (std::is_same_v<T, std::chrono::day>) {
+          std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()), v};
+          return process(date);
+        }
+      },
+      d.day.value_or(today.day()));
 }
 
 DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now) {

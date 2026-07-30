@@ -78,7 +78,7 @@ struct ParsedTime {
 };
 
 struct DateTimeLiteral {
-  std::optional<std::chrono::day> day;
+  std::optional<std::variant<std::chrono::day, std::chrono::weekday>> day;
   std::optional<std::chrono::month> month;
   std::optional<std::chrono::year> year;
   std::optional<ParsedTime> time;
@@ -130,6 +130,7 @@ public:
 
   bool isTimezoneToken(std::string_view name);
   std::optional<DateTimeLiteral> parseYYYYMMDD();
+  std::optional<DateTimeLiteral> parseNaturalDateLiteral();
   std::optional<DateTimeLiteral> parseDate();
   // [<hour>]:[minute]:[second]
   std::optional<ParsedTime> parseTime();

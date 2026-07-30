@@ -122,6 +122,73 @@ TEST_CASE("should parse month name", TAG) {
   }
 }
 
+TEST_CASE("should parse <month_name> <day_of_the_month>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("Jan 18", evalOpts);
+    REQUIRE(res.value() == "2026-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+
+  {
+    auto res = calc.evaluate("January 18", evalOpts);
+    REQUIRE(res.value() == "2026-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("should parse <month_name> <day_of_the_month> <year>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("Jan 18 2025", evalOpts);
+    REQUIRE(res.value() == "2025-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("should parse <year> <month_name> <day_of_the_month>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("2025 Jan 18", evalOpts);
+    REQUIRE(res.value() == "2025-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+// very cursed, but hey...
+TEST_CASE("should parse <month_name> <year> <day_of_the_month>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("Jan 2025 18", evalOpts);
+    REQUIRE(res.value() == "2025-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("should parse <month_name> <year>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("Jan 2025", evalOpts);
+    REQUIRE(res.value() == "2025-01-01 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("should parse <year> <month_name>", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("2025 Jan", evalOpts);
+    REQUIRE(res.value() == "2025-01-01 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
 TEST_CASE("subtracting two dates should produce the difference in seconds", TAG) {
   {
     abacus::Abacus calc;
