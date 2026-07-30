@@ -69,8 +69,6 @@ enum class Meridiem { AM, PM };
 // time_lit = <hour>[:<min>:<sec>][am|pm]
 // date = [now|time_lit] [in <TZ>]
 
-struct RelativeDateString {};
-
 struct ParsedTime {
   std::optional<std::chrono::hours> hours;
   std::optional<std::chrono::minutes> minutes;
@@ -126,7 +124,7 @@ class Parser {
 public:
   Parser(std::string_view data, const UnitDatabase &unitDb);
 
-  std::optional<std::string_view> parseUnit();
+  std::optional<OpaqueUnit> parseUnit();
 
   bool isTimezoneToken(std::string_view name);
   std::optional<DateTimeLiteral> parseYYYYMMDD();

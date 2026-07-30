@@ -26,6 +26,7 @@ add_library(${PROJECT_NAME}
 	src/abacus.cpp
 	src/parser.cpp
 	src/timezone.cpp
+	src/unit.cpp
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_MP_STANDALONE=1)

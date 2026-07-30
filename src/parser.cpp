@@ -1,14 +1,11 @@
 #include "parser.hpp"
-#include "abacus/abacus.hpp"
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <initializer_list>
-#include <iostream>
 #include <numbers>
-#include <ostream>
 #include <string_view>
 #include <type_traits>
 
@@ -95,7 +92,7 @@ bool Parser::isTimezoneToken(std::string_view name) {
   return TimezoneDB{}.query(name);
 }
 
-std::optional<std::string_view> Parser::parseUnit() {
+std::optional<OpaqueUnit> Parser::parseUnit() {
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
     if (auto unit = m_unitDb.findUnit(std::string{tok->raw})) { return tok->raw; }
   }

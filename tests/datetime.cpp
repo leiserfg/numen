@@ -189,6 +189,50 @@ TEST_CASE("should parse <year> <month_name>", TAG) {
   }
 }
 
+TEST_CASE("should be able to add months to date", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 4 month", evalOpts);
+    REQUIRE(res.value() == "2001-05-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 4 months", evalOpts);
+    REQUIRE(res.value() == "2001-05-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 4mo", evalOpts);
+    REQUIRE(res.value() == "2001-05-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("should be able to add years to date", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 1 year", evalOpts);
+    REQUIRE(res.value() == "2002-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 3 years", evalOpts);
+    REQUIRE(res.value() == "2004-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+
+  {
+    auto res = calc.evaluate("01/18/2001 + 1yr", evalOpts);
+    REQUIRE(res.value() == "2002-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
 TEST_CASE("subtracting two dates should produce the difference in seconds", TAG) {
   {
     abacus::Abacus calc;

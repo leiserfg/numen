@@ -4,6 +4,7 @@
 #include "rang/rang.hpp"
 #include "timezone.hpp"
 #include <algorithm>
+#include <bits/chrono.h>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -21,6 +22,28 @@
 #include <variant>
 
 namespace abacus {
+
+TimePoint shiftMonth(TimePoint t, int delta) {
+  auto time = std::chrono::floor<std::chrono::days>(t);
+  std::chrono::year_month_day ymd{time};
+  auto tod = t - time;
+  ymd += std::chrono::months(static_cast<int>(delta));
+
+  auto point = std::chrono::sys_days{ymd} + tod;
+
+  return point;
+}
+
+TimePoint shiftYear(TimePoint t, int delta) {
+  auto time = std::chrono::floor<std::chrono::days>(t);
+  std::chrono::year_month_day ymd{time};
+  auto tod = t - time;
+  ymd += std::chrono::years(static_cast<int>(delta));
+
+  auto point = std::chrono::sys_days{ymd} + tod;
+
+  return point;
+}
 
 TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time_zone &tz, TimePoint now) {
   std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
@@ -349,6 +372,18 @@ private:
         auto second = m_db.findUnit("second");
 
         if (it != candidates.end()) {
+          if (it->id == "month") {
+            DateTime dt = *d;
+            dt.time = shiftMonth(dt.time, static_cast<int>(rhs.asNumber()->n));
+            return ComputedValue{.value = dt};
+          }
+
+          if (it->id == "year") {
+            DateTime dt = *d;
+            dt.time = shiftYear(dt.time, static_cast<int>(rhs.asNumber()->n));
+            return ComputedValue{.value = dt};
+          }
+
           // convert everything to seconds, then add it to time
           auto diff = m_db.convert(n->n, *it, *second);
           auto time = d->time + std::chrono::seconds(static_cast<int>(diff.value()));
