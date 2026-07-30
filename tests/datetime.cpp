@@ -99,3 +99,23 @@ TEST_CASE("should parse MM/DD/YYYY", TAG) {
   REQUIRE(res.value() == "2001-01-18 00:00:00 (Etc/UTC)");
   REQUIRE(true);
 }
+
+TEST_CASE("subtracting two dates should produce the difference in seconds") {
+  {
+    abacus::Abacus calc;
+    auto res = calc.compute("01/18/2001 1:00:00 - 01/18/2001 00:00:00", evalOpts);
+
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    REQUIRE(res->asNumber()->n == 3600); // 1 hour
+  }
+
+  {
+    abacus::Abacus calc;
+    auto res = calc.compute("01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours", evalOpts);
+
+    REQUIRE(res);
+    REQUIRE(res->isNumber());
+    REQUIRE(res->asNumber()->n == 1); // 1 hour
+  }
+}

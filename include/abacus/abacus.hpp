@@ -21,6 +21,10 @@ struct DateTime {
   DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
 };
 
+struct Time {
+  std::chrono::seconds seconds;
+};
+
 enum class NumberOutputFormat { Decimal, Hexadecimal, Binary, Octal };
 
 struct Number {

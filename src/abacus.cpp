@@ -353,6 +353,16 @@ private:
   }
 
   static ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) {
+    if (lhs.isDateTime() && rhs.isDateTime()) {
+      auto diff =
+          std::chrono::duration_cast<std::chrono::seconds>(lhs.asDateTime()->time - rhs.asDateTime()->time);
+
+      return ComputedValue{
+          .value = Number{static_cast<double>(diff.count())},
+          .unitRaw = "second",
+      };
+    }
+
     assertBinary<Number, Number>(lhs, rhs);
     return output(lhs.asNumber()->n - rhs.asNumber()->n, lhs, rhs);
   }
