@@ -100,7 +100,29 @@ TEST_CASE("should parse MM/DD/YYYY", TAG) {
   REQUIRE(true);
 }
 
-TEST_CASE("subtracting two dates should produce the difference in seconds") {
+TEST_CASE("should parse month name", TAG) {
+  abacus::Abacus calc;
+
+  {
+    auto res = calc.evaluate("18 Jan 2001", evalOpts);
+
+    REQUIRE(res.value() == "2001-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+  {
+    auto res = calc.evaluate("18 January 2001", evalOpts);
+
+    REQUIRE(res.value() == "2001-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+  {
+    auto res = calc.evaluate("18 january 2001", evalOpts);
+    REQUIRE(res.value() == "2001-01-18 00:00:00 (Etc/UTC)");
+    REQUIRE(true);
+  }
+}
+
+TEST_CASE("subtracting two dates should produce the difference in seconds", TAG) {
   {
     abacus::Abacus calc;
     auto res = calc.compute("01/18/2001 1:00:00 - 01/18/2001 00:00:00", evalOpts);

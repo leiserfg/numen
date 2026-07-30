@@ -160,5 +160,6 @@ protected:
 
 private:
   Lexer m_lexer;
+  DateStringVocab m_dateStringVocab;
   const UnitDatabase &m_unitDb;
 };

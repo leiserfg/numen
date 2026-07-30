@@ -73,22 +73,6 @@ std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner, std::str
   });
 }
 
-std::optional<std::chrono::weekday> parseWeekday(std::string_view s) {
-  std::istringstream is{std::string{s}};
-  std::chrono::weekday m;
-  is >> std::chrono::parse("{:L%a}", m);
-  if (!is) return std::nullopt;
-  return m;
-}
-
-std::optional<std::chrono::month> parseMonth(std::string_view s) {
-  std::istringstream is{std::string{s}};
-  std::chrono::month m;
-  is >> std::chrono::parse("%b", m);
-  if (!is) return std::nullopt;
-  return m;
-}
-
 bool isRelativeDateToken(std::string_view name) {
   // handle more relative expressions, e.g "last week" etc...
   return name == "time" || name == "date" || name == "now" || name == "yesterday";
@@ -191,7 +175,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
     if (auto m = m_lexer.peak(1)) {
 
-      if (auto month = parseMonth(m->raw)) {
+      if (auto month = m_dateStringVocab.asMonth(m->raw)) {
         DateTimeLiteral d;
         d.day = std::chrono::day{static_cast<unsigned>(toNumber(tok->raw))};
         d.month = month;
