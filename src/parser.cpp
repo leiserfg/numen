@@ -15,17 +15,28 @@ struct OperatorDefinition {
   int precedence;
 };
 
-const auto OPERATORS = std::to_array<OperatorDefinition>(
-    {OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 1},
-     OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 1},
-     OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 1},
-     OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 1},
-     OperatorDefinition{.id = "+", .aliases = {"+", "add", "plus"}, .precedence = 2},
-     OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 2},
-     OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 3},
-     OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 3},
-     OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 3},
-     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = 4}});
+// clang-format off
+const auto OPERATORS = std::to_array<OperatorDefinition>({
+     OperatorDefinition{.id = "==", .aliases = {"=="}, .precedence = 1},
+     OperatorDefinition{.id = "!=", .aliases = {"!="}, .precedence = 1},
+     OperatorDefinition{.id = ">", .aliases = {">"}, .precedence = 1},
+     OperatorDefinition{.id = ">=", .aliases = {">="}, .precedence = 1},
+     OperatorDefinition{.id = "<", .aliases = {"<"}, .precedence = 1},
+     OperatorDefinition{.id = "<=", .aliases = {"<="}, .precedence = 1},
+
+     OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 2},
+     OperatorDefinition{.id = ">>", .aliases = {">>"}, .precedence = 2},
+     OperatorDefinition{.id = "<<", .aliases = {"<<"}, .precedence = 2},
+     OperatorDefinition{.id = "|", .aliases = {"|"}, .precedence = 2},
+     OperatorDefinition{.id = "&", .aliases = {"&"}, .precedence = 2},
+     OperatorDefinition{.id = "+", .aliases = {"+", "add", "plus"}, .precedence = 3},
+     OperatorDefinition{.id = "-", .aliases = {"-", "minus"}, .precedence = 3},
+     OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 4},
+     OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 4},
+     OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 4},
+     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = 5}
+});
+// clang-format on
 
 struct ConstantDef {
   std::string_view name;

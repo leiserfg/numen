@@ -66,7 +66,7 @@ if (BUILD_TESTS)
 	endif()
 
 	set(TEST_TARGET abacus-tests)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/datetime.cpp tests/unit.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/datetime.cpp tests/unit.cpp tests/compare.cpp)
 
 	if (NOT MSVC)
 		add_compile_options(${TEST_TARGET} -g3)

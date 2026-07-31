@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
-#include <iostream>
 
 TEST_CASE("should find timezone using fully qualifed name", "timezone") {
   TimezoneDB db;

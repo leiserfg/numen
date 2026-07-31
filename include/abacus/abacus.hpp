@@ -1,7 +1,7 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include <chrono>
-#include <ctime>
+#include <compare>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -19,6 +19,9 @@ struct DateTime {
   std::chrono::seconds offset = std::chrono::seconds(0);
 
   DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
+
+  auto operator<=>(const DateTime &rhs) const { return time <=> rhs.time; }
+  bool operator==(const DateTime &rhs) const { return time == rhs.time; }
 };
 
 struct Time {
@@ -30,9 +33,17 @@ enum class NumberOutputFormat { Decimal, Hexadecimal, Binary, Octal };
 struct Number {
   double n;
   NumberOutputFormat format;
+
+  bool operator==(const Number &rhs) const { return n == rhs.n; }
+  std::partial_ordering operator<=>(const Number &rhs) const { return n <=> rhs.n; }
 };
 
-using ValueType = std::variant<Number, DateTime, bool>;
+struct Boolean {
+  bool value;
+  auto operator<=>(const Boolean &rhs) const = default;
+};
+
+using ValueType = std::variant<Number, DateTime, Boolean>;
 
 struct ComputedValue {
 
@@ -46,7 +57,6 @@ struct ComputedValue {
   bool isNumber() const { return std::holds_alternative<Number>(value); }
 
   bool isDateTime() const { return std::holds_alternative<DateTime>(value); }
-  bool isBool() const { return std::holds_alternative<bool>(value); }
 
   const Number *asNumber() const { return std::get_if<Number>(&value); }
   const DateTime *asDateTime() const { return std::get_if<DateTime>(&value); }

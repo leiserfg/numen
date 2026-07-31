@@ -222,6 +222,13 @@ public:
         if (be.op == "&") { return bitwiseAnd(lhs, rhs); }
         if (be.op == "|") { return bitwiseor(lhs, rhs); }
 
+        if (be.op == "==") { return ComputedValue{.value = Boolean{lhs.value == rhs.value}}; }
+        if (be.op == "!=") { return ComputedValue{.value = Boolean{lhs.value != rhs.value}}; }
+        if (be.op == ">") { return ComputedValue{.value = Boolean{lhs.value > rhs.value}}; }
+        if (be.op == ">=") { return ComputedValue{.value = Boolean{lhs.value >= rhs.value}}; }
+        if (be.op == "<") { return ComputedValue{.value = Boolean{lhs.value < rhs.value}}; }
+        if (be.op == "<=") { return ComputedValue{.value = Boolean{lhs.value <= rhs.value}}; }
+
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
         const auto &conv = value;
@@ -516,8 +523,8 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
       } else if constexpr (std::is_same_v<T, DateTime>) {
         return formatDate(value);
       } else {
-        static_assert(std::is_same_v<T, bool>);
-        return value ? "true" : "false";
+        static_assert(std::is_same_v<T, Boolean>);
+        return value.value ? "true" : "false";
       }
     };
 

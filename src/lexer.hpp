@@ -128,7 +128,8 @@ public:
 
     auto tryCommit = [&]() -> std::optional<Token> {
       switch (state) {
-      case State::Number: {
+      case State::Number:
+      case State::NumberBase: {
         return makeToken(TokenType::Number, Number{.n = n, .fromBase = base});
       }
       case State::String:

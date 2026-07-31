@@ -155,7 +155,7 @@ protected:
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);
-  std::unique_ptr<Expression> parseMul() { return pratParse(3); }
+  std::unique_ptr<Expression> parseMul() { return pratParse(4); }
 
 private:
   Lexer m_lexer;
