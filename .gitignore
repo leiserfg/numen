@@ -45,3 +45,5 @@ heaptrack*
 .envrc.local
 
 *.pdb
+
+/Testing

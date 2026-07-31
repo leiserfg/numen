@@ -1,84 +1,42 @@
-#include "abacus/abacus.hpp"
-#include "catch2/matchers/catch_matchers.hpp"
+#include "helpers.hpp"
 #include <catch2/catch_test_macros.hpp>
-#include <cmath>
+#include <catch2/generators/catch_generators.hpp>
 #include <numbers>
 #include <string_view>
-#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-using Catch::Matchers::WithinAbs;
+using test::assertExpr;
+using test::assertNumber;
 
-auto inline evaluate(std::string_view expr) {
-  abacus::Abacus calc;
-  return calc.evaluate(expr);
+TEST_CASE("Should compute basic expression", "[arithmetic]") { assertExpr("1 + 1", "2"); }
+
+TEST_CASE("Should compute basic expression with many terms", "[arithmetic]") {
+  assertExpr("1 + 1 + 1", "3");
 }
 
-#define assertExpr(expr, expected)                                                                           \
-  {                                                                                                          \
-    abacus::Abacus calc;                                                                                     \
-    auto res = calc.evaluate(std::string{expr});                                                             \
-    REQUIRE(res);                                                                                            \
-    REQUIRE(res.value() == expected);                                                                        \
-  }
+TEST_CASE("proper priority without parentheses", "[priority]") { assertExpr("1 + 2 * 4", "9"); }
 
-#define assertPrecision(a, b, precision)                                                                     \
-  { REQUIRE_THAT(a, WithinAbs(b, std::pow(10, -precision))); }
-
-TEST_CASE("Should compute basic expression") {
-  auto eval = evaluate("1 + 1");
-  REQUIRE(eval);
-  REQUIRE(eval.value() == "2");
+TEST_CASE("Should parse floating point numbers correctly", "[float]") {
+  assertNumber("2.345678", 2.345678, 1e-7);
 }
 
-TEST_CASE("Should compute basic expression with many terms") {
-  auto eval = evaluate("1 + 1 + 1");
-  REQUIRE(eval);
-  REQUIRE(eval.value() == "3");
+TEST_CASE("Should add floating point numbers correctly", "[float]") {
+  assertNumber("2.345678 + 1.42", 3.765678, 1e-7);
 }
 
-TEST_CASE("proper priority without parentheses") {
-  auto eval = evaluate("1 + 2 * 4");
-  REQUIRE(eval);
-  REQUIRE(eval.value() == "9");
-}
+TEST_CASE("priority with parentheses", "[priority]") { assertExpr("(1 + 2) * 4", "12"); }
 
-TEST_CASE("Should parse floating point numbers correctly") {
-  abacus::Abacus calc;
-  auto res = calc.compute("2.345678");
-
-  REQUIRE(res);
-  REQUIRE(res->isNumber());
-  assertPrecision(res->asNumber()->n, 2.345678, 7);
-}
-
-TEST_CASE("Should add floating point numbers correctly") {
-  abacus::Abacus calc;
-  auto res = calc.compute("2.345678 + 1.42");
-
-  REQUIRE(res);
-  REQUIRE(res->isNumber());
-  assertPrecision(res->asNumber()->n, 3.765678, 7);
-}
-
-TEST_CASE("priority with parentheses") {
-  auto eval = evaluate("(1 + 2) * 4");
-  REQUIRE(eval);
-  REQUIRE(eval.value() == "12");
-}
-
-TEST_CASE("modulo operator") {
+TEST_CASE("modulo operator", "[arithmetic]") {
   assertExpr("5 % 2", "1");
   assertExpr("6 % 2", "0");
-  // assertExpr("6 mod 2", "0");
-  // assertExpr("6 modulo 2", "0");
+  assertExpr("6 mod 2", "0");
+  assertExpr("6 modulo 2", "0");
 }
 
-TEST_CASE("addition operator") { assertExpr("1 + 1", "2"); }
+TEST_CASE("addition operator", "[arithmetic]") { assertExpr("1 + 1", "2"); }
 
 TEST_CASE("should support negative number", "[unary]") {
   assertExpr("-1", "-1");
   assertExpr("-1 + -1", "-2");
-  assertExpr("-1 - 1", "-2");
   assertExpr("-1 - 1", "-2");
   assertExpr("-1 + - 1", "-2");
 }
@@ -91,57 +49,51 @@ TEST_CASE("as many unary operators can be used", "[unary]") {
   assertExpr("--++ ++ ++++++ - -123 + 1", "124");
 }
 
-TEST_CASE("minus operator") {
+TEST_CASE("minus operator", "[arithmetic]") {
   assertExpr("1 - 1", "0");
   assertExpr("1 - 5", "-4");
 }
 
-TEST_CASE("multiplication operator") {
-  // assertExpr("5 mul 5", "25");
+TEST_CASE("multiplication operator", "[arithmetic]") {
   assertExpr("5 * 5", "25");
-  // assertExpr("5 * 5 mul 10", "250");
-  // assertExpr("5 * (5 mul 10 + 1)", "255");
+  assertExpr("5 mul 5", "25");
+  assertExpr("5 * 5 mul 10", "250");
+  assertExpr("5 * (5 mul 10 + 1)", "255");
 }
 
-TEST_CASE("division operator") {
-  // assertExpr("5 div 5", "1");
+TEST_CASE("division operator", "[arithmetic]") {
   assertExpr("5 / 5", "1");
-  // assertExpr("100 div 10 / 2", "5")
+  assertExpr("5 div 5", "1");
+  assertExpr("100 div 10 / 2", "5");
 }
 
-TEST_CASE("expression support") {}
-
-TEST_CASE("whitespaces do no matter") {
+TEST_CASE("whitespaces do no matter", "[lexer]") {
   assertExpr("1+1", "2");
   assertExpr("(1+1)/2", "1");
   assertExpr("((1+1)/2)*2", "2");
 }
 
-TEST_CASE("basic float support") {
+TEST_CASE("basic float support", "[float]") {
   assertExpr("1.2 + 2.5", "3.7");
   assertExpr("5 / 2", "2.5");
 }
 
-TEST_CASE("nested parentheses") {
-  {
-    auto eval = evaluate("((1 + 2) * 4) / 2");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "6");
-  }
-  {
-    auto eval = evaluate("(1 + 2) * 4 / 2");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "6");
-  }
+TEST_CASE("nested parentheses", "[priority]") {
+  assertExpr("((1 + 2) * 4) / 2", "6");
+  assertExpr("(1 + 2) * 4 / 2", "6");
 }
 
-TEST_CASE("exponent operator") {
+TEST_CASE("exponent operator", "[arithmetic]") {
   // we support a few nlp variations
   assertExpr("2 ^ 8", "256");
+  assertExpr("2 pow 8", "256");
   assertExpr("2 power 8", "256");
-  // assertExpr("2 to the power of 8", "256");
-  // assertExpr("100 + 2 to the power of 8", "356");
-  // assertExpr("2 exp 8", "256");
+}
+
+TEST_CASE("planned NLP operator phrasings", "[.][future]") {
+  assertExpr("2 to the power of 8", "256");
+  assertExpr("100 + 2 to the power of 8", "356");
+  assertExpr("2 exp 8", "256");
 }
 
 TEST_CASE("function call should be recognized", "[function]") {
@@ -153,7 +105,7 @@ TEST_CASE("expressions can be used inside function parameters", "[function]") {
   assertExpr("max(1 km to m, 100)", "1000");
 }
 
-TEST_CASE("Function call in function argument", "function") { assertExpr("max(min(1, 10),max(1, 5))", "5"); }
+TEST_CASE("Function call in function argument", "[function]") { assertExpr("max(min(1, 10),max(1, 5))", "5"); }
 
 TEST_CASE("leftshit works", "[bitwise]") {
   assertExpr("1 << 8", "256");
@@ -200,148 +152,62 @@ TEST_CASE("implicit multiplication for parenthesized terms", "[priority]") {
 }
 
 TEST_CASE("support common constants", "[constant]") {
-  std::initializer_list<std::tuple<std::string_view, double>> constants{
+  auto [name, value] = GENERATE(table<std::string_view, double>({
       {"pi", std::numbers::pi},
       {"e", std::numbers::e},
       {"phi", std::numbers::phi},
-  };
-  abacus::Abacus calc;
+  }));
 
-  for (auto [name, value] : constants) {
-    auto res = calc.compute(name);
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    REQUIRE(res->asNumber()->n == value);
-  }
+  assertNumber(name, value, 0);
 }
 
 TEST_CASE("support operations with constants", "[constant]") {
-  abacus::Abacus calc;
-
-  {
-    auto res = calc.compute("pi");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, 3.14, 2);
-  }
-
-  {
-    auto res = calc.compute("pi*2");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, 6.28, 2);
-  }
-
-  {
-    auto res = calc.compute("2*pi");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, 6.28, 2);
-  }
-
-  {
-    auto res = calc.compute("2(pi)");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, 6.28, 2);
-  }
+  assertNumber("pi", 3.14, 1e-2);
+  assertNumber("pi*2", 6.28, 1e-2);
+  assertNumber("2*pi", 6.28, 1e-2);
+  assertNumber("2(pi)", 6.28, 1e-2);
 }
 
-TEST_CASE("implicit multiplication of constants") {
-  abacus::Abacus calc;
+TEST_CASE("implicit multiplication of constants", "[constant]") {
   constexpr auto pi2 = std::numbers::pi * 2;
   constexpr auto pi4 = std::numbers::pi * 4;
 
-  {
-    auto res = calc.compute("2pi");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, pi2, 2);
-  }
+  auto [expr, expected] = GENERATE_COPY(table<std::string_view, double>({
+      {"2pi", pi2},
+      {"pi2", pi2},
+      {"4 * 2pi + 1", 4 * pi2 + 1},
+      {"pi(1+1)", pi2},
+      {"(1+1)pi", pi2},
+      {"pi2^2", pi4},
+      {"2^2pi", pi4},
+  }));
 
-  {
-    auto res = calc.compute("pi2");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, pi2, 2);
-  }
-
-  {
-    auto res = calc.compute("4 * 2pi + 1");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, 4 * std::numbers::pi * 2 + 1, 2);
-  }
-
-  {
-    auto res = calc.compute("pi(1+1)");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, pi2, 2);
-  }
-
-  {
-    auto res = calc.compute("(1+1)pi");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    assertPrecision(res->asNumber()->n, pi2, 2);
-  }
-
-  {
-    for (auto s : {"pi2^2", "2^2pi"}) {
-      auto res = calc.compute(s);
-      REQUIRE(res);
-      REQUIRE(res->isNumber());
-      assertPrecision(res->asNumber()->n, pi4, 2);
-    }
-  }
+  assertNumber(expr, expected, 1e-2);
 }
 
-TEST_CASE("Handle thousand separators", "[number]") {
+TEST_CASE("Handle thousand separators", "[number]") { assertNumber("1_000_000 + 1_000", 1001000); }
+
+TEST_CASE("Any amount of separator should be ignored", "[number]") { assertNumber("1_0_0______0", 1000); }
+
+TEST_CASE("Basic percentage", "[percentage]") {
+  assertExpr("20% of 100", "20");
+  assertExpr("20% of 100 * 2", "40");
+  assertExpr("(20% of 100) * 2", "40");
+  assertExpr("(10 + 10)% of 100 + 2", "22");
+  assertExpr("40% of 10^2", "40");
+}
+
+TEST_CASE("malformed expressions should error", "[error]") {
   abacus::Abacus calc;
 
-  {
-    auto res = calc.compute("1_000_000 + 1_000");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    REQUIRE(res->asNumber()->n == 1001000);
-  };
+  CHECK(!calc.evaluate("1 +"));
+  CHECK(!calc.evaluate("*5"));
 }
 
-TEST_CASE("Any amount of separator should be ignored", "[number]") {
+TEST_CASE("unknown function should error with its name", "[error]") {
   abacus::Abacus calc;
-  {
-    auto res = calc.compute("1_0_0______0");
-    REQUIRE(res);
-    REQUIRE(res->isNumber());
-    REQUIRE(res->asNumber()->n == 1000);
-  }
-}
 
-TEST_CASE("Basic percentage") {
-  {
-    auto eval = evaluate("20% of 100");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "20");
-  }
-
-  {
-    auto eval = evaluate("20% of 100 * 2");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "40");
-  }
-
-  {
-    auto eval = evaluate("(20% of 100) * 2");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "40");
-  }
-
-  {
-    auto eval = evaluate("(10 + 10)% of 100 + 2");
-    REQUIRE(eval);
-    REQUIRE(eval.value() == "22");
-  }
-
-  { assertExpr("40% of 10^2", "40"); }
+  auto res = calc.evaluate("foo(1, 2)");
+  REQUIRE(!res);
+  CHECK(res.error() == "Unknown function \"foo\"");
 }

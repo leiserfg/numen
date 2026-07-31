@@ -3,21 +3,23 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 
-TEST_CASE("should find timezone using fully qualifed name", "timezone") {
+constexpr auto TAG = "[timezone]";
+
+TEST_CASE("should find timezone using fully qualifed name", TAG) {
   TimezoneDB db;
   auto tz = db.query("America/New_York");
 
   REQUIRE(tz);
 }
 
-TEST_CASE("should not find timezone using wrong qualifed name", "timezone") {
+TEST_CASE("should not find timezone using wrong qualifed name", TAG) {
   TimezoneDB db;
   auto tz = db.query("Americo/New_Yorgue");
 
   REQUIRE(!tz);
 }
 
-TEST_CASE("city name alone should match unique timezone", "timezone") {
+TEST_CASE("city name alone should match unique timezone", TAG) {
   TimezoneDB db;
   auto tz = db.query("New_York");
 
@@ -25,7 +27,7 @@ TEST_CASE("city name alone should match unique timezone", "timezone") {
   REQUIRE(tz->name() == "America/New_York");
 }
 
-TEST_CASE("city name alone should match unique timezone, case insensitively", "timezone") {
+TEST_CASE("city name alone should match unique timezone, case insensitively", TAG) {
   TimezoneDB db;
   auto tz = db.query("new_york");
 
@@ -35,7 +37,7 @@ TEST_CASE("city name alone should match unique timezone, case insensitively", "t
 
 TEST_CASE("city name alone should match unique timezone, case insentively and "
           "without underscores",
-          "timezone") {
+          TAG) {
   TimezoneDB db;
   auto tz = db.query("new york");
 
@@ -45,7 +47,7 @@ TEST_CASE("city name alone should match unique timezone, case insentively and "
 
 TEST_CASE("city name alone should match unique timezone, case insentively and "
           "without underscores, and with any amount of spaces",
-          "timezone") {
+          TAG) {
   TimezoneDB db;
   auto tz = db.query("   new     york ");
 
@@ -53,7 +55,7 @@ TEST_CASE("city name alone should match unique timezone, case insentively and "
   REQUIRE(tz->name() == "America/New_York");
 }
 
-TEST_CASE("city name for a timezone with many /") {
+TEST_CASE("city name for a timezone with many /", TAG) {
   using SI = std::initializer_list<std::string_view>;
 
   TimezoneDB db;
@@ -63,49 +65,50 @@ TEST_CASE("city name for a timezone with many /") {
   REQUIRE(std::ranges::contains(SI{"America/Argentina/Buenos_Aires", "America/Buenos_Aires"}, tz->name()));
 }
 
-TEST_CASE("should handle famous european timezones") {
+TEST_CASE("should handle famous european timezones", TAG) {
   TimezoneDB db;
 
   {
     auto tz = db.query("berlin");
     REQUIRE(tz);
-    REQUIRE(tz->name() == "Europe/Berlin");
+    CHECK(tz->name() == "Europe/Berlin");
   }
   {
     auto tz = db.query("paris");
     REQUIRE(tz);
-    REQUIRE(tz->name() == "Europe/Paris");
+    CHECK(tz->name() == "Europe/Paris");
   }
 
   {
     auto tz = db.query("rome");
     REQUIRE(tz);
-    REQUIRE(tz->name() == "Europe/Rome");
+    CHECK(tz->name() == "Europe/Rome");
   }
 }
 
-TEST_CASE("Resolve timezone links", "timezone") {
+TEST_CASE("Resolve timezone links", TAG) {
   TimezoneDB db;
 
   for (const auto &link : std::chrono::get_tzdb().links) {
+    CAPTURE(link.name());
     auto tz = db.query(link.name());
-    REQUIRE(tz);
-    REQUIRE(tz->name() == link.target());
+    CHECK(tz);
+    if (tz) { CHECK(tz->name() == link.target()); }
   }
 }
 
-TEST_CASE("resolve custom tz link", "[timezone]") {
+TEST_CASE("resolve custom tz link", TAG) {
   TimezoneDB db;
 
   {
     auto tz = db.query("nyc");
     REQUIRE(tz);
-    REQUIRE(tz->name() == "America/New_York");
+    CHECK(tz->name() == "America/New_York");
   }
 
   {
     auto tz = db.query("europe");
     REQUIRE(tz);
-    REQUIRE(tz->name() == "Europe/Paris");
+    CHECK(tz->name() == "Europe/Paris");
   }
 }

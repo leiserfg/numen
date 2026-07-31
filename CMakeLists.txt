@@ -63,15 +63,20 @@ if (BUILD_TESTS)
 		  GIT_TAG        v3.8.1
 		)
 		FetchContent_MakeAvailable(Catch2)
+		list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 	endif()
 
 	set(TEST_TARGET abacus-tests)
 	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/datetime.cpp tests/unit.cpp tests/compare.cpp)
 
 	if (NOT MSVC)
-		add_compile_options(${TEST_TARGET} -g3)
+		target_compile_options(${TEST_TARGET} PRIVATE -g3)
 	endif()
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
 	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
+
+	include(CTest)
+	include(Catch)
+	catch_discover_tests(${TEST_TARGET})
 endif()
