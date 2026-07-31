@@ -23,7 +23,7 @@ namespace test {
 // "now" is frozen so that tests depending on the current date stay valid
 inline const abacus::EvalConfig &frozenConfig() {
   static const abacus::EvalConfig config = [] {
-    std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{7}, std::chrono::day{26}};
+    std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{1}, std::chrono::day{18}};
     return abacus::EvalConfig{
         .now = std::chrono::sys_days(now),
         .timzone = std::chrono::locate_zone("UTC"),

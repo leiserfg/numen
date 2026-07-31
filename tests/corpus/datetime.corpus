@@ -1,0 +1,44 @@
+# "now" is frozen to 2026-01-18 00:00:00 UTC by the test harness
+
+# times
+2:42:21                     => 2026-01-18 02:42:21 (Etc/UTC)
+2:42:21 + 1hour             => 2026-01-18 03:42:21 (Etc/UTC)
+
+# numeric dates
+18/01/2001                  => 2001-01-18 00:00:00 (Etc/UTC)
+2001/01/18                  => 2001-01-18 00:00:00 (Etc/UTC)
+01/18/2001                  => 2001-01-18 00:00:00 (Etc/UTC)
+18/01/2001 13:30:15         => 2001-01-18 13:30:15 (Etc/UTC)
+
+# month names, in every order
+18 Jan 2001                 => 2001-01-18 00:00:00 (Etc/UTC)
+18 January 2001             => 2001-01-18 00:00:00 (Etc/UTC)
+18 january 2001             => 2001-01-18 00:00:00 (Etc/UTC)
+Jan 18 2025                 => 2025-01-18 00:00:00 (Etc/UTC)
+2025 Jan 18                 => 2025-01-18 00:00:00 (Etc/UTC)
+# very cursed, but hey...
+Jan 2025 18                 => 2025-01-18 00:00:00 (Etc/UTC)
+Jan 2025                    => 2025-01-01 00:00:00 (Etc/UTC)
+2025 Jan                    => 2025-01-01 00:00:00 (Etc/UTC)
+Jan 18                      => 2026-01-18 00:00:00 (Etc/UTC)
+January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
+
+# adding durations
+18/01/2001 13:30:15 + 1d + 5min => 2001-01-19 13:35:15 (Etc/UTC)
+
+# adding months
+01/18/2001 + 4 month        => 2001-05-18 00:00:00 (Etc/UTC)
+01/18/2001 + 4 months       => 2001-05-18 00:00:00 (Etc/UTC)
+01/18/2001 + 4mo            => 2001-05-18 00:00:00 (Etc/UTC)
+
+# adding years
+01/18/2001 + 1 year         => 2002-01-18 00:00:00 (Etc/UTC)
+01/18/2001 + 3 years        => 2004-01-18 00:00:00 (Etc/UTC)
+01/18/2001 + 1yr            => 2002-01-18 00:00:00 (Etc/UTC)
+
+# subtracting two dates produces a duration
+01/18/2001 1:00:00 - 01/18/2001 00:00:00          => 3600second
+01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours => 1hours
+
+# timezones
+2001/01/18 New York         => 2001-01-18 00:00:00 (America/New_York)

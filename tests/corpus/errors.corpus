@@ -1,0 +1,10 @@
+# malformed expressions
+1 +                         => !error Expected term
+*5                          => !error Expected term
+
+# unknown names
+foo(1, 2)                   => !error Unknown function "foo"
+
+# inconvertible units
+1meter to s                 => !error
+1m to 150                   => !error

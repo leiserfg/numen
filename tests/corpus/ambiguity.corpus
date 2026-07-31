@@ -1,0 +1,15 @@
+# ambiguous numeric date resolves day-first (DD/MM/YYYY)
+11/08/2025                  => 2025-08-11 00:00:00 (Etc/UTC)
+
+# slashes with spaces around them are division, not a date
+2001 / 1 / 18               => 111.167
+
+# 'm' means minutes when converting to seconds, not meters
+1m to s                     => 60s
+
+# 'in' is a conversion operator between units, a unit name elsewhere
+1m in in                    => 39.3701in
+
+# adjacent digit + constant is implicit multiplication
+2pi                         => 6.28319
+pi2                         => 6.28319

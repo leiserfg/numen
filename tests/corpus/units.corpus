@@ -1,0 +1,11 @@
+# conversions
+1 km to m                   => 1000m
+1 km in m                   => 1000m
+km to in                    => 39370.1in
+1m to s                     => 60s
+
+# implicit conversion in binary expressions
+30min + 1hour               => 1.5hour
+
+# units flowing through functions
+max(1 km to m, 100)         => 1000
