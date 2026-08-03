@@ -2,6 +2,7 @@
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
 #include <cassert>
+#include "date-string.hpp"
 #include <chrono>
 #include <memory>
 #include <optional>
