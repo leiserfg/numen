@@ -1,94 +1,130 @@
 #include "abacus/unit.hpp"
+#include "builtin-units.hpp"
 #include "utils.hpp"
-#include <bits/chrono.h>
+#include <array>
 #include <format>
 #include <algorithm>
-#include <chrono>
 #include <ranges>
 
+namespace {
+
+struct Prefix {
+  std::string_view symbol;
+  double multiplier;
+  // 'm'/'M' (milli/mega) and 'p'/'P' (pico/peta) only differ by case
+  bool caseSensitive = false;
+  // binary prefixes only make sense for data units
+  bool dataOnly = false;
+};
+
+// declaration order is irrelevant: expansion collects candidates from
+// every matching prefix, first-match-wins semantics must not be assumed
+constexpr auto PREFIXES = std::to_array<Prefix>({
+    {.symbol = "micro", .multiplier = 1e-6},
+    {.symbol = "milli", .multiplier = 1e-3},
+    {.symbol = "centi", .multiplier = 1e-2},
+    {.symbol = "nano", .multiplier = 1e-9},
+    {.symbol = "pico", .multiplier = 1e-12},
+    {.symbol = "deci", .multiplier = 1e-1},
+    {.symbol = "kilo", .multiplier = 1e3},
+    {.symbol = "mega", .multiplier = 1e6},
+    {.symbol = "giga", .multiplier = 1e9},
+    {.symbol = "tera", .multiplier = 1e12},
+    {.symbol = "peta", .multiplier = 1e15},
+    {.symbol = "kibi", .multiplier = 1024.0, .dataOnly = true},
+    {.symbol = "mebi", .multiplier = 1048576.0, .dataOnly = true},
+    {.symbol = "gibi", .multiplier = 1073741824.0, .dataOnly = true},
+    {.symbol = "tebi", .multiplier = 1099511627776.0, .dataOnly = true},
+    {.symbol = "ki", .multiplier = 1024.0, .dataOnly = true},
+    {.symbol = "mi", .multiplier = 1048576.0, .dataOnly = true},
+    {.symbol = "gi", .multiplier = 1073741824.0, .dataOnly = true},
+    {.symbol = "ti", .multiplier = 1099511627776.0, .dataOnly = true},
+    {.symbol = "n", .multiplier = 1e-9},
+    {.symbol = "u", .multiplier = 1e-6},
+    {.symbol = "m", .multiplier = 1e-3, .caseSensitive = true},
+    {.symbol = "M", .multiplier = 1e6, .caseSensitive = true},
+    {.symbol = "c", .multiplier = 1e-2},
+    {.symbol = "d", .multiplier = 1e-1},
+    {.symbol = "k", .multiplier = 1e3},
+    {.symbol = "G", .multiplier = 1e9},
+    {.symbol = "T", .multiplier = 1e12},
+    {.symbol = "p", .multiplier = 1e-12, .caseSensitive = true},
+    {.symbol = "P", .multiplier = 1e15, .caseSensitive = true},
+});
+
+// "meters" -> "meter", "inches" -> "inch". Only ever consulted for tokens
+// with no direct reading: a token that is a unit name by itself ("ms",
+// "min") must never be reinterpreted as a plural.
+std::vector<std::string_view> pluralForms(std::string_view q) {
+  std::vector<std::string_view> forms;
+  if (q.size() > 1 && (q.back() == 's' || q.back() == 'S')) {
+    forms.push_back(q.substr(0, q.size() - 1));
+    if (q.size() > 2 && equalsIgnoreCase(q.substr(q.size() - 2), std::string_view{"es"})) {
+      forms.push_back(q.substr(0, q.size() - 2));
+    }
+  }
+  return forms;
+}
+
+} // namespace
+
 UnitDatabase::UnitDatabase() noexcept {
-  registerUnit(UnitDef{
-      .id = "inch", .aliases = {"in"}, .factor = 0.0254, .family = "imperial", .type = UnitType::Distance});
-  registerUnit(
-      UnitDef{.id = "meter", .aliases = {"m"}, .factor = 1, .family = "metric", .type = UnitType::Distance});
-  registerUnit(UnitDef{
-      .id = "kilometer", .aliases = {"km"}, .factor = 1e3, .family = "metric", .type = UnitType::Distance});
+  for (const auto &unit : units::builtins()) { registerUnit(unit); }
+}
 
-  {
-    using namespace std::chrono;
+std::vector<UnitDef> UnitDatabase::matchExact(std::string_view q) const {
+  return m_units | std::views::filter([&](const UnitDef &unit) {
+           return equalsIgnoreCase(unit.id, q) || std::ranges::any_of(unit.aliases, [&](auto &&str) {
+                    return equalsIgnoreCase(str, q);
+                  });
+         }) |
+         std::ranges::to<std::vector>();
+}
 
-    const auto toSeconds = [](auto &&t) { return duration_cast<seconds>(t).count(); };
+std::vector<UnitDef> UnitDatabase::expandPrefixed(std::string_view q) const {
+  std::vector<UnitDef> out;
 
-    registerUnit(UnitDef{.id = "second",
-                         .aliases = {"s", "sec", "secs", "seconds"},
-                         .factor = 1,
-                         .family = "duration",
-                         .type = UnitType::Duration});
-    registerUnit(UnitDef{.id = "minute",
-                         .aliases = {"m", "min", "mins", "minutes"},
-                         .factor = toSeconds(minutes(1)),
-                         .family = "duration",
-                         .type = UnitType::Duration});
-    registerUnit(UnitDef{.id = "hour",
-                         .aliases = {"h", "hr", "hrs", "hours"},
-                         .factor = toSeconds(hours(1)),
-                         .family = "duration",
-                         .type = UnitType::Duration});
-    registerUnit(UnitDef{.id = "day",
-                         .aliases = {"d", "days", "dys"},
-                         .factor = toSeconds(days{1}),
-                         .family = "duration",
-                         .type = UnitType::Duration});
-    registerUnit(UnitDef{.id = "month",
-                         .aliases = {"mo", "months"},
-                         // average number of seconds in a month
-                         .factor = toSeconds(months{1}),
-                         .family = "duration",
-                         .type = UnitType::Duration});
+  for (const auto &prefix : PREFIXES) {
+    if (q.size() <= prefix.symbol.size()) { continue; }
 
-    registerUnit(UnitDef{.id = "year",
-                         .aliases = {"years", "yr"},
-                         // average number of seconds in a year
-                         .factor = toSeconds(years{1}),
-                         .family = "duration",
-                         .type = UnitType::Duration});
+    auto head = q.substr(0, prefix.symbol.size());
+    bool matches = prefix.caseSensitive ? head == prefix.symbol : equalsIgnoreCase(head, prefix.symbol);
+    if (!matches) { continue; }
+
+    // exact-only: a plural remainder ("mins" as milli + "ins" -> inch) must
+    // lose to the plural pass on the whole token
+    auto rest = q.substr(prefix.symbol.size());
+    auto bases = matchExact(rest);
+
+    for (const auto &base : bases) {
+      if (!base.prefixable || !base.factor || base.offset != 0) { continue; }
+      if (prefix.dataOnly && base.dimension != dimensions::DATA) { continue; }
+
+      out.push_back(UnitDef{
+          .id = std::string{q},
+          .factor = prefix.multiplier * *base.factor,
+          .dimension = base.dimension,
+          .family = base.family,
+      });
+    }
   }
 
-  registerUnit(UnitDef{.id = "kelvin", .factor = 1, .family = "degree", .type = UnitType::Temperature});
-  registerUnit(UnitDef{
-      .id = "celsius",
-      .aliases = {"cel", "c"},
-      .factor = 1,
-      .family = "degree",
-      .type = UnitType::Temperature,
-      .offset = 273.15,
-  });
-  registerUnit(UnitDef{
-      .id = "fahrenheight",
-      .aliases = {"fahren", "f"},
-      .factor = 5.0 / 9,
-      .family = "degree",
-      .type = UnitType::Temperature,
-      .offset = 459.67 * 5 / 9,
-  });
-
-  registerUnit(UnitDef{.id = "usd", .family = "currency"});
-  registerUnit(UnitDef{.id = "gbp", .family = "currency"});
-  registerUnit(UnitDef{.id = "eur", .family = "currency"});
+  return out;
 }
 
 std::vector<UnitDef> UnitDatabase::findUnitCandidates(std::string_view q) const {
-  auto units = m_units | std::views::filter([&](const UnitDef &unit) {
-                 return equalsIgnoreCase(unit.id, q) || std::ranges::any_of(unit.aliases, [&](auto &&str) {
-                          return equalsIgnoreCase(str, q);
-                        });
-               }) |
-               std::ranges::to<std::vector>();
-  assert(!units.empty());
-  return units;
+  if (auto units = matchExact(q); !units.empty()) { return units; }
+  if (auto units = expandPrefixed(q); !units.empty()) { return units; }
+
+  for (auto form : pluralForms(q)) {
+    if (auto units = matchExact(form); !units.empty()) { return units; }
+    if (auto units = expandPrefixed(form); !units.empty()) { return units; }
+  }
+
+  return {};
 }
 
-void UnitDatabase::registerUnit(UnitDef unit) { m_units.emplace_back(unit); }
+void UnitDatabase::registerUnit(UnitDef unit) { m_units.emplace_back(std::move(unit)); }
 
 const UnitDef *UnitDatabase::findUnit(const std::string &id) const {
   auto it = std::ranges::find_if(
@@ -99,11 +135,17 @@ const UnitDef *UnitDatabase::findUnit(const std::string &id) const {
 
 std::expected<double, std::string> UnitDatabase::convert(double n, const UnitDef &from,
                                                          const UnitDef &to) const {
-  if (from.type == to.type) {
-    auto base = n * from.factor + from.offset;
-    return (base - to.offset) / to.factor;
+  if (from.id == to.id) { return n; }
+
+  if (from.dimension != to.dimension) {
+    return std::unexpected(std::format("No idea how to convert {} to {}, as they are not of the same type.",
+                                       from.id, to.id));
   }
 
-  return std::unexpected(std::format("No idea how to convert {} to {}, as they are not of the same type.",
-                                     from.family, to.family));
+  if (!from.factor || !to.factor) {
+    return std::unexpected(std::format("No conversion rate available between {} and {}.", from.id, to.id));
+  }
+
+  auto base = n * *from.factor + from.offset;
+  return (base - to.offset) / *to.factor;
 }

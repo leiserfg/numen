@@ -105,7 +105,7 @@ bool Parser::isTimezoneToken(std::string_view name) {
 
 std::optional<OpaqueUnit> Parser::parseUnit() {
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (auto unit = m_unitDb.findUnit(std::string{tok->raw})) { return tok->raw; }
+    if (!m_unitDb.findUnitCandidates(tok->raw).empty()) { return tok->raw; }
   }
   return std::nullopt;
 }

@@ -24,6 +24,7 @@ endif()
 
 add_library(${PROJECT_NAME}
 	src/abacus.cpp
+	src/builtin-units.cpp
 	src/parser.cpp
 	src/timezone.cpp
 	src/unit.cpp

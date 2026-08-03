@@ -1,26 +1,39 @@
 #pragma once
 #include <cassert>
 #include <expected>
+#include <optional>
 #include <string>
 #include <vector>
 
-struct UnitDerivative {};
+namespace dimensions {
+inline constexpr const char *LENGTH = "length";
+inline constexpr const char *MASS = "mass";
+inline constexpr const char *DURATION = "duration";
+inline constexpr const char *TEMPERATURE = "temperature";
+inline constexpr const char *DATA = "data";
+inline constexpr const char *VOLUME = "volume";
+inline constexpr const char *AREA = "area";
+inline constexpr const char *SPEED = "speed";
+inline constexpr const char *CURRENCY = "currency";
+}; // namespace dimensions
 
-enum class UnitType { Date, Currency, Distance, Duration, Temperature };
+namespace families {
+inline constexpr const char *METRIC = "metric";
+inline constexpr const char *IMPERIAL = "imperial";
+inline constexpr const char *DURATION = "duration";
+inline constexpr const char *DEGREE = "degree";
+inline constexpr const char *DATA = "data";
+inline constexpr const char *CURRENCY = "currency";
+}; // namespace families
 
 struct UnitDef {
   std::string id;
   std::vector<std::string> aliases;
-  double factor;
+  std::optional<double> factor; // currency exchange rates are resolved at runtime
+  std::string dimension;
   std::string family;
-  UnitType type;
   double offset = 0;
-};
-
-struct UnitBaseRelation {
-  std::string lhs;
-  std::string rhs;
-  double factor;
+  bool prefixable = false;
 };
 
 class UnitDatabase {
@@ -38,5 +51,8 @@ public:
   std::expected<double, std::string> convert(double n, const UnitDef &from, const UnitDef &to) const;
 
 private:
+  std::vector<UnitDef> matchExact(std::string_view q) const;
+  std::vector<UnitDef> expandPrefixed(std::string_view q) const;
+
   std::vector<UnitDef> m_units;
 };

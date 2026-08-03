@@ -307,8 +307,11 @@ private:
     auto valueCandidates = m_db.findUnitCandidates(fromUnit);
     auto targetCandidates = m_db.findUnitCandidates(toUnit);
 
+    if (valueCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", fromUnit)); }
+    if (targetCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", toUnit)); }
+
     auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
-      if (lhs.type != rhs.type) {
+      if (lhs.dimension != rhs.dimension) {
         throw std::runtime_error(std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
       }
 
@@ -335,8 +338,8 @@ private:
     // 1s to 1m
     if (valueCandidates.size() > targetCandidates.size()) {
       auto rhs = targetCandidates.front();
-      auto lhs =
-          std::ranges::find_if(valueCandidates, [&](const UnitDef &unit) { return unit.type == rhs.type; });
+      auto lhs = std::ranges::find_if(valueCandidates,
+                                      [&](const UnitDef &unit) { return unit.dimension == rhs.dimension; });
       if (lhs == valueCandidates.end()) {
         throw std::runtime_error(std::format("Incompatible units: no common family"));
       }
@@ -345,8 +348,8 @@ private:
 
     if (targetCandidates.size() > valueCandidates.size()) {
       auto lhs = valueCandidates.front();
-      auto rhs =
-          std::ranges::find_if(targetCandidates, [&](const UnitDef &unit) { return unit.type == lhs.type; });
+      auto rhs = std::ranges::find_if(targetCandidates,
+                                      [&](const UnitDef &unit) { return unit.dimension == lhs.dimension; });
       if (rhs == targetCandidates.end()) {
         throw std::runtime_error(std::format("Incompatible units: no common type"));
       }
@@ -375,7 +378,7 @@ private:
       if (rhs.unitRaw) {
         auto candidates = m_db.findUnitCandidates(rhs.unitRaw.value());
         auto it =
-            std::ranges::find_if(candidates, [](const UnitDef &u) { return u.type == UnitType::Duration; });
+            std::ranges::find_if(candidates, [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
         auto second = m_db.findUnit("second");
 
         if (it != candidates.end()) {

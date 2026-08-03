@@ -8,3 +8,6 @@ foo(1, 2)                   => !error Unknown function "foo"
 # inconvertible units
 1meter to s                 => !error
 1m to 150                   => !error
+
+# currency conversion without a rate provider
+1 usd to eur                => !error No conversion rate available between usd and eur.

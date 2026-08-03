@@ -1,11 +1,55 @@
-# conversions
+# length
 1 km to m                   => 1000m
 1 km in m                   => 1000m
 km to in                    => 39370.1in
+5 feet to cm                => 152.4cm
+3 miles to km               => 4.82803km
+
+# prefix and plural expansion
+1 kilometres to m           => 1000m
+10 kms to m                 => 10000m
+5KM to m                    => 5000m
+1000 micrograms to mg       => 1mg
+2 dl to ml                  => 200ml
+
+# mass
+80 kg to lbs                => 176.37lbs
+1 tonne to kg               => 1000kg
+1 pound to kg               => 0.453592kg
+
+# duration
 1m to s                     => 60s
+2 weeks to days             => 14days
+5 ms to s                   => 0.005s
+3 microseconds to ms        => 0.003ms
+
+# temperature
+100 f to c                  => 37.7778c
+20 c to f                   => 68f
+0 c to k                    => 273.15k
+
+# data
+1 gb to mb                  => 1000mb
+1 GB to MB                  => 1000MB
+1 kib to b                  => 1024b
+1 gib to mib                => 1024mib
+
+# volume
+2 cups to ml                => 473.176ml
+
+# area
+1 acre to sqm               => 4046.86sqm
+
+# speed
+100 mph to kmh              => 160.934kmh
+90 kmh to mph               => 55.9234mph
 
 # implicit conversion in binary expressions
 30min + 1hour               => 1.5hour
+
+# currency: identity and same-currency arithmetic work without rates
+100 dollars                 => 100dollars
+100 usd + 20 usd            => 120usd
 
 # units flowing through functions
 max(1 km to m, 100)         => 1000
