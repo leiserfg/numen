@@ -244,7 +244,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     if (equalsIgnoreCase(word.data, std::string_view{"ago"})) {
       auto units = m_unitDb.findUnitCandidates(unit.data);
       auto it = std::ranges::find_if(
-          units, [](auto &&unit) { return unit.dimension == dimensions::DURATION && unit.factor; });
+          units, [](auto &&unit) { return unit.dimension == dimensions::DURATION; });
       if (it != units.end()) {
         RelativeDateTimeLiteral l{.direction = RelativeDateTimeLiteral::Direction::Past};
 
@@ -253,7 +253,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
         } else if (it->id == "year") {
           l.anchor = std::chrono::years{static_cast<unsigned>(n.n)};
         } else {
-          l.anchor = std::chrono::seconds{static_cast<unsigned>(n.n * it->factor.value())};
+          l.anchor = std::chrono::seconds{static_cast<unsigned>(n.n * it->factor)};
         }
 
         for (int i = 0; i != 3; ++i)

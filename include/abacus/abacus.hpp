@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include "abstract-currency-provider.hpp"
 
 namespace abacus {
 
@@ -69,13 +70,19 @@ struct EvalConfig {
 
 class Abacus {
 public:
-  Abacus() = default;
+  Abacus();
 
   std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
   std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
   void printAST(const std::string &expr) const;
 
+  void setCurrencyProvider(std::unique_ptr<AbstractCurrencyProvider> provider) {
+    m_currencyProvider = std::move(provider);
+    m_unitDb.setCurrencyProvider(*m_currencyProvider);
+  }
+
 private:
+  std::unique_ptr<AbstractCurrencyProvider> m_currencyProvider;
   UnitDatabase m_unitDb;
 };
 

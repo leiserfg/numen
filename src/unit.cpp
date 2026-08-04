@@ -1,4 +1,5 @@
 #include "abacus/unit.hpp"
+#include "abacus/abstract-currency-provider.hpp"
 #include "builtin-units.hpp"
 #include "utils.hpp"
 #include <array>
@@ -69,14 +70,15 @@ std::vector<std::string_view> pluralForms(std::string_view q) {
 } // namespace
 
 UnitDatabase::UnitDatabase() noexcept {
-  for (const auto &unit : units::builtins()) { registerUnit(unit); }
+  for (const auto &unit : units::builtins()) {
+    registerUnit(unit);
+  }
 }
 
 std::vector<UnitDef> UnitDatabase::matchExact(std::string_view q) const {
   return m_units | std::views::filter([&](const UnitDef &unit) {
-           return equalsIgnoreCase(unit.id, q) || std::ranges::any_of(unit.aliases, [&](auto &&str) {
-                    return equalsIgnoreCase(str, q);
-                  });
+           return equalsIgnoreCase(unit.id, q) ||
+                  std::ranges::any_of(unit.aliases, [&](auto &&str) { return equalsIgnoreCase(str, q); });
          }) |
          std::ranges::to<std::vector>();
 }
@@ -97,12 +99,12 @@ std::vector<UnitDef> UnitDatabase::expandPrefixed(std::string_view q) const {
     auto bases = matchExact(rest);
 
     for (const auto &base : bases) {
-      if (!base.prefixable || !base.factor || base.offset != 0) { continue; }
+      if (!base.prefixable || base.offset != 0) { continue; }
       if (prefix.dataOnly && base.dimension != dimensions::DATA) { continue; }
 
       out.push_back(UnitDef{
           .id = std::string{q},
-          .factor = prefix.multiplier * *base.factor,
+          .factor = prefix.multiplier * base.factor,
           .dimension = base.dimension,
           .family = base.family,
       });
@@ -138,14 +140,24 @@ std::expected<double, std::string> UnitDatabase::convert(double n, const UnitDef
   if (from.id == to.id) { return n; }
 
   if (from.dimension != to.dimension) {
-    return std::unexpected(std::format("No idea how to convert {} to {}, as they are not of the same type.",
-                                       from.id, to.id));
+    return std::unexpected(
+        std::format("No idea how to convert {} to {}, as they are not of the same type.", from.id, to.id));
   }
 
-  if (!from.factor || !to.factor) {
-    return std::unexpected(std::format("No conversion rate available between {} and {}.", from.id, to.id));
+  double fromFactor = from.factor;
+  double toFactor = to.factor;
+
+  if (from.dimension == dimensions::CURRENCY) {
+    auto lhsRate = m_currencyProvider->getRate(from.id);
+    auto rhsRate = m_currencyProvider->getRate(to.id);
+
+    if (!lhsRate || !rhsRate) {
+      return std::unexpected(std::format("No conversion rate available between {} and {}.", from.id, to.id));
+    }
+
+    return n / *lhsRate * *rhsRate;
   }
 
-  auto base = n * *from.factor + from.offset;
-  return (base - to.offset) / *to.factor;
+  auto base = n * fromFactor + from.offset;
+  return (base - to.offset) / toFactor;
 }

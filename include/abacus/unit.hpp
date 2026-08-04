@@ -1,7 +1,7 @@
 #pragma once
+#include "abacus/abstract-currency-provider.hpp"
 #include <cassert>
 #include <expected>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,7 +29,9 @@ inline constexpr const char *CURRENCY = "currency";
 struct UnitDef {
   std::string id;
   std::vector<std::string> aliases;
-  std::optional<double> factor; // currency exchange rates are resolved at runtime
+  // meaningless for currency: exchange rates are resolved at runtime, keyed
+  // by the currency dimension
+  double factor = 1;
   std::string dimension;
   std::string family;
   double offset = 0;
@@ -50,9 +52,12 @@ public:
 
   std::expected<double, std::string> convert(double n, const UnitDef &from, const UnitDef &to) const;
 
+  void setCurrencyProvider(const AbstractCurrencyProvider &provider) { m_currencyProvider = &provider; }
+
 private:
   std::vector<UnitDef> matchExact(std::string_view q) const;
   std::vector<UnitDef> expandPrefixed(std::string_view q) const;
 
   std::vector<UnitDef> m_units;
+  const AbstractCurrencyProvider *m_currencyProvider;
 };

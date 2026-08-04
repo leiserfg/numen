@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(BUILD_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
 option(BUILD_REPL "Build the repl program" ON)
 option(BUILD_TESTS "Build the test suite" ON)
 
@@ -22,7 +23,8 @@ if (WIN32 AND NOT MSVC)
 	message(FATAL_ERROR "Windows builds are only supported with MSVC (got '${CMAKE_CXX_COMPILER_ID}'). Please set -DCMAKE_CXX_COMPILER=cl.")
 endif()
 
-add_library(${PROJECT_NAME}
+set(LINK_LIBS)
+set(SRCS 
 	src/abacus.cpp
 	src/builtin-units.cpp
 	src/lexer.cpp
@@ -31,7 +33,23 @@ add_library(${PROJECT_NAME}
 	src/unit.cpp
 )
 
+if (BUILD_CURRENCY_PROVIDER)
+	find_package(OpenSSL REQUIRED)
+	add_compile_definitions(CPPHTTPLIB_OPENSSL_SUPPORT=1)
+	add_compile_definitions(BUILD_CURRENCY_PROVIDER=1)
+	list(APPEND SRCS
+		src/vicinae-currency-provider.cpp
+	)
+	list(APPEND LINK_LIBS
+		OpenSSL::SSL OpenSSL::Crypto
+	)
+endif()
+
+add_library(${PROJECT_NAME} ${SRCS})
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_MP_STANDALONE=1)
+target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
+target_compile_options(${PROJECT_NAME} PRIVATE -g3)
 add_subdirectory(${VENDOR_DIR}/boost-mp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -69,7 +87,7 @@ if (BUILD_TESTS)
 	endif()
 
 	set(TEST_TARGET abacus-tests)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	if (NOT MSVC)

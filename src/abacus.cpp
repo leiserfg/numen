@@ -1,5 +1,6 @@
 #include "abacus/abacus.hpp"
 #include "abacus/unit.hpp"
+#include "dummy-currency-provider.hpp"
 #include "parser.hpp"
 #include "rang/rang.hpp"
 #include "timezone.hpp"
@@ -640,5 +641,7 @@ void Abacus::printAST(const std::string &expr) const {
   auto ast = parser.parse();
   printASTNode(std::cout, *ast.root, 0);
 }
+
+Abacus::Abacus() { setCurrencyProvider(std::make_unique<DummyCurrencyProvider>()); }
 
 }; // namespace abacus
