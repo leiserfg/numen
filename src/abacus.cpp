@@ -86,8 +86,24 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
     using T = std::remove_cvref_t<decltype(value)>;
     if constexpr (std::is_same_v<T, DateTimeLiteral>) {
       return parseDateTimeLiteral(value, *tz, now);
+    } else if constexpr (std::is_same_v<T, RelativeDateTimeLiteral>) {
+      return std::visit(
+          [&](auto &&anchor) {
+            using A = std::remove_cvref_t<decltype(anchor)>;
+            int sign = value.direction == RelativeDateTimeLiteral::Direction::Past ? -1 : 1;
+            if constexpr (std::is_same_v<A, std::chrono::weekday>) {
+              return now;
+            } else if constexpr (std::is_same_v<A, std::chrono::months>) {
+              return shiftMonth(now, anchor.count() * sign);
+            } else if constexpr (std::is_same_v<A, std::chrono::years>) {
+              return shiftYear(now, anchor.count() * sign);
+            } else {
+              return now + anchor * sign;
+            }
+          },
+          value.anchor);
     } else {
-      return std::chrono::system_clock::now();
+      return now;
     }
   };
 
@@ -377,8 +393,8 @@ private:
 
       if (rhs.unitRaw) {
         auto candidates = m_db.findUnitCandidates(rhs.unitRaw.value());
-        auto it =
-            std::ranges::find_if(candidates, [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
+        auto it = std::ranges::find_if(candidates,
+                                       [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
         auto second = m_db.findUnit("second");
 
         if (it != candidates.end()) {

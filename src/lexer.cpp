@@ -32,7 +32,7 @@ std::optional<Lexer::Token> Lexer::next() {
       return makeToken(TokenType::Number, Number{.n = n, .fromBase = base});
     }
     case State::String:
-      return makeToken(TokenType::String, String{});
+      return makeToken(TokenType::String, String{.data = getSelection()});
     case State::Operator:
       return makeToken(TokenType::Operator, Operator{});
     default:

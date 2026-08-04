@@ -83,8 +83,15 @@ struct DateTimeLiteral {
   std::optional<ParsedTime> time;
 };
 
+struct RelativeDateTimeLiteral {
+  // seconds if for anything that is a fixed duration, the others are for calendar units that cannot
+  // be expressed as static durations.
+  std::variant<std::chrono::seconds, std::chrono::weekday, std::chrono::months, std::chrono::years> anchor;
+  enum class Direction : std::uint8_t { Past, Future } direction;
+};
+
 struct DateString {
-  std::variant<DateTimeLiteral, std::string_view> value;
+  std::variant<DateTimeLiteral, RelativeDateTimeLiteral, std::string_view> value;
   std::optional<TimezoneLike> timezone;
 };
 
@@ -135,6 +142,7 @@ public:
   std::optional<ParsedTime> parseTime();
   std::optional<TimezoneLike> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
+  std::optional<RelativeDateTimeLiteral> parseRelativeDateTimeLiteral();
 
   template <typename F> std::optional<std::string_view> greedyParse(int n, F fn) {
     assert(n >= 0);

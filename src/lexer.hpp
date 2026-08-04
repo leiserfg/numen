@@ -1,4 +1,6 @@
 #pragma once
+#include <any>
+#include <iostream>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -35,6 +37,15 @@ public:
 
     const Number *asNumber() const { return std::get_if<Number>(&data); }
   };
+
+  template <typename... Ts> std::optional<std::tuple<Ts...>> peakForward() {
+    return [&]<std::size_t... I>(std::index_sequence<I...>) -> std::optional<std::tuple<Ts...>> {
+      std::array<std::optional<Lexer::Token>, sizeof...(Ts)> p{peak(I)...};
+      bool ok = std::apply([](auto... q) { return (... && (q && std::holds_alternative<Ts>(q->data))); }, p);
+      if (!ok) return std::nullopt;
+      return std::tuple<Ts...>{std::get<Ts>(p[I]->data)...};
+    }(std::index_sequence_for<Ts...>{});
+  }
 
   Lexer(std::string_view data) : m_data(data), m_cursor(0) {}
 

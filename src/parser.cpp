@@ -1,4 +1,5 @@
 #include "parser.hpp"
+#include "abacus/unit.hpp"
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
@@ -235,6 +236,37 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
   return std::nullopt;
 }
 
+std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
+  if (auto t = m_lexer.peakForward<Lexer::Number, Lexer::String, Lexer::String>()) {
+    const auto &[n, unit, word] = *t;
+
+    // X <duration> ago
+    if (equalsIgnoreCase(word.data, std::string_view{"ago"})) {
+      auto units = m_unitDb.findUnitCandidates(unit.data);
+      auto it = std::ranges::find_if(
+          units, [](auto &&unit) { return unit.dimension == dimensions::DURATION && unit.factor; });
+      if (it != units.end()) {
+        RelativeDateTimeLiteral l{.direction = RelativeDateTimeLiteral::Direction::Past};
+
+        if (it->id == "month") {
+          l.anchor = std::chrono::months{static_cast<unsigned>(n.n)};
+        } else if (it->id == "year") {
+          l.anchor = std::chrono::years{static_cast<unsigned>(n.n)};
+        } else {
+          l.anchor = std::chrono::seconds{static_cast<unsigned>(n.n * it->factor.value())};
+        }
+
+        for (int i = 0; i != 3; ++i)
+          m_lexer.next();
+
+        return l;
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto d = parseYYYYMMDD()) {
     d->time = parseTime();
@@ -363,6 +395,12 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
 
     if (auto date = parseDate()) {
+      DateString ds{.value = *date};
+      if (auto result = parseTimezone()) { ds.timezone = result.value(); }
+      return std::make_unique<Expression>(ds);
+    }
+
+    if (auto date = parseRelativeDateTimeLiteral()) {
       DateString ds{.value = *date};
       if (auto result = parseTimezone()) { ds.timezone = result.value(); }
       return std::make_unique<Expression>(ds);
