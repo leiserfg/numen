@@ -3,6 +3,7 @@
 #include "dummy-currency-provider.hpp"
 #include "parser.hpp"
 #include "rang/rang.hpp"
+#include "region-currency.hpp"
 #include "timezone.hpp"
 #include <algorithm>
 #include <bits/chrono.h>
@@ -14,10 +15,12 @@
 #include <format>
 #include <functional>
 #include <iostream>
+#include <locale>
 #include <memory>
 #include <ostream>
 #include <ranges>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <variant>
@@ -205,7 +208,7 @@ class Interpreter {
 public:
   Interpreter(const UnitDatabase &db, const EvalConfig &opts) : m_db(db), m_opts(opts) {}
 
-  ComputedValue computeExpr(const Expression &expr) const {
+  ComputedValue computeExprImpl(const Expression &expr) const {
     auto visitor = [&](const auto &value) -> ComputedValue {
       using T = std::remove_cvref_t<decltype(value)>;
       if constexpr (std::is_same_v<T, UnaryExpression>) {
@@ -292,7 +295,9 @@ public:
             // if converted expression has no unit there is nothing to do,
             // just tag it with the target unit... 1m to s 1m to in
             if (!v.unitRaw) return ComputedValue{.value = value, .unitRaw = unit->name};
-            return convertToUnit(n->n, *v.unitRaw, unit->name);
+            auto converted = convertToUnit(n->n, *v.unitRaw, unit->name);
+            converted.explicitlyConverted = true;
+            return converted;
           }
         }
         throw std::runtime_error("unexpected conversion flow");
@@ -310,13 +315,30 @@ public:
       } else {
         static_assert(std::is_same_v<T, DateString>);
         const auto &ds = value;
-        auto &tz = m_opts.timzone ? *m_opts.timzone : *std::chrono::current_zone();
+        auto &tz = m_opts.timezone ? *m_opts.timezone : *std::chrono::current_zone();
         auto dt = parseDateTime(ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
         return ComputedValue{.value = dt};
       }
     };
 
     return std::visit(visitor, expr.data);
+  }
+
+  ComputedValue computeExpr(const Expression &expr) const {
+    auto result = computeExprImpl(expr);
+
+    // the implementation obviously suck, we can do much better
+    if (result.isNumber() && m_opts.implicitCurrencyConversion && result.unitRaw &&
+        !result.explicitlyConverted) {
+      auto lhs = m_db.findUnit(std::string{*result.unitRaw});
+
+      if (lhs && lhs->dimension == dimensions::CURRENCY) {
+        auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
+        if (target && *target != lhs->id) { return convertToUnit(result.asNumber()->n, lhs->id, *target); }
+      }
+    }
+
+    return result;
   }
 
 private:
@@ -336,7 +358,11 @@ private:
 
       if (!res) throw std::runtime_error(res.error());
 
-      return {.value = Number{res.value()}, .unitRaw = toUnit};
+      return {
+          .value = Number{res.value()},
+          .unit = rhs,
+          .unitRaw = toUnit,
+      };
     };
 
     // only one choice on both sides, there is no ambiguity

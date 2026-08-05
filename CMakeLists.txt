@@ -29,6 +29,7 @@ set(SRCS
 	src/builtin-units.cpp
 	src/lexer.cpp
 	src/parser.cpp
+	src/region-currency.cpp
 	src/timezone.cpp
 	src/unit.cpp
 )

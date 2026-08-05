@@ -129,8 +129,10 @@ std::vector<UnitDef> UnitDatabase::findUnitCandidates(std::string_view q) const 
 void UnitDatabase::registerUnit(UnitDef unit) { m_units.emplace_back(std::move(unit)); }
 
 const UnitDef *UnitDatabase::findUnit(const std::string &id) const {
-  auto it = std::ranges::find_if(
-      m_units, [&](const UnitDef &u) { return u.id == id || std::ranges::contains(u.aliases, id); });
+  auto it = std::ranges::find_if(m_units, [&](const UnitDef &u) {
+    return equalsIgnoreCase(u.id, id) ||
+           std::ranges::any_of(u.aliases, [&](auto &&str) { return equalsIgnoreCase(id, str); });
+  });
 
   return it != m_units.end() ? &*it : nullptr;
 }

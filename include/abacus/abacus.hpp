@@ -54,6 +54,7 @@ struct ComputedValue {
   // optional is convenient, and no lifetime issues by copying...
   std::optional<UnitDef> unit;
   std::optional<std::string_view> unitRaw;
+  bool explicitlyConverted = false;
 
   bool isNumber() const { return std::holds_alternative<Number>(value); }
 
@@ -65,7 +66,21 @@ struct ComputedValue {
 
 struct EvalConfig {
   std::optional<TimePoint> now;
-  const std::chrono::time_zone *timzone;
+  const std::chrono::time_zone *timezone;
+
+  /**
+   * If the expression is only a currency, it will automatically be
+   * converted to the locale currency.
+   * e.g if locale is set to fr_FR, "100 usd" will automatically convert
+   * to euro.
+   */
+  bool implicitCurrencyConversion = true;
+
+  /**
+   * Locale to use for implicit conversions. If not specified, the default locale
+   * is used.
+   */
+  std::optional<std::string> locale;
 };
 
 class Abacus {
