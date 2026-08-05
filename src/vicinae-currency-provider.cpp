@@ -57,7 +57,7 @@ bool VicinaeCurrencyProvider::loadRates(std::string_view json) {
     {
       std::lock_guard lock{m_mut};
       for (const auto &[k, v] : obj["crypto"]["prices"].get<json::object_t>()) {
-        m_rates[normalizeCurrencyId(k)] = v.get<double>();
+        m_rates[normalizeCurrencyId(k)] = 1 / v.get<double>();
       }
       // fiat always take priority over crypto tickers for nowk
       for (const auto &[k, v] : obj["fiat"]["rates"].get<json::object_t>()) {

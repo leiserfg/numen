@@ -5,6 +5,7 @@
 #include "rang/rang.hpp"
 #include "region-currency.hpp"
 #include "timezone.hpp"
+#include "utils.hpp"
 #include <algorithm>
 #include <bits/chrono.h>
 #include <cassert>
@@ -208,7 +209,7 @@ class Interpreter {
 public:
   Interpreter(const UnitDatabase &db, const EvalConfig &opts) : m_db(db), m_opts(opts) {}
 
-  ComputedValue computeExprImpl(const Expression &expr) const {
+  ComputedValue computeExpr(const Expression &expr) const {
     auto visitor = [&](const auto &value) -> ComputedValue {
       using T = std::remove_cvref_t<decltype(value)>;
       if constexpr (std::is_same_v<T, UnaryExpression>) {
@@ -227,8 +228,12 @@ public:
         auto lhs = computeExpr(*be.lhs);
         auto rhs = computeExpr(*be.rhs);
 
-        if (lhs.unitRaw && rhs.unitRaw && lhs.asNumber() && rhs.asNumber()) {
-          lhs = convertToUnit(lhs.asNumber()->n, *lhs.unitRaw, *rhs.unitRaw);
+        if (lhs.asNumber() && rhs.asNumber()) {
+          auto nlhs = lhs.asNumber();
+          auto nrhs = rhs.asNumber();
+          if (nlhs->unit && nrhs->unit) {
+            lhs = convertToUnit(lhs.asNumber()->n, nlhs->unit->raw, nrhs->unit->raw);
+          }
         }
 
         if (be.op == "+") { return add(lhs, rhs); }
@@ -292,11 +297,8 @@ public:
           }
 
           if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-            // if converted expression has no unit there is nothing to do,
-            // just tag it with the target unit... 1m to s 1m to in
-            if (!v.unitRaw) return ComputedValue{.value = value, .unitRaw = unit->name};
-            auto converted = convertToUnit(n->n, *v.unitRaw, unit->name);
-            converted.explicitlyConverted = true;
+            if (!n->unit) return ComputedValue{.value = value};
+            auto converted = convertToUnit(n->n, n->unit->raw, unit->name);
             return converted;
           }
         }
@@ -305,11 +307,18 @@ public:
         return ComputedValue{.value = Number{value}};
       } else if constexpr (std::is_same_v<T, UnitExpression>) {
         const auto &ue = value;
-        auto n = computeExpr(*ue.expr).value;
+        ValueType v = computeExpr(*ue.expr).value;
+        ComputedValue c{.value = v};
 
-        // since we unitify the expression, we discard any unit the expr might
-        // have had
-        return ComputedValue{.value = n, .unitRaw = ue.unit};
+        // unit only makes sense for a number, ignore it otherwise
+        if (auto n = c.asNumber()) {
+          n->unit = Number::Unit{.raw = ue.unit};
+          if (auto candidates = m_db.findUnitCandidates(ue.unit); candidates.size() == 1) {
+            n->unit->def = candidates.front();
+          }
+        }
+
+        return c;
       } else if constexpr (std::is_same_v<T, FunctionCall>) {
         return executeFunction(value);
       } else {
@@ -324,17 +333,15 @@ public:
     return std::visit(visitor, expr.data);
   }
 
-  ComputedValue computeExpr(const Expression &expr) const {
-    auto result = computeExprImpl(expr);
+  ComputedValue computeExprBase(const Expression &expr) const {
+    auto result = computeExpr(expr);
 
-    // the implementation obviously suck, we can do much better
-    if (result.isNumber() && m_opts.implicitCurrencyConversion && result.unitRaw &&
-        !result.explicitlyConverted) {
-      auto lhs = m_db.findUnit(std::string{*result.unitRaw});
-
-      if (lhs && lhs->dimension == dimensions::CURRENCY) {
-        auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
-        if (target && *target != lhs->id) { return convertToUnit(result.asNumber()->n, lhs->id, *target); }
+    if (auto n = result.asNumber(); n && n->unit && n->unit->def &&
+                                    n->unit->def->dimension == dimensions::CURRENCY &&
+                                    !n->explicitlyConverted) {
+      auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
+      if (target && !equalsIgnoreCase(*target, n->unit->def->id)) {
+        return convertToUnit(result.asNumber()->n, n->unit->def->id, *target);
       }
     }
 
@@ -359,9 +366,9 @@ private:
       if (!res) throw std::runtime_error(res.error());
 
       return {
-          .value = Number{res.value()},
-          .unit = rhs,
-          .unitRaw = toUnit,
+          .value = Number{.n = res.value(),
+                          .unit = Number::Unit{.raw = toUnit, .def = rhs},
+                          .explicitlyConverted = true},
       };
     };
 
@@ -375,10 +382,10 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return ComputedValue{.value = Number{v}, .unitRaw = toUnit};
+      return ComputedValue{
+          .value = Number{.n = v, .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
     }
 
-    // 1s to 1m
     if (valueCandidates.size() > targetCandidates.size()) {
       auto rhs = targetCandidates.front();
       auto lhs = std::ranges::find_if(valueCandidates,
@@ -418,8 +425,8 @@ private:
       auto d = lhs.asDateTime();
       auto n = rhs.asNumber();
 
-      if (rhs.unitRaw) {
-        auto candidates = m_db.findUnitCandidates(rhs.unitRaw.value());
+      if (n->unit) {
+        auto candidates = m_db.findUnitCandidates(n->unit->raw);
         auto it = std::ranges::find_if(candidates,
                                        [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
         auto second = m_db.findUnit("second");
@@ -450,7 +457,7 @@ private:
 
     assertBinary<Number, Number>(lhs, rhs);
 
-    return output(lhs.asNumber()->n + rhs.asNumber()->n, lhs, rhs);
+    return output(lhs.asNumber()->n + rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) {
@@ -459,58 +466,65 @@ private:
           std::chrono::duration_cast<std::chrono::seconds>(lhs.asDateTime()->time - rhs.asDateTime()->time);
 
       return ComputedValue{
-          .value = Number{static_cast<double>(diff.count())},
-          .unitRaw = "second",
+          .value = Number{.n = static_cast<double>(diff.count()), .unit = Number::Unit{.raw = "second"}},
       };
     }
 
     assertBinary<Number, Number>(lhs, rhs);
-    return output(lhs.asNumber()->n - rhs.asNumber()->n, lhs, rhs);
+    return output(lhs.asNumber()->n - rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue multiply(const ComputedValue &lhs, const ComputedValue &rhs) {
 
     assertBinary<Number, Number>(lhs, rhs);
-    return output(lhs.asNumber()->n * rhs.asNumber()->n, lhs, rhs);
+    return output(lhs.asNumber()->n * rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue div(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(lhs.asNumber()->n / rhs.asNumber()->n, lhs, rhs);
+    return output(lhs.asNumber()->n / rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue modulo(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) % static_cast<int>(rhs.asNumber()->n), lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) % static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static ComputedValue pow(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(std::pow(lhs.asNumber()->n, rhs.asNumber()->n), lhs, rhs);
+    return output(std::pow(lhs.asNumber()->n, rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue leftshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) << static_cast<int>(rhs.asNumber()->n), lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) << static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static ComputedValue rightshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) >> static_cast<int>(rhs.asNumber()->n), lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) >> static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static ComputedValue bitwiseor(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) | static_cast<int>(rhs.asNumber()->n), lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) | static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static ComputedValue bitwiseAnd(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) & static_cast<int>(rhs.asNumber()->n), lhs, rhs);
+    return output(static_cast<int>(lhs.asNumber()->n) & static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
-  static ComputedValue output(double n, const ComputedValue &lhs, const ComputedValue &rhs) {
-    return ComputedValue{.value = Number{n}, .unitRaw = rhs.unitRaw.or_else([&]() { return lhs.unitRaw; })};
+  static ComputedValue output(double n, const Number &lhs, const Number &rhs) {
+    auto result = Number{.n = n,
+                         .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
+                         .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
+    return ComputedValue{.value = result};
   }
 
   ComputedValue executeFunction(const FunctionCall &fn) const {
@@ -537,7 +551,7 @@ std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr,
     auto ast = parser.parse();
     Interpreter i{m_unitDb, opts};
 
-    return i.computeExpr(*ast.root);
+    return i.computeExprBase(*ast.root);
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
@@ -547,19 +561,25 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
     Interpreter i{m_unitDb, opts};
-    auto result = i.computeExpr(*ast.root);
+    auto result = i.computeExprBase(*ast.root);
 
     const auto formatNumber = [](const Number &v) -> std::string {
-      switch (v.format) {
-      case abacus::NumberOutputFormat::Hexadecimal:
-        return std::format("{:#x}", static_cast<int>(std::round(v.n)));
-      case abacus::NumberOutputFormat::Octal:
-        return std::format("{:#o}", static_cast<int>(std::round(v.n)));
-      case abacus::NumberOutputFormat::Binary:
-        return std::format("{:#b}", static_cast<int>(std::round(v.n)));
-      default:
-        return std::format("{:.6g}", v.n);
+      constexpr auto formatN = [](const Number &v) {
+        switch (v.format) {
+        case abacus::NumberOutputFormat::Hexadecimal:
+          return std::format("{:#x}", static_cast<int>(std::round(v.n)));
+        case abacus::NumberOutputFormat::Octal:
+          return std::format("{:#o}", static_cast<int>(std::round(v.n)));
+        case abacus::NumberOutputFormat::Binary:
+          return std::format("{:#b}", static_cast<int>(std::round(v.n)));
+        default:
+          return std::format("{:.6g}", v.n);
+        };
       };
+
+      auto unitName = v.unit.transform([&](const Number::Unit &u) { return u.raw; }).value_or("");
+
+      return std::format("{}{}", formatN(v), unitName);
     };
 
     auto visitor = [&](const auto &value) -> std::string {
@@ -574,7 +594,7 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
       }
     };
 
-    return std::format("{}{}", std::visit(visitor, result.value), result.unitRaw.value_or(""));
+    return std::format("{}", std::visit(visitor, result.value));
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 

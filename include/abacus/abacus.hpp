@@ -32,8 +32,26 @@ struct Time {
 enum class NumberOutputFormat { Decimal, Hexadecimal, Binary, Octal };
 
 struct Number {
+  // unit may remain ambigious until more information is known.
+  // To deal with that, the attached unit can either be a fully
+  // qualified unit or a "raw" unit, that is the unit-like string
+  // as it was parsed.
+  // For instance: in "1m to s" the "m" unit can refer to "meters" or "minutes".
+  // In this case, the second operand is what will allow disambiguation since both
+  // are durations. Until we are able to consider the conversion operation, "1m" is
+  // ambiguous.
+
   double n;
   NumberOutputFormat format;
+
+  struct Unit {
+    std::string_view raw;
+    std::optional<UnitDef> def;
+  };
+
+  std::optional<Unit> unit;
+
+  bool explicitlyConverted = false;
 
   bool operator==(const Number &rhs) const { return n == rhs.n; }
   std::partial_ordering operator<=>(const Number &rhs) const { return n <=> rhs.n; }
@@ -47,25 +65,24 @@ struct Boolean {
 using ValueType = std::variant<Number, DateTime, Boolean>;
 
 struct ComputedValue {
-
   ValueType value;
-
-  // TODO: maybe we want the pointer in the db, idk...
-  // optional is convenient, and no lifetime issues by copying...
-  std::optional<UnitDef> unit;
-  std::optional<std::string_view> unitRaw;
-  bool explicitlyConverted = false;
 
   bool isNumber() const { return std::holds_alternative<Number>(value); }
 
   bool isDateTime() const { return std::holds_alternative<DateTime>(value); }
 
   const Number *asNumber() const { return std::get_if<Number>(&value); }
+  Number *asNumber() { return std::get_if<Number>(&value); }
   const DateTime *asDateTime() const { return std::get_if<DateTime>(&value); }
 };
 
 struct EvalConfig {
+  /**
+   * Timepoint that should be used as the current time.
+   * You most likely don't want to change this, the main use case is testing.
+   */
   std::optional<TimePoint> now;
+
   const std::chrono::time_zone *timezone;
 
   /**

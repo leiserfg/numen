@@ -36,6 +36,7 @@ public:
     bool isAdjacent(const Token &rhs) const { return end == rhs.start; }
 
     const Number *asNumber() const { return std::get_if<Number>(&data); }
+    const Number *asNumber() { return std::get_if<Number>(&data); }
   };
 
   template <typename... Ts> std::optional<std::tuple<Ts...>> peakForward() {

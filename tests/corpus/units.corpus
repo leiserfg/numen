@@ -52,4 +52,4 @@ km to in                    => 39370.1in
 100 usd + 20 usd            => 120usd
 
 # units flowing through functions
-max(1 km to m, 100)         => 1000
+max(1 km to m, 100)         => 1000m

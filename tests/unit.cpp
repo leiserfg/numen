@@ -7,8 +7,9 @@ TEST_CASE("unit should tag any expression", "[unit]") {
   {
     auto res = calc.compute("5 * 2 + 10 usd");
     REQUIRE(res.has_value());
-    REQUIRE(res->unitRaw == "usd");
     REQUIRE(res->asNumber()->n == 20);
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "usd");
   }
 }
 
@@ -19,7 +20,8 @@ TEST_CASE("unit can be converted using the 'to' operator", "[unit]") {
     auto res = calc.compute("1 km to m");
     REQUIRE(res);
     REQUIRE(res->asNumber()->n == 1000);
-    REQUIRE(res->unitRaw == "m");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "m");
   }
 }
 
@@ -30,7 +32,8 @@ TEST_CASE("unit can be converted using the 'in' operator", "[unit]") {
     auto res = calc.compute("1 km in m");
     REQUIRE(res);
     REQUIRE(res->asNumber()->n == 1000);
-    REQUIRE(res->unitRaw == "m");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "m");
   }
 }
 
@@ -41,7 +44,8 @@ TEST_CASE("unit can be converted many times in a row", "[unit]") {
     auto res = calc.compute("1 km in m to km");
     REQUIRE(res);
     REQUIRE(res->asNumber()->n == 1);
-    REQUIRE(res->unitRaw == "km");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "km");
   }
 }
 
@@ -51,7 +55,8 @@ TEST_CASE("artithmetic can be used on a converted unit", "[unit]") {
     auto res = calc.compute("1km to m to km * 10 + 5");
     REQUIRE(res);
     REQUIRE(res->asNumber()->n == 15);
-    REQUIRE(res->unitRaw == "km");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "km");
   }
 }
 
@@ -62,7 +67,8 @@ TEST_CASE("unit name should be inferred from context", "[unit]") {
     auto res = calc.compute("1m to s");
     REQUIRE(res);
     REQUIRE(res->asNumber()->n == 60);
-    REQUIRE(res->unitRaw == "s");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "s");
   }
 }
 
@@ -128,7 +134,8 @@ TEST_CASE("in should work as a conversion operator in the right context, and a "
                                        // in is an alias for the 'go' operator
   REQUIRE(res);
   REQUIRE(std::round(res->asNumber()->n) == 39);
-  REQUIRE(res->unitRaw == "in");
+  REQUIRE(res->asNumber()->unit);
+  REQUIRE(res->asNumber()->unit->raw == "in");
 }
 
 TEST_CASE("Unit should convert implicitly when in a binary expression", "[unit]") {
@@ -139,7 +146,8 @@ TEST_CASE("Unit should convert implicitly when in a binary expression", "[unit]"
     REQUIRE(res);
     REQUIRE(res->isNumber());
     REQUIRE(res->asNumber()->n == 1100);
-    REQUIRE(res->unitRaw == "m");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "m");
   }
 
   {
@@ -147,7 +155,8 @@ TEST_CASE("Unit should convert implicitly when in a binary expression", "[unit]"
     REQUIRE(res);
     REQUIRE(res->isNumber());
     REQUIRE(res->asNumber()->n == 1.5);
-    REQUIRE(res->unitRaw == "hour");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "hour");
   }
 
   {
@@ -155,6 +164,7 @@ TEST_CASE("Unit should convert implicitly when in a binary expression", "[unit]"
     REQUIRE(res);
     REQUIRE(res->isNumber());
     REQUIRE(res->asNumber()->n == 1.5);
-    REQUIRE(res->unitRaw == "hours");
+    REQUIRE(res->asNumber()->unit);
+    REQUIRE(res->asNumber()->unit->raw == "hours");
   }
 }

@@ -5,6 +5,7 @@
 #include <array>
 #include <format>
 #include <algorithm>
+#include <iostream>
 #include <ranges>
 
 namespace {
@@ -157,7 +158,7 @@ std::expected<double, std::string> UnitDatabase::convert(double n, const UnitDef
       return std::unexpected(std::format("No conversion rate available between {} and {}.", from.id, to.id));
     }
 
-    return n / *lhsRate * *rhsRate;
+    return n / lhsRate.value() * rhsRate.value();
   }
 
   auto base = n * fromFactor + from.offset;
