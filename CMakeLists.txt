@@ -88,7 +88,7 @@ if (BUILD_TESTS)
 	endif()
 
 	set(TEST_TARGET abacus-tests)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/datetime.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	if (NOT MSVC)

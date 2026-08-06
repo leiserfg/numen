@@ -27,23 +27,13 @@
 #include <variant>
 
 namespace abacus {
-
-TimePoint shiftMonth(TimePoint t, int delta) {
+template <typename T> TimePoint shift(TimePoint t, T duration) {
   auto time = std::chrono::floor<std::chrono::days>(t);
   std::chrono::year_month_day ymd{time};
   auto tod = t - time;
-  ymd += std::chrono::months(static_cast<int>(delta));
+  ymd += duration;
 
-  auto point = std::chrono::sys_days{ymd} + tod;
-
-  return point;
-}
-
-TimePoint shiftYear(TimePoint t, int delta) {
-  auto time = std::chrono::floor<std::chrono::days>(t);
-  std::chrono::year_month_day ymd{time};
-  auto tod = t - time;
-  ymd += std::chrono::years(static_cast<int>(delta));
+  if (!ymd.ok()) ymd = ymd.year() / ymd.month() / std::chrono::last;
 
   auto point = std::chrono::sys_days{ymd} + tod;
 
@@ -99,9 +89,9 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
             if constexpr (std::is_same_v<A, std::chrono::weekday>) {
               return now;
             } else if constexpr (std::is_same_v<A, std::chrono::months>) {
-              return shiftMonth(now, anchor.count() * sign);
+              return shift(now, std::chrono::months{anchor.count() * sign});
             } else if constexpr (std::is_same_v<A, std::chrono::years>) {
-              return shiftYear(now, anchor.count() * sign);
+              return shift(now, std::chrono::years{anchor.count() * sign});
             } else {
               return now + anchor * sign;
             }
@@ -434,13 +424,13 @@ private:
         if (it != candidates.end()) {
           if (it->id == "month") {
             DateTime dt = *d;
-            dt.time = shiftMonth(dt.time, static_cast<int>(rhs.asNumber()->n));
+            dt.time = shift(dt.time, std::chrono::months{static_cast<int>(rhs.asNumber()->n)});
             return ComputedValue{.value = dt};
           }
 
           if (it->id == "year") {
             DateTime dt = *d;
-            dt.time = shiftYear(dt.time, static_cast<int>(rhs.asNumber()->n));
+            dt.time = shift(dt.time, std::chrono::years{static_cast<int>(rhs.asNumber()->n)});
             return ComputedValue{.value = dt};
           }
 

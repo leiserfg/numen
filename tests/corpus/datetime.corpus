@@ -43,8 +43,11 @@ January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 # timezones
 2001/01/18 New York         => 2001-01-18 00:00:00 (America/New_York)
 
+31 Jan 2026 + 1 month       => 2026-02-28 00:00:00 (Etc/UTC)
+
 # relative
 now => 2026-01-18 00:00:00 (Etc/UTC)
 1 month ago => 2025-12-18 00:00:00 (Etc/UTC)
 3 weeks ago => 2025-12-28 00:00:00 (Etc/UTC)
 1 year ago + 1yr => 2026-01-18 00:00:00 (Etc/UTC)
+
