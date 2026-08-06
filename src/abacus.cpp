@@ -88,12 +88,12 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
             int sign = value.direction == RelativeDateTimeLiteral::Direction::Past ? -1 : 1;
             if constexpr (std::is_same_v<A, std::chrono::weekday>) {
               return now;
-            } else if constexpr (std::is_same_v<A, std::chrono::months>) {
-              return shift(now, std::chrono::months{anchor.count() * sign});
-            } else if constexpr (std::is_same_v<A, std::chrono::years>) {
-              return shift(now, std::chrono::years{anchor.count() * sign});
             } else {
-              return now + anchor * sign;
+              static_assert(std::is_same_v<A, Duration>);
+              if (auto &y = anchor.years) now = shift<std::chrono::years>(now, sign * *y);
+              if (auto &m = anchor.months) now = shift<std::chrono::months>(now, sign * *m);
+              if (auto &s = anchor.seconds) now = now + sign * *s;
+              return now;
             }
           },
           value.anchor);
@@ -197,7 +197,8 @@ struct OperationHandler {};
 
 class Interpreter {
 public:
-  Interpreter(const UnitDatabase &db, const EvalConfig &opts) : m_db(db), m_opts(opts) {}
+  Interpreter(const UnitDatabase &db, const EvalConfig &opts)
+      : m_db(db), m_opts(opts), m_now(opts.now.value_or(std::chrono::system_clock::now())) {}
 
   ComputedValue computeExpr(const Expression &expr) const {
     auto visitor = [&](const auto &value) -> ComputedValue {
@@ -315,7 +316,7 @@ public:
         static_assert(std::is_same_v<T, DateString>);
         const auto &ds = value;
         auto &tz = m_opts.timezone ? *m_opts.timezone : *std::chrono::current_zone();
-        auto dt = parseDateTime(ds, tz, m_opts.now.value_or(std::chrono::system_clock::now()));
+        auto dt = parseDateTime(ds, tz, m_now);
         return ComputedValue{.value = dt};
       }
     };
@@ -348,7 +349,8 @@ private:
 
     auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
       if (lhs.dimension != rhs.dimension) {
-        throw std::runtime_error(std::format("Incompatible units ({} to {})", lhs.id, rhs.id));
+        throw std::runtime_error(std::format("Incompatible units: {} ({}) to {} ({})", lhs.id, lhs.dimension,
+                                             rhs.id, rhs.dimension));
       }
 
       auto res = m_db.convert(n, lhs, rhs);
@@ -533,6 +535,7 @@ private:
 
   const UnitDatabase &m_db;
   const EvalConfig &m_opts;
+  TimePoint m_now;
 };
 
 std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr, const EvalConfig &opts) {

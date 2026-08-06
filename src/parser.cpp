@@ -9,6 +9,7 @@
 #include <numbers>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 struct OperatorDefinition {
   std::string_view id;
@@ -237,31 +238,34 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 }
 
 std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
-  if (auto t = m_lexer.peakForward<Lexer::Number, Lexer::String, Lexer::String>()) {
-    const auto &[n, unit, word] = *t;
-
-    // X <duration> ago
-    if (equalsIgnoreCase(word.data, std::string_view{"ago"})) {
-      auto units = m_unitDb.findUnitCandidates(unit.data);
-      auto it = std::ranges::find_if(
-          units, [](auto &&unit) { return unit.dimension == dimensions::DURATION; });
-      if (it != units.end()) {
-        RelativeDateTimeLiteral l{.direction = RelativeDateTimeLiteral::Direction::Past};
-
-        if (it->id == "month") {
-          l.anchor = std::chrono::months{static_cast<unsigned>(n.n)};
-        } else if (it->id == "year") {
-          l.anchor = std::chrono::years{static_cast<unsigned>(n.n)};
-        } else {
-          l.anchor = std::chrono::seconds{static_cast<unsigned>(n.n * it->factor)};
-        }
-
-        for (int i = 0; i != 3; ++i)
+  if (auto duration = parseDuration()) {
+    if (auto s = m_lexer.peak(duration->tokenCount); s && s->type == Lexer::TokenType::String) {
+      auto word = s->raw;
+      if (equalsIgnoreCase(word, std::string_view{"ago"})) {
+        for (int i = 0; i != duration->tokenCount + 1; ++i)
           m_lexer.next();
-
-        return l;
+        return RelativeDateTimeLiteral{
+            .anchor = duration->data,
+            .direction = RelativeDateTimeLiteral::Direction::Past,
+        };
       }
     }
+  }
+
+  if (auto tok = m_lexer.peak(); tok->raw == "yesterday") {
+    m_lexer.next();
+    return RelativeDateTimeLiteral{
+        .anchor = Duration{.seconds = std::chrono::days{1}},
+        .direction = RelativeDateTimeLiteral::Direction::Past,
+    };
+  }
+
+  if (auto tok = m_lexer.peak(); tok->raw == "tomorrow") {
+    m_lexer.next();
+    return RelativeDateTimeLiteral{
+        .anchor = Duration{.seconds = std::chrono::days{1}},
+        .direction = RelativeDateTimeLiteral::Direction::Future,
+    };
   }
 
   return std::nullopt;
@@ -491,6 +495,39 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   if (!expr) { throw std::runtime_error("Expected term"); }
 
   return expr;
+}
+
+std::optional<Scanned<Duration>> Parser::parseDuration() {
+  // 1 year 2 weeks 2 minutes
+  Scanned<Duration> d;
+
+  while (true) {
+    if (auto pk = m_lexer.peakForward<Lexer::Number, Lexer::String>(d.tokenCount)) {
+      auto &[n, u] = *pk;
+      if (auto unit = m_unitDb.findUnit(std::string{u.data});
+          unit && unit->dimension == dimensions::DURATION) {
+
+        d.tokenCount += 2;
+
+        if (unit->id == "year") {
+          d.data.years = std::chrono::years{static_cast<unsigned>(n.n)};
+        } else if (unit->id == "month") {
+          d.data.months = std::chrono::months{static_cast<unsigned>(n.n)};
+        } else {
+          d.data.seconds = d.data.seconds.value_or(std::chrono::seconds{0}) +
+                           std::chrono::seconds{static_cast<unsigned>(n.n * unit->factor)};
+        }
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  if (d.data.years || d.data.months || d.data.seconds) { return d; }
+
+  return std::nullopt;
 }
 
 std::unique_ptr<Expression> Parser::pratParse(int minPrec) {

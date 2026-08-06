@@ -48,7 +48,7 @@ public:
   // 'minute'.
   std::vector<UnitDef> findUnitCandidates(std::string_view q) const;
 
-  const UnitDef *findUnit(const std::string &id) const;
+  std::optional<UnitDef> findUnit(const std::string &id) const;
 
   std::expected<double, std::string> convert(double n, const UnitDef &from, const UnitDef &to) const;
 

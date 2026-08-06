@@ -1,6 +1,7 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include "lexer.hpp"
+#include <bits/chrono.h>
 #include <cassert>
 #include "date-string.hpp"
 #include <chrono>
@@ -83,10 +84,21 @@ struct DateTimeLiteral {
   std::optional<ParsedTime> time;
 };
 
+template <typename T> struct Scanned {
+  T data;
+  std::size_t tokenCount = 0;
+};
+
+struct Duration {
+  std::optional<std::chrono::years> years;
+  std::optional<std::chrono::months> months;
+
+  // anything that is not a calendar unit can collapse as seconds
+  std::optional<std::chrono::seconds> seconds;
+};
+
 struct RelativeDateTimeLiteral {
-  // seconds if for anything that is a fixed duration, the others are for calendar units that cannot
-  // be expressed as static durations.
-  std::variant<std::chrono::seconds, std::chrono::weekday, std::chrono::months, std::chrono::years> anchor;
+  std::variant<Duration, std::chrono::weekday> anchor;
   enum class Direction : std::uint8_t { Past, Future } direction;
 };
 
@@ -161,6 +173,7 @@ public:
   AST parse();
 
 protected:
+  std::optional<Scanned<Duration>> parseDuration();
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);

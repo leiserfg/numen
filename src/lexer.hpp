@@ -39,9 +39,9 @@ public:
     const Number *asNumber() { return std::get_if<Number>(&data); }
   };
 
-  template <typename... Ts> std::optional<std::tuple<Ts...>> peakForward() {
+  template <typename... Ts> std::optional<std::tuple<Ts...>> peakForward(std::size_t i = 0) {
     return [&]<std::size_t... I>(std::index_sequence<I...>) -> std::optional<std::tuple<Ts...>> {
-      std::array<std::optional<Lexer::Token>, sizeof...(Ts)> p{peak(I)...};
+      std::array<std::optional<Lexer::Token>, sizeof...(Ts)> p{peak(i + I)...};
       bool ok = std::apply([](auto... q) { return (... && (q && std::holds_alternative<Ts>(q->data))); }, p);
       if (!ok) return std::nullopt;
       return std::tuple<Ts...>{std::get<Ts>(p[I]->data)...};
