@@ -48,30 +48,30 @@ std::string formatDuration(const Duration &d) {
 
   // TODO: proper spacing
   if (years) {
-    oss << years << "yr";
+    oss << years << " yr";
     if (years > 1) oss << "s";
   }
   if (months.count()) {
     if (!oss.str().empty()) oss << " ";
-    oss << months.count() << "month";
+    oss << months.count() << " month";
     if (months.count() > 1) oss << "s";
   }
   if (days) {
     if (!oss.str().empty()) oss << " ";
-    oss << days << "day";
+    oss << days << " day";
     if (days > 1) oss << "s";
   }
   if (hours) {
     if (!oss.str().empty()) oss << " ";
-    oss << hours << "hr";
+    oss << hours << " hr";
   }
   if (minutes) {
     if (!oss.str().empty()) oss << " ";
-    oss << minutes << "min";
+    oss << minutes << " min";
   }
   if (seconds) {
     if (!oss.str().empty()) oss << " ";
-    oss << seconds << "sec";
+    oss << seconds << " sec";
   }
 
   return oss.str();
@@ -247,6 +247,7 @@ public:
 
       return ComputedValue{.value = *min};
     });
+
     registerFunction("max", [&](FunctionCtx ctx) {
       if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
       auto nn = ctx.unpackAll<Number>();
@@ -254,6 +255,7 @@ public:
 
       return ComputedValue{.value = *max};
     });
+
     /*
 registerFunction("sin", [&](FunctionCtx ctx) {
   auto [lhs] = ctx.unpack<double>();
@@ -451,18 +453,21 @@ private:
     if (!nb || !nb->unit) return std::nullopt;
 
     auto candidates = m_db.findUnitCandidates(nb->unit->raw);
-    auto it = std::ranges::find_if(candidates,
-                                   [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
-    if (it == candidates.end()) return std::nullopt;
+
+    if (candidates.size() != 1) return std::nullopt;
+
+    auto &unit = candidates[0];
+
+    if (unit.dimension != dimensions::DURATION) return std::nullopt;
 
     Duration d;
 
-    if (it->id == "year")
+    if (unit.id == "year")
       d.years = std::chrono::years{static_cast<int>(nb->n)};
-    else if (it->id == "month")
+    else if (unit.id == "month")
       d.months = std::chrono::months{static_cast<int>(nb->n)};
     else
-      d.seconds = std::chrono::seconds{static_cast<int>(nb->n * it->factor)};
+      d.seconds = std::chrono::seconds{static_cast<int>(nb->n * unit.factor)};
 
     return d;
   }

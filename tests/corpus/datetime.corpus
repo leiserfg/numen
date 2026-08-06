@@ -36,8 +36,8 @@ January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 01/18/2001 + 3 years        => 2004-01-18 00:00:00 (Etc/UTC)
 01/18/2001 + 1yr            => 2002-01-18 00:00:00 (Etc/UTC)
 
-# subtracting two dates produces a duration
-01/18/2001 1:00:00 - 01/18/2001 00:00:00          => 3600second
+# subtracting two dates produces a duratio
+01/18/2001 1:00:00 - 01/18/2001 00:00:00          => 1 hr
 01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours => 1hours
 
 # timezones

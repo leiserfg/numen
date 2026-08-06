@@ -45,7 +45,7 @@ km to in                    => 39370.1in
 90 kmh to mph               => 55.9234mph
 
 # implicit conversion in binary expressions
-30min + 1hour               => 1.5hour
+30min + 1hour               => 1 hr 30 min
 
 # currency: identity and same-currency arithmetic work without rates
 100 dollars                 => 100dollars

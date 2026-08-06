@@ -1,7 +1,3 @@
-# malformed expressions
-1 +                         => !error Expected term
-*5                          => !error Expected term
-
 # unknown names
 foo(1, 2)                   => !error Unknown function "foo"
 

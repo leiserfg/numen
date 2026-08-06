@@ -53,6 +53,7 @@ public:
   std::optional<Token> peakIf(TokenType type);
   std::optional<Token> peak(int n = 0);
   // get as much string as we can and return that portion
+  void advance(int n);
   std::optional<std::string_view> peakString(int n = 1);
 
   // e.g can check whether "to the power of" is next

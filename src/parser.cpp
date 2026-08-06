@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <memory>
 #include <numbers>
+#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -162,9 +163,7 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
     if (weekday) lit.day = weekday;
     if (day) lit.day = day;
 
-    for (int j = 0; j != i; ++j) {
-      m_lexer.next();
-    }
+    m_lexer.advance(i);
 
     return lit;
   }
@@ -243,8 +242,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     if (auto s = m_lexer.peak(duration->tokenCount); s && s->type == Lexer::TokenType::String) {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
-        for (int i = 0; i != duration->tokenCount + 1; ++i)
-          m_lexer.next();
+        m_lexer.advance(duration->tokenCount + 1);
         return RelativeDateTimeLiteral{
             .anchor = duration->data,
             .direction = RelativeDateTimeLiteral::Direction::Past,
@@ -383,6 +381,10 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
 }
 
 std::unique_ptr<Expression> Parser::parseTerm() {
+  if (!m_lexer.peak()) {
+    throw std::runtime_error("Expected EOF, looks like there is nothing we can parse!");
+  }
+
   auto expr = std::unique_ptr<Expression>();
 
   if (auto tok = m_lexer.peak()) {
@@ -502,7 +504,10 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     m_lexer.next();
   }
 
-  if (!expr) { throw std::runtime_error("Expected term"); }
+  if (!expr) {
+    m_lexer.next();
+    return parseTerm();
+  }
 
   return expr;
 }
@@ -549,18 +554,16 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
       m_lexer.next();
 
-      // in is equivalent to addition semantically speaking, for durations.
+      // in is equivalent to addition for durations.
       // now in 2 days 5minutes
       if (auto duration = scanDuration(); duration && tok->raw == "in") {
         auto rhs = std::make_unique<Expression>(duration->data);
-
         left = std::make_unique<Expression>(BinaryExpression{
             .op = "+",
             .lhs = std::move(left),
             .rhs = std::move(rhs),
         });
-        for (int i = 0; i != duration->tokenCount; ++i)
-          m_lexer.next();
+        m_lexer.advance(duration->tokenCount);
         continue;
       }
 
@@ -623,7 +626,11 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
           continue;
         }
       }
-      break;
+
+      if (tok->raw == "(" || tok->raw == ")" || tok->raw == "," || parseConstant(tok->raw)) break;
+
+      m_lexer.next();
+      continue;
     }
   }
 

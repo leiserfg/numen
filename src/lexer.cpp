@@ -10,6 +10,12 @@ constexpr char THOUSAND_DELIM = '_';
 constexpr char FRACTION_DELIM = '.';
 }; // namespace
 
+void Lexer::advance(int n) {
+  for (int i = 0; i != n; ++i) {
+    next();
+  }
+}
+
 std::optional<Lexer::Token> Lexer::next() {
   State state = State::Reset;
   size_t startPos = m_cursor;
@@ -181,10 +187,12 @@ std::optional<std::string_view> Lexer::peakString(int n) {
 }
 
 std::optional<Lexer::Token> Lexer::peak(int n) {
+  if (m_cursor >= m_data.size()) return std::nullopt;
   auto old = m_cursor;
   std::optional<Token> tok;
   for (int i = 0; i != n + 1; ++i) {
     tok = next();
+    if (!tok) break;
   }
   m_cursor = old;
   return tok;
