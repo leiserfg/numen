@@ -6,6 +6,7 @@
 #include <expected>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include "abstract-currency-provider.hpp"
 
@@ -110,6 +111,24 @@ struct ComputedValue {
 
   const Duration *asDuration() { return std::get_if<Duration>(&value); }
   const Duration *asDuration() const { return std::get_if<Duration>(&value); }
+
+  std::string_view valueTypeName() const {
+    return std::visit(
+        [](const auto &v) {
+          using T = std::remove_cvref_t<decltype(v)>;
+          if constexpr (std::is_same_v<T, Duration>) {
+            return "Duration";
+          } else if constexpr (std::is_same_v<T, Number>) {
+            return "Number";
+          } else if constexpr (std::is_same_v<T, DateTime>) {
+            return "DateTime";
+          } else {
+            static_assert(std::is_same_v<T, Boolean>);
+            return "Boolean";
+          }
+        },
+        value);
+  }
 };
 
 struct EvalConfig {

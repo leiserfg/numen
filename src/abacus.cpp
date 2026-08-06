@@ -47,14 +47,66 @@ std::string formatDuration(const Duration &d) {
   auto seconds = s.count() - days * 86400 - hours * 3600 - minutes * 60;
 
   // TODO: proper spacing
-  if (years) { oss << years << " yr "; }
-  if (months.count()) { oss << months.count() << " month "; }
-  if (days) { oss << days << " day "; }
-  if (hours) { oss << hours << " hr "; }
-  if (minutes) { oss << minutes << " min "; }
-  if (seconds) { oss << seconds << " sec "; }
+  if (years) {
+    oss << years << "yr";
+    if (years > 1) oss << "s";
+  }
+  if (months.count()) {
+    if (!oss.str().empty()) oss << " ";
+    oss << months.count() << "month";
+    if (months.count() > 1) oss << "s";
+  }
+  if (days) {
+    if (!oss.str().empty()) oss << " ";
+    oss << days << "day";
+    if (days > 1) oss << "s";
+  }
+  if (hours) {
+    if (!oss.str().empty()) oss << " ";
+    oss << hours << "hr";
+  }
+  if (minutes) {
+    if (!oss.str().empty()) oss << " ";
+    oss << minutes << "min";
+  }
+  if (seconds) {
+    if (!oss.str().empty()) oss << " ";
+    oss << seconds << "sec";
+  }
 
   return oss.str();
+}
+
+Duration subtractDates(const DateTime &lhs, const DateTime &rhs) {
+  using namespace std::chrono;
+
+  auto lhsDays = floor<days>(lhs.time);
+  auto rhsDays = floor<days>(rhs.time);
+
+  // calendar difference a -> b, assuming a <= b
+  auto amd = year_month_day{floor<days>(lhsDays)};
+  auto bmd = year_month_day{floor<days>(rhsDays)};
+
+  auto atod = lhs.time - lhsDays;
+  auto btod = rhs.time - rhsDays;
+
+  auto m = (bmd.year() / bmd.month()) - (amd.year() / amd.month()); // chrono::months, exact
+  if (bmd.day() < amd.day()) --m;                                   // last month isn't complete yet
+
+  auto anchor = amd + m; // same clamped month-shift you already have
+  if (!anchor.ok()) anchor = anchor.year() / anchor.month() / last;
+
+  auto d = sys_days{bmd} - sys_days{anchor}; // exact leftover days
+
+  auto y = m / 12;
+  auto mo = m % 12;
+
+  seconds secs =
+      duration_cast<seconds>(days{d}) - seconds{std::abs(duration_cast<seconds>(atod - btod).count())};
+
+  return Duration{.years = std::chrono::years{std::abs(y.count())},
+                  .months = std::chrono::months{std::abs(mo.count())},
+                  .seconds = seconds{std::abs(secs.count())}};
 }
 
 template <typename T> TimePoint shift(TimePoint t, T duration) {
@@ -478,7 +530,25 @@ private:
   template <typename T, typename U = T>
   static void assertBinary(const ComputedValue &lhs, const ComputedValue &rhs) {
     bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
-    if (!ok) throw std::runtime_error("Invalid operands");
+
+    if (!ok) {
+      throw std::runtime_error(
+          std::format("Invalid operands: {} and {}", lhs.valueTypeName(), rhs.valueTypeName()));
+    }
+  }
+
+  template <typename T, typename U>
+  static std::optional<std::tuple<const T *, const U *>>
+  getTypedOperands(const ComputedValue &lhs, const ComputedValue &rhs, bool swappable = false) {
+    if (std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value)) {
+      return std::tuple<const T *, const U *>{std::get_if<T>(&lhs.value), std::get_if<U>(&rhs.value)};
+    }
+
+    if constexpr (std::is_same_v<T, U>) { return std::nullopt; }
+
+    if (swappable) return getTypedOperands<T, U>(rhs, lhs, false);
+
+    return std::nullopt;
   }
 
   ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
@@ -491,13 +561,13 @@ private:
     if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
     if (lhs.asDuration() && rhs.asDateTime()) { return add(rhs, lhs); }
 
-    if (lhs.asDuration() && rhs.asDuration()) {
-      return ComputedValue{{*lhs.asDuration() + *rhs.asDuration()}};
+    if (auto ops = getTypedOperands<Duration, Duration>(lhs, rhs, true)) {
+      auto [d1, d2] = *ops;
+      return ComputedValue{*d1 + *d2};
     }
 
-    if (lhs.isDateTime() && rhs.asDuration()) {
-      auto dt = lhs.asDateTime();
-      auto dur = rhs.asDuration();
+    if (auto ops = getTypedOperands<DateTime, Duration>(lhs, rhs, true)) {
+      auto [dt, dur] = *ops;
       auto result = *dt;
 
       if (auto y = dur->years) { result.time = shift(result.time, *y); }
@@ -507,9 +577,8 @@ private:
       return ComputedValue{result};
     }
 
-    if (lhs.isDateTime() && rhs.isNumber()) {
-      auto d = lhs.asDateTime();
-      auto n = rhs.asNumber();
+    if (auto ops = getTypedOperands<DateTime, Number>(lhs, rhs, true)) {
+      auto [d, n] = *ops;
 
       if (n->unit) {
         auto candidates = m_db.findUnitCandidates(n->unit->raw);
@@ -541,9 +610,12 @@ private:
       }
     }
 
-    assertBinary<Number, Number>(lhs, rhs);
+    if (auto ops = getTypedOperands<Number, Number>(lhs, rhs, true)) {
+      auto [n1, n2] = *ops;
+      return output(lhs.asNumber()->n + rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+    }
 
-    return output(lhs.asNumber()->n + rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+    throw std::runtime_error(std::format("Cannot add {} to {}", rhs.valueTypeName(), lhs.valueTypeName()));
   }
 
   ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) const {
@@ -554,36 +626,8 @@ private:
     }
 
     if (lhs.isDateTime() && rhs.isDateTime()) {
-      if (lhs.asDateTime()->time > rhs.asDateTime()->time) { return subtract(rhs, lhs); }
-      using namespace std::chrono;
-
-      auto lhsDays = floor<days>(lhs.asDateTime()->time);
-      auto rhsDays = floor<days>(rhs.asDateTime()->time);
-
-      // calendar difference a -> b, assuming a <= b
-      auto amd = year_month_day{floor<days>(lhsDays)};
-      auto bmd = year_month_day{floor<days>(rhsDays)};
-
-      auto atod = lhs.asDateTime()->time - lhsDays;
-      auto btod = rhs.asDateTime()->time - rhsDays;
-
-      auto m = (bmd.year() / bmd.month()) - (amd.year() / amd.month()); // chrono::months, exact
-      if (bmd.day() < amd.day()) --m;                                   // last month isn't complete yet
-
-      auto anchor = amd + m; // same clamped month-shift you already have
-      if (!anchor.ok()) anchor = anchor.year() / anchor.month() / last;
-
-      auto d = sys_days{bmd} - sys_days{anchor}; // exact leftover days
-
-      auto y = m / 12;
-      auto mo = m % 12;
-
-      seconds secs =
-          duration_cast<seconds>(days{d}) - seconds{std::abs(duration_cast<seconds>(atod - btod).count())};
-
-      return ComputedValue{Duration{.years = std::chrono::years{std::abs(y.count())},
-                                    .months = std::chrono::months{std::abs(mo.count())},
-                                    .seconds = seconds{std::abs(secs.count())}}};
+      if (lhs.asDateTime()->time > rhs.asDateTime()->time) return subtract(rhs, lhs);
+      return ComputedValue{subtractDates(*lhs.asDateTime(), *rhs.asDateTime())};
     }
 
     if (lhs.isDateTime() && rhs.asDuration()) {
