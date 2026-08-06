@@ -6,6 +6,7 @@
 #include <array>
 #include <chrono>
 #include <initializer_list>
+#include <memory>
 #include <numbers>
 #include <string_view>
 #include <type_traits>
@@ -238,7 +239,7 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 }
 
 std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
-  if (auto duration = parseDuration()) {
+  if (auto duration = scanDuration()) {
     if (auto s = m_lexer.peak(duration->tokenCount); s && s->type == Lexer::TokenType::String) {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
@@ -422,6 +423,14 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
   }
 
+  // less than 2 tokens means likely unit
+  if (auto duration = scanDuration()) {
+    for (int i = 0; i != duration->tokenCount; ++i) {
+      m_lexer.next();
+    }
+    return std::make_unique<Expression>(duration->data);
+  }
+
   if (auto tok = m_lexer.peak()) {
     bool unary = std::ranges::contains(std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
     if (unary) {
@@ -497,7 +506,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   return expr;
 }
 
-std::optional<Scanned<Duration>> Parser::parseDuration() {
+std::optional<Scanned<Duration>> Parser::scanDuration() {
   // 1 year 2 weeks 2 minutes
   Scanned<Duration> d;
 
@@ -538,6 +547,19 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       if (minPrec > 0) break;
 
       m_lexer.next();
+
+      if (auto duration = scanDuration()) {
+        auto rhs = std::make_unique<Expression>(duration->data);
+
+        left = std::make_unique<Expression>(BinaryExpression{
+            .op = "+",
+            .lhs = std::move(left),
+            .rhs = std::move(rhs),
+        });
+        for (int i = 0; i != duration->tokenCount; ++i)
+          m_lexer.next();
+        continue;
+      }
 
       if (auto tz = parseTimezone()) {
         left = std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = tz.value()});

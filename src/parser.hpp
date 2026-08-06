@@ -1,5 +1,6 @@
 #pragma once
 #include "abacus/unit.hpp"
+#include "abacus/abacus.hpp"
 #include "lexer.hpp"
 #include <bits/chrono.h>
 #include <cassert>
@@ -9,6 +10,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+
+using namespace abacus;
 
 struct Expression;
 
@@ -89,14 +92,6 @@ template <typename T> struct Scanned {
   std::size_t tokenCount = 0;
 };
 
-struct Duration {
-  std::optional<std::chrono::years> years;
-  std::optional<std::chrono::months> months;
-
-  // anything that is not a calendar unit can collapse as seconds
-  std::optional<std::chrono::seconds> seconds;
-};
-
 struct RelativeDateTimeLiteral {
   std::variant<Duration, std::chrono::weekday> anchor;
   enum class Direction : std::uint8_t { Past, Future } direction;
@@ -124,7 +119,7 @@ struct UnitExpression {
 
 struct Expression {
   std::variant<BinaryExpression, UnaryExpression, NumberString, DateString, UnitExpression,
-               ConversionExpression, FunctionCall>
+               ConversionExpression, Duration, FunctionCall>
       data;
 
   const BinaryExpression *asBinaryExpression() const { return std::get_if<BinaryExpression>(&data); }
@@ -173,7 +168,7 @@ public:
   AST parse();
 
 protected:
-  std::optional<Scanned<Duration>> parseDuration();
+  std::optional<Scanned<abacus::Duration>> scanDuration();
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);

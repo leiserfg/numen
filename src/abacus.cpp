@@ -327,6 +327,8 @@ public:
         return c;
       } else if constexpr (std::is_same_v<T, FunctionCall>) {
         return executeFunction(value);
+      } else if constexpr (std::is_same_v<T, Duration>) {
+        return {value};
       } else {
         static_assert(std::is_same_v<T, DateString>);
         const auto &ds = value;
@@ -355,6 +357,28 @@ public:
   }
 
 private:
+  std::optional<Duration> promoteDuration(const ComputedValue &v) const {
+    if (auto dur = v.asDuration()) return *dur;
+    auto nb = v.asNumber();
+    if (!nb) return std::nullopt;
+
+    auto candidates = m_db.findUnitCandidates(nb->unit->raw);
+    auto it = std::ranges::find_if(candidates,
+                                   [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
+    if (it == candidates.end()) return std::nullopt;
+
+    Duration d;
+
+    if (it->id == "year")
+      d.years = std::chrono::years{static_cast<int>(nb->n)};
+    else if (it->id == "month")
+      d.months = std::chrono::months{static_cast<int>(nb->n)};
+    else
+      d.seconds = std::chrono::seconds{static_cast<int>(nb->n * it->factor)};
+
+    return d;
+  }
+
   ComputedValue convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
     auto valueCandidates = m_db.findUnitCandidates(fromUnit);
     auto targetCandidates = m_db.findUnitCandidates(toUnit);
@@ -422,11 +446,30 @@ private:
   }
 
   ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
-    if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
+    {
+      auto dur1 = promoteDuration(lhs);
+      auto dur2 = promoteDuration(rhs);
+      if (dur1 && dur2) return ComputedValue{*dur1 + *dur2};
+    }
 
-    // TODO: handle date + time.
-    // We need a way to discriminate datetime from time alone, because
-    // adding two dates together obviously makes no sense
+    if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
+    if (lhs.asDuration() && rhs.asDateTime()) { return add(rhs, lhs); }
+
+    if (lhs.asDuration() && rhs.asDuration()) {
+      return ComputedValue{{*lhs.asDuration() + *rhs.asDuration()}};
+    }
+
+    if (lhs.isDateTime() && rhs.asDuration()) {
+      auto dt = lhs.asDateTime();
+      auto dur = rhs.asDuration();
+      auto result = *dt;
+
+      if (auto y = dur->years) result.time = shift(dt->time, *y);
+      if (auto m = dur->months) result.time = shift(dt->time, *m);
+      if (auto s = dur->seconds) result.time += *s;
+
+      return ComputedValue{result};
+    }
 
     if (lhs.isDateTime() && rhs.isNumber()) {
       auto d = lhs.asDateTime();
@@ -467,7 +510,13 @@ private:
     return output(lhs.asNumber()->n + rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) {
+  ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) const {
+    {
+      auto dur1 = promoteDuration(lhs);
+      auto dur2 = promoteDuration(rhs);
+      if (dur1 && dur2) return ComputedValue{*dur1 - *dur2};
+    }
+
     if (lhs.isDateTime() && rhs.isDateTime()) {
       auto diff =
           std::chrono::duration_cast<std::chrono::seconds>(lhs.asDateTime()->time - rhs.asDateTime()->time);
@@ -475,6 +524,22 @@ private:
       return ComputedValue{
           .value = Number{.n = static_cast<double>(diff.count()), .unit = Number::Unit{.raw = "second"}},
       };
+    }
+
+    if (lhs.isDateTime() && rhs.asDuration()) {
+      auto dt = lhs.asDateTime();
+      auto dur = rhs.asDuration();
+      auto result = *dt;
+
+      if (auto y = dur->years) result.time = shift(dt->time, -*y);
+      if (auto m = dur->months) result.time = shift(dt->time, -*m);
+      if (auto s = dur->seconds) result.time += -*s;
+
+      return ComputedValue{result};
+    }
+
+    if (lhs.asDuration() && rhs.asDuration()) {
+      return ComputedValue{{*lhs.asDuration() - *rhs.asDuration()}};
     }
 
     assertBinary<Number, Number>(lhs, rhs);
@@ -598,6 +663,9 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
         return formatNumber(value);
       } else if constexpr (std::is_same_v<T, DateTime>) {
         return formatDate(value);
+      } else if constexpr (std::is_same_v<T, Duration>) {
+        // TODO: proper formatting for duration
+        return std::format("{}seconds", value.total());
       } else {
         static_assert(std::is_same_v<T, Boolean>);
         return value.value ? "true" : "false";
@@ -687,6 +755,8 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
             printASTNode(os, *arg, depth + 1);
           }
           os << ident() << "}\n";
+        } else if constexpr (std::is_same_v<T, Duration>) {
+          os << ident() << "Duration " << rang::fg::green << value.total() << rang::fg::reset << "\n";
         }
       },
       expr.data);

@@ -1,5 +1,6 @@
 #pragma once
 #include "abacus/unit.hpp"
+#include <bits/chrono.h>
 #include <chrono>
 #include <compare>
 #include <expected>
@@ -23,6 +24,38 @@ struct DateTime {
 
   auto operator<=>(const DateTime &rhs) const { return time <=> rhs.time; }
   bool operator==(const DateTime &rhs) const { return time == rhs.time; }
+};
+
+struct Duration {
+  std::optional<std::chrono::years> years;
+  std::optional<std::chrono::months> months;
+
+  // anything that is not a calendar unit can collapse as seconds
+  std::optional<std::chrono::seconds> seconds;
+
+  std::chrono::seconds total() const {
+    return years.value_or(std::chrono::years(0)) + months.value_or(std::chrono::months{0}) +
+           seconds.value_or(std::chrono::seconds{0});
+  }
+
+  Duration operator+(const Duration &rhs) const {
+    Duration n;
+    n.years = years.value_or(std::chrono::years{0}) + rhs.years.value_or(std::chrono::years{0});
+    n.months = months.value_or(std::chrono::months{0}) + rhs.months.value_or(std::chrono::months{0});
+    n.seconds = seconds.value_or(std::chrono::seconds{0}) + rhs.seconds.value_or(std::chrono::seconds{0});
+    return n;
+  }
+
+  Duration operator-(const Duration &rhs) const {
+    Duration n;
+    n.years = years.value_or(std::chrono::years{0}) - rhs.years.value_or(std::chrono::years{0});
+    n.months = months.value_or(std::chrono::months{0}) - rhs.months.value_or(std::chrono::months{0});
+    n.seconds = seconds.value_or(std::chrono::seconds{0}) - rhs.seconds.value_or(std::chrono::seconds{0});
+    return n;
+  }
+
+  auto operator<=>(const Duration &rhs) const { return total() <=> rhs.total(); }
+  bool operator==(const Duration &rhs) const { return total() == rhs.total(); }
 };
 
 struct Time {
@@ -62,7 +95,7 @@ struct Boolean {
   auto operator<=>(const Boolean &rhs) const = default;
 };
 
-using ValueType = std::variant<Number, DateTime, Boolean>;
+using ValueType = std::variant<Number, DateTime, Boolean, Duration>;
 
 struct ComputedValue {
   ValueType value;
@@ -74,6 +107,9 @@ struct ComputedValue {
   const Number *asNumber() const { return std::get_if<Number>(&value); }
   Number *asNumber() { return std::get_if<Number>(&value); }
   const DateTime *asDateTime() const { return std::get_if<DateTime>(&value); }
+
+  const Duration *asDuration() { return std::get_if<Duration>(&value); }
+  const Duration *asDuration() const { return std::get_if<Duration>(&value); }
 };
 
 struct EvalConfig {
