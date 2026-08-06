@@ -27,6 +27,8 @@
 #include <variant>
 
 namespace abacus {
+bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
+
 template <typename T> TimePoint shift(TimePoint t, T duration) {
   auto time = std::chrono::floor<std::chrono::days>(t);
   std::chrono::year_month_day ymd{time};
@@ -267,6 +269,17 @@ public:
           return ComputedValue{d};
         }
 
+        if (v.isDateTime()) {
+          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+            if (unit->name == "unix") {
+              auto epoch = v.asDateTime()->time.time_since_epoch();
+              auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
+              return ComputedValue{
+                  Number{.n = static_cast<double>(seconds), .unit = Number::Unit{.raw = "second"}}};
+            }
+          }
+        }
+
         if (auto n = v.asNumber()) {
           auto value = *n;
 
@@ -288,7 +301,9 @@ public:
           }
 
           if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+
             if (!n->unit) return ComputedValue{.value = value};
+
             auto converted = convertToUnit(n->n, n->unit->raw, unit->name);
             return converted;
           }
@@ -514,6 +529,7 @@ private:
 
   static ComputedValue output(double n, const Number &lhs, const Number &rhs) {
     auto result = Number{.n = n,
+                         .format = lhs.format,
                          .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
                          .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
     return ComputedValue{.value = result};
@@ -566,7 +582,8 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
         case abacus::NumberOutputFormat::Binary:
           return std::format("{:#b}", static_cast<int>(std::round(v.n)));
         default:
-          return std::format("{:.6g}", v.n);
+          return !isWholeNumber(v.n) ? std::format("{:.6g}", v.n)
+                                     : std::format("{}", static_cast<long long>(v.n));
         };
       };
 
