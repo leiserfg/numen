@@ -11,6 +11,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <exception>
 #include <expected>
 #include <format>
@@ -20,6 +21,7 @@
 #include <memory>
 #include <ostream>
 #include <ranges>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -29,7 +31,35 @@
 namespace abacus {
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
+std::string formatDuration(const Duration &d) {
+  using namespace std::chrono;
+  auto y = d.years.value_or(years{0});
+  auto m = d.months.value_or(months{0});
+  auto s = d.seconds.value_or(seconds{0});
+
+  std::ostringstream oss;
+
+  auto years = y.count() + m.count() / 12;
+  auto months = m % 12;
+  auto days = s.count() / 86400;
+  auto hours = s.count() % 86400 / 3600;
+  auto minutes = s.count() % 3600 / 60;
+  auto seconds = s.count() - days * 86400 - hours * 3600 - minutes * 60;
+
+  // TODO: proper spacing
+  if (years) { oss << years << " yr "; }
+  if (months.count()) { oss << months.count() << " month "; }
+  if (days) { oss << days << " day "; }
+  if (hours) { oss << hours << " hr "; }
+  if (minutes) { oss << minutes << " min "; }
+  if (seconds) { oss << seconds << " sec "; }
+
+  return oss.str();
+}
+
 template <typename T> TimePoint shift(TimePoint t, T duration) {
+  if (!duration.count()) return t;
+
   auto time = std::chrono::floor<std::chrono::days>(t);
   std::chrono::year_month_day ymd{time};
   auto tod = t - time;
@@ -280,6 +310,12 @@ public:
           }
         }
 
+        if (auto d = v.asDuration()) {
+          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+            return convertToUnit(d->total().count(), "second", unit->name);
+          }
+        }
+
         if (auto n = v.asNumber()) {
           auto value = *n;
 
@@ -360,7 +396,7 @@ private:
   std::optional<Duration> promoteDuration(const ComputedValue &v) const {
     if (auto dur = v.asDuration()) return *dur;
     auto nb = v.asNumber();
-    if (!nb) return std::nullopt;
+    if (!nb || !nb->unit) return std::nullopt;
 
     auto candidates = m_db.findUnitCandidates(nb->unit->raw);
     auto it = std::ranges::find_if(candidates,
@@ -464,9 +500,9 @@ private:
       auto dur = rhs.asDuration();
       auto result = *dt;
 
-      if (auto y = dur->years) result.time = shift(dt->time, *y);
-      if (auto m = dur->months) result.time = shift(dt->time, *m);
-      if (auto s = dur->seconds) result.time += *s;
+      if (auto y = dur->years) { result.time = shift(result.time, *y); }
+      if (auto m = dur->months) { result.time = shift(result.time, *m); }
+      if (auto s = dur->seconds) { result.time += *s; }
 
       return ComputedValue{result};
     }
@@ -518,12 +554,36 @@ private:
     }
 
     if (lhs.isDateTime() && rhs.isDateTime()) {
-      auto diff =
-          std::chrono::duration_cast<std::chrono::seconds>(lhs.asDateTime()->time - rhs.asDateTime()->time);
+      if (lhs.asDateTime()->time > rhs.asDateTime()->time) { return subtract(rhs, lhs); }
+      using namespace std::chrono;
 
-      return ComputedValue{
-          .value = Number{.n = static_cast<double>(diff.count()), .unit = Number::Unit{.raw = "second"}},
-      };
+      auto lhsDays = floor<days>(lhs.asDateTime()->time);
+      auto rhsDays = floor<days>(rhs.asDateTime()->time);
+
+      // calendar difference a -> b, assuming a <= b
+      auto amd = year_month_day{floor<days>(lhsDays)};
+      auto bmd = year_month_day{floor<days>(rhsDays)};
+
+      auto atod = lhs.asDateTime()->time - lhsDays;
+      auto btod = rhs.asDateTime()->time - rhsDays;
+
+      auto m = (bmd.year() / bmd.month()) - (amd.year() / amd.month()); // chrono::months, exact
+      if (bmd.day() < amd.day()) --m;                                   // last month isn't complete yet
+
+      auto anchor = amd + m; // same clamped month-shift you already have
+      if (!anchor.ok()) anchor = anchor.year() / anchor.month() / last;
+
+      auto d = sys_days{bmd} - sys_days{anchor}; // exact leftover days
+
+      auto y = m / 12;
+      auto mo = m % 12;
+
+      seconds secs =
+          duration_cast<seconds>(days{d}) - seconds{std::abs(duration_cast<seconds>(atod - btod).count())};
+
+      return ComputedValue{Duration{.years = std::chrono::years{std::abs(y.count())},
+                                    .months = std::chrono::months{std::abs(mo.count())},
+                                    .seconds = seconds{std::abs(secs.count())}}};
     }
 
     if (lhs.isDateTime() && rhs.asDuration()) {
@@ -664,8 +724,7 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
       } else if constexpr (std::is_same_v<T, DateTime>) {
         return formatDate(value);
       } else if constexpr (std::is_same_v<T, Duration>) {
-        // TODO: proper formatting for duration
-        return std::format("{}seconds", value.total());
+        return formatDuration(value);
       } else {
         static_assert(std::is_same_v<T, Boolean>);
         return value.value ? "true" : "false";

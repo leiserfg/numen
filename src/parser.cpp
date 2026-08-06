@@ -424,7 +424,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   // less than 2 tokens means likely unit
-  if (auto duration = scanDuration()) {
+  if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
     for (int i = 0; i != duration->tokenCount; ++i) {
       m_lexer.next();
     }
@@ -450,7 +450,8 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
     m_lexer.next();
 
-    if (auto tok = m_lexer.peak(); tok && tok->type != Lexer::TokenType::Operator) {
+    if (auto tok = m_lexer.peak();
+        tok && tok->type != Lexer::TokenType::Operator && tok->raw != "to" && tok->raw != "in") {
       if (auto unit = parseUnit()) {
         if (!expr)
           expr = makeUnit(makeNumberExpr(1), unit.value());
@@ -548,7 +549,9 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
       m_lexer.next();
 
-      if (auto duration = scanDuration()) {
+      // in is equivalent to addition semantically speaking, for durations.
+      // now in 2 days 5minutes
+      if (auto duration = scanDuration(); duration && tok->raw == "in") {
         auto rhs = std::make_unique<Expression>(duration->data);
 
         left = std::make_unique<Expression>(BinaryExpression{
