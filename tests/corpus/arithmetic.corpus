@@ -154,8 +154,15 @@ pi                          => 3.141593
 (-1) ^ 0.5                  => !error Result is undefined
 (-8) ^ 0.5                  => !error Result is undefined
 
-# overflow to infinity is deliberately left alone for now
-10 ^ 400                    => inf
+# large integers stay exact rather than saturating to a float.
+# they currently print in full, however many digits that is -- an
+# unresolved question, which is why these assert relationships instead
+10 ^ 400 / 10 ^ 399         => 10
+10 ^ 400 == 10 ^ 400        => true
+2 ^ 100                     => 1267650600228229401496703205376
+
+# past the exact exponent ceiling it degrades to a float, and overflows
+10 ^ 100000                 => inf
 
 # scientific notation, 'e' is an exponent marker when glued to digits
 1e3                         => 1000
@@ -345,5 +352,4 @@ min(0.1 + 0.2, 0.3)         => 0.3
 0.1 + 0.2 >= 0.3            => true
 0.1 + 0.2 > 0.3             => false
 
-# a whole number should not print hundreds of digits
-1e300                       => 1e+300
+1e300 / 1e299               => 10

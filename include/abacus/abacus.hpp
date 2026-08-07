@@ -75,7 +75,12 @@ struct Number {
   // are durations. Until we are able to consider the conversion operation, "1m" is
   // ambiguous.
 
+  // an approximation; `text` carries the result losslessly and is what to display
   double n;
+
+  std::string text;
+  bool isExact = true;
+
   NumberOutputFormat format;
 
   struct Unit {

@@ -1,6 +1,7 @@
 #include "abacus/abacus.hpp"
 #include "abacus/unit.hpp"
 #include "dummy-currency-provider.hpp"
+#include "computed.hpp"
 #include "parser.hpp"
 #include "rang/rang.hpp"
 #include "region-currency.hpp"
@@ -29,11 +30,23 @@
 #include <variant>
 
 namespace abacus {
+using namespace abacus::detail;
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
 constexpr int MAX_DECIMALS = 6;
+constexpr int MAX_SHIFT = 1000000;
 
-std::string formatDecimals(double n) {
+std::string toBinary(Integer i) {
+  if (i == 0) return "0";
+  std::string out;
+  while (i > 0) {
+    out.insert(out.begin(), (i % 2 == 0) ? '0' : '1');
+    i /= 2;
+  }
+  return out;
+}
+
+std::string renderInexact(double n) {
   auto s = std::format("{:.{}f}", n, MAX_DECIMALS);
 
   // a non zero value rounding to all zeroes would read as an exact 0
@@ -43,6 +56,51 @@ std::string formatDecimals(double n) {
   s.resize(s[last] == '.' ? last : last + 1);
 
   return s;
+}
+
+// integer arithmetic throughout, so an exact value never meets a float on its way out
+std::string renderExact(const Exact &r) {
+  Integer num = numerator(r);
+  Integer den = denominator(r);
+  bool negative = num < 0;
+
+  if (negative) num = -num;
+
+  Integer scale = boost::multiprecision::pow(Integer{10}, MAX_DECIMALS);
+  Integer scaled = (num * scale * 2 + den) / (den * 2);
+
+  if (scaled == 0 && num != 0) { return renderInexact(static_cast<double>(r)); }
+
+  auto digits = scaled.str();
+  if (digits.size() <= MAX_DECIMALS) digits.insert(0, MAX_DECIMALS + 1 - digits.size(), '0');
+  digits.insert(digits.size() - MAX_DECIMALS, ".");
+
+  auto last = digits.find_last_not_of('0');
+  digits.resize(digits[last] == '.' ? last : last + 1);
+
+  return (negative && digits != "0" ? "-" : "") + digits;
+}
+
+std::string renderValue(const Value &v, NumberOutputFormat format) {
+  if (format != NumberOutputFormat::Decimal) {
+    Integer i = v.truncated();
+    bool negative = i < 0;
+    if (negative) i = -i;
+    std::string body = format == NumberOutputFormat::Hexadecimal ? i.str(0, std::ios_base::hex)
+                       : format == NumberOutputFormat::Octal     ? i.str(0, std::ios_base::oct)
+                                                                 : toBinary(i);
+    const char *prefix = format == NumberOutputFormat::Hexadecimal ? "0x"
+                         : format == NumberOutputFormat::Octal     ? "0o"
+                                                                   : "0b";
+    return std::format("{}{}{}", negative ? "-" : "", prefix, body);
+  }
+
+  if (auto e = v.asExact()) {
+    if (denominator(*e) == 1) return numerator(*e).str();
+    return renderExact(*e);
+  }
+
+  return renderInexact(static_cast<double>(*v.asInexact()));
 }
 
 std::string formatDuration(const Duration &d) {
@@ -239,11 +297,11 @@ struct FunctionCtx {
     return unpacked;
   }
 
-  FunctionCtx(std::span<const ComputedValue> args) : args(args) {}
-  std::span<const ComputedValue> args;
+  FunctionCtx(std::span<const Computed> args) : args(args) {}
+  std::span<const Computed> args;
 };
 
-using FunctionHandler = std::function<ComputedValue(FunctionCtx ctx)>;
+using FunctionHandler = std::function<Computed(FunctionCtx ctx)>;
 
 struct FunctionDefinition {
   std::string_view name;
@@ -256,24 +314,24 @@ public:
   FunctionDatabase() {
     registerFunction("min", [&](FunctionCtx ctx) {
       if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
-      auto nn = ctx.unpackAll<Number>();
-      auto min = std::ranges::min(nn, std::less{}, [](const Number *a) { return a->n; });
+      auto nn = ctx.unpackAll<Num>();
+      auto min = std::ranges::min(nn, std::less{}, [](const Num *a) { return a->n; });
 
-      return ComputedValue{.value = *min};
+      return Computed{.value = *min};
     });
 
     registerFunction("max", [&](FunctionCtx ctx) {
       if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
-      auto nn = ctx.unpackAll<Number>();
-      auto max = std::ranges::max(nn, std::less{}, [](const Number *a) { return a->n; });
+      auto nn = ctx.unpackAll<Num>();
+      auto max = std::ranges::max(nn, std::less{}, [](const Num *a) { return a->n; });
 
-      return ComputedValue{.value = *max};
+      return Computed{.value = *max};
     });
 
     /*
 registerFunction("sin", [&](FunctionCtx ctx) {
   auto [lhs] = ctx.unpack<double>();
-  return ComputedValue{.value = std::sin(lhs)};
+  return Computed{.value = std::sin(lhs)};
 });
     */
   }
@@ -300,8 +358,8 @@ public:
   Interpreter(const UnitDatabase &db, const EvalConfig &opts)
       : m_db(db), m_opts(opts), m_now(opts.now.value_or(std::chrono::system_clock::now())) {}
 
-  ComputedValue computeExpr(const Expression &expr) const {
-    auto visitor = [&](const auto &value) -> ComputedValue {
+  Computed computeExpr(const Expression &expr) const {
+    auto visitor = [&](const auto &value) -> Computed {
       using T = std::remove_cvref_t<decltype(value)>;
       if constexpr (std::is_same_v<T, UnaryExpression>) {
         const auto &ue = value;
@@ -309,7 +367,7 @@ public:
 
         if (auto n = c.asNumber()) {
           auto c = *n;
-          if (ue.op == "-") { c.n *= -1; }
+          if (ue.op == "-") { c.n = -c.n; }
           return {c};
         }
 
@@ -323,7 +381,7 @@ public:
           auto nlhs = lhs.asNumber();
           auto nrhs = rhs.asNumber();
           if (nlhs->unit && nrhs->unit) {
-            lhs = convertToUnit(lhs.asNumber()->n, nlhs->unit->raw, nrhs->unit->raw);
+            lhs = convertToUnit(lhs.asNumber()->n.toDouble(), nlhs->unit->raw, nrhs->unit->raw);
           }
         }
 
@@ -338,12 +396,12 @@ public:
         if (be.op == "&") { return bitwiseAnd(lhs, rhs); }
         if (be.op == "|") { return bitwiseor(lhs, rhs); }
 
-        if (be.op == "==") { return ComputedValue{.value = Boolean{lhs.value == rhs.value}}; }
-        if (be.op == "!=") { return ComputedValue{.value = Boolean{lhs.value != rhs.value}}; }
-        if (be.op == ">") { return ComputedValue{.value = Boolean{lhs.value > rhs.value}}; }
-        if (be.op == ">=") { return ComputedValue{.value = Boolean{lhs.value >= rhs.value}}; }
-        if (be.op == "<") { return ComputedValue{.value = Boolean{lhs.value < rhs.value}}; }
-        if (be.op == "<=") { return ComputedValue{.value = Boolean{lhs.value <= rhs.value}}; }
+        if (be.op == "==") { return Computed{.value = Boolean{lhs.value == rhs.value}}; }
+        if (be.op == "!=") { return Computed{.value = Boolean{lhs.value != rhs.value}}; }
+        if (be.op == ">") { return Computed{.value = Boolean{lhs.value > rhs.value}}; }
+        if (be.op == ">=") { return Computed{.value = Boolean{lhs.value >= rhs.value}}; }
+        if (be.op == "<") { return Computed{.value = Boolean{lhs.value < rhs.value}}; }
+        if (be.op == "<=") { return Computed{.value = Boolean{lhs.value <= rhs.value}}; }
 
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
@@ -364,7 +422,7 @@ public:
             d.offset = otz->offset;
           }
 
-          return ComputedValue{d};
+          return Computed{d};
         }
 
         if (v.isDateTime()) {
@@ -372,8 +430,8 @@ public:
             if (unit->name == "unix") {
               auto epoch = v.asDateTime()->time.time_since_epoch();
               auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
-              return ComputedValue{
-                  Number{.n = static_cast<double>(seconds), .unit = Number::Unit{.raw = "second"}}};
+              return Computed{
+                  Num{.n = Value{static_cast<std::int64_t>(seconds)}, .unit = Number::Unit{.raw = "second"}}};
             }
           }
         }
@@ -390,35 +448,34 @@ public:
           if (auto fmt = std::get_if<NamedNumberFormat>(&conv.target)) {
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
               value.format = NumberOutputFormat::Hexadecimal;
-              return ComputedValue{value};
+              return Computed{value};
             }
 
             if (fmt->name == "binary") {
               value.format = NumberOutputFormat::Binary;
-              return ComputedValue{value};
+              return Computed{value};
             }
 
             if (fmt->name == "octal") {
               value.format = NumberOutputFormat::Octal;
-              return ComputedValue{value};
+              return Computed{value};
             }
           }
 
           if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
 
-            if (!n->unit) return ComputedValue{.value = value};
+            if (!n->unit) return Computed{.value = value};
 
-            auto converted = convertToUnit(n->n, n->unit->raw, unit->name);
+            auto converted = convertToUnit(n->n.toDouble(), n->unit->raw, unit->name);
             return converted;
           }
         }
         throw std::runtime_error("unexpected conversion flow");
       } else if constexpr (std::is_same_v<T, NumberString>) {
-        return ComputedValue{.value = Number{value}};
+        return Computed{.value = Num{value}};
       } else if constexpr (std::is_same_v<T, UnitExpression>) {
         const auto &ue = value;
-        ValueType v = computeExpr(*ue.expr).value;
-        ComputedValue c{.value = v};
+        Computed c{.value = computeExpr(*ue.expr).value};
 
         // unit only makes sense for a number, ignore it otherwise
         if (auto n = c.asNumber()) {
@@ -433,7 +490,7 @@ public:
         auto c = computeExpr(*value.expr);
 
         if (auto n = c.asNumber()) {
-          n->n /= 100;
+          n->n = n->n / Value{100};
           n->isPercentage = true;
         }
 
@@ -447,14 +504,14 @@ public:
         const auto &ds = value;
         auto &tz = m_opts.timezone ? *m_opts.timezone : *std::chrono::current_zone();
         auto dt = parseDateTime(ds, tz, m_now);
-        return ComputedValue{.value = dt};
+        return Computed{.value = dt};
       }
     };
 
     return std::visit(visitor, expr.data);
   }
 
-  ComputedValue computeExprBase(const Expression &expr) const {
+  Computed computeExprBase(const Expression &expr) const {
     auto result = computeExpr(expr);
 
     if (auto n = result.asNumber(); n && n->unit && n->unit->def &&
@@ -462,7 +519,7 @@ public:
                                     !n->explicitlyConverted) {
       auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
       if (target && !equalsIgnoreCase(*target, n->unit->def->id)) {
-        return convertToUnit(result.asNumber()->n, n->unit->def->id, *target);
+        return convertToUnit(result.asNumber()->n.toDouble(), n->unit->def->id, *target);
       }
     }
 
@@ -470,7 +527,7 @@ public:
   }
 
 private:
-  std::optional<Duration> promoteDuration(const ComputedValue &v) const {
+  std::optional<Duration> promoteDuration(const Computed &v) const {
     if (auto dur = v.asDuration()) return *dur;
     auto nb = v.asNumber();
     if (!nb || !nb->unit) return std::nullopt;
@@ -486,23 +543,23 @@ private:
     Duration d;
 
     if (unit.id == "year")
-      d.years = std::chrono::years{static_cast<int>(nb->n)};
+      d.years = std::chrono::years{static_cast<int>(nb->n.toDouble())};
     else if (unit.id == "month")
-      d.months = std::chrono::months{static_cast<int>(nb->n)};
+      d.months = std::chrono::months{static_cast<int>(nb->n.toDouble())};
     else
-      d.seconds = std::chrono::seconds{static_cast<int>(nb->n * unit.factor)};
+      d.seconds = std::chrono::seconds{static_cast<int>(nb->n.toDouble() * unit.factor)};
 
     return d;
   }
 
-  ComputedValue convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
+  Computed convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
     auto valueCandidates = m_db.findUnitCandidates(fromUnit);
     auto targetCandidates = m_db.findUnitCandidates(toUnit);
 
     if (valueCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", fromUnit)); }
     if (targetCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", toUnit)); }
 
-    auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> ComputedValue {
+    auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> Computed {
       if (lhs.dimension != rhs.dimension) {
         throw std::runtime_error(std::format("Incompatible units: {} ({}) to {} ({})", lhs.id, lhs.dimension,
                                              rhs.id, rhs.dimension));
@@ -513,7 +570,7 @@ private:
       if (!res) throw std::runtime_error(res.error());
 
       return {
-          .value = Number{.n = res.value(),
+          .value = Num{.n = Value::fromDouble(res.value()),
                           .unit = Number::Unit{.raw = toUnit, .def = rhs},
                           .explicitlyConverted = true},
       };
@@ -529,8 +586,8 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return ComputedValue{
-          .value = Number{.n = v, .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
+      return Computed{
+          .value = Num{.n = Value::fromDouble(v), .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
     }
 
     if (valueCandidates.size() > targetCandidates.size()) {
@@ -556,7 +613,7 @@ private:
   }
 
   template <typename T, typename U = T>
-  static void assertBinary(const ComputedValue &lhs, const ComputedValue &rhs) {
+  static void assertBinary(const Computed &lhs, const Computed &rhs) {
     bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
 
     if (!ok) {
@@ -567,7 +624,7 @@ private:
 
   template <typename T, typename U>
   static std::optional<std::tuple<const T *, const U *>>
-  getTypedOperands(const ComputedValue &lhs, const ComputedValue &rhs, bool swappable = false) {
+  getTypedOperands(const Computed &lhs, const Computed &rhs, bool swappable = false) {
     if (std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value)) {
       return std::tuple<const T *, const U *>{std::get_if<T>(&lhs.value), std::get_if<U>(&rhs.value)};
     }
@@ -579,11 +636,11 @@ private:
     return std::nullopt;
   }
 
-  ComputedValue add(const ComputedValue &lhs, const ComputedValue &rhs) const {
+  Computed add(const Computed &lhs, const Computed &rhs) const {
     {
       auto dur1 = promoteDuration(lhs);
       auto dur2 = promoteDuration(rhs);
-      if (dur1 && dur2) return ComputedValue{*dur1 + *dur2};
+      if (dur1 && dur2) return Computed{*dur1 + *dur2};
     }
 
     if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
@@ -591,7 +648,7 @@ private:
 
     if (auto ops = getTypedOperands<Duration, Duration>(lhs, rhs, true)) {
       auto [d1, d2] = *ops;
-      return ComputedValue{*d1 + *d2};
+      return Computed{*d1 + *d2};
     }
 
     if (auto ops = getTypedOperands<DateTime, Duration>(lhs, rhs, true)) {
@@ -602,10 +659,10 @@ private:
       if (auto m = dur->months) { result.time = shift(result.time, *m); }
       if (auto s = dur->seconds) { result.time += *s; }
 
-      return ComputedValue{result};
+      return Computed{result};
     }
 
-    if (auto ops = getTypedOperands<DateTime, Number>(lhs, rhs, true)) {
+    if (auto ops = getTypedOperands<DateTime, Num>(lhs, rhs, true)) {
       auto [d, n] = *ops;
 
       if (n->unit) {
@@ -617,28 +674,28 @@ private:
         if (it != candidates.end()) {
           if (it->id == "month") {
             DateTime dt = *d;
-            dt.time = shift(dt.time, std::chrono::months{static_cast<int>(rhs.asNumber()->n)});
-            return ComputedValue{.value = dt};
+            dt.time = shift(dt.time, std::chrono::months{static_cast<int>(rhs.asNumber()->n.toDouble())});
+            return Computed{.value = dt};
           }
 
           if (it->id == "year") {
             DateTime dt = *d;
-            dt.time = shift(dt.time, std::chrono::years{static_cast<int>(rhs.asNumber()->n)});
-            return ComputedValue{.value = dt};
+            dt.time = shift(dt.time, std::chrono::years{static_cast<int>(rhs.asNumber()->n.toDouble())});
+            return Computed{.value = dt};
           }
 
           // convert everything to seconds, then add it to time
-          auto diff = m_db.convert(n->n, *it, *second);
+          auto diff = m_db.convert(n->n.toDouble(), *it, *second);
           auto time = d->time + std::chrono::seconds(static_cast<int>(diff.value()));
 
           DateTime dt = *d;
           dt.time = time;
-          return ComputedValue{dt};
+          return Computed{dt};
         }
       }
     }
 
-    if (auto ops = getTypedOperands<Number, Number>(lhs, rhs, true)) {
+    if (auto ops = getTypedOperands<Num, Num>(lhs, rhs, true)) {
       auto [n1, n2] = *ops;
       if (n2->isPercentage && !n1->isPercentage) { return output(n1->n + n1->n * n2->n, *n1, *n2); }
       return output(n1->n + n2->n, *n1, *n2);
@@ -647,16 +704,16 @@ private:
     throw std::runtime_error(std::format("Cannot add {} to {}", rhs.valueTypeName(), lhs.valueTypeName()));
   }
 
-  ComputedValue subtract(const ComputedValue &lhs, const ComputedValue &rhs) const {
+  Computed subtract(const Computed &lhs, const Computed &rhs) const {
     {
       auto dur1 = promoteDuration(lhs);
       auto dur2 = promoteDuration(rhs);
-      if (dur1 && dur2) return ComputedValue{*dur1 - *dur2};
+      if (dur1 && dur2) return Computed{*dur1 - *dur2};
     }
 
     if (lhs.isDateTime() && rhs.isDateTime()) {
       if (lhs.asDateTime()->time > rhs.asDateTime()->time) return subtract(rhs, lhs);
-      return ComputedValue{subtractDates(*lhs.asDateTime(), *rhs.asDateTime())};
+      return Computed{subtractDates(*lhs.asDateTime(), *rhs.asDateTime())};
     }
 
     if (lhs.isDateTime() && rhs.asDuration()) {
@@ -668,14 +725,14 @@ private:
       if (auto m = dur->months) result.time = shift(dt->time, -*m);
       if (auto s = dur->seconds) result.time += -*s;
 
-      return ComputedValue{result};
+      return Computed{result};
     }
 
     if (lhs.asDuration() && rhs.asDuration()) {
-      return ComputedValue{{*lhs.asDuration() - *rhs.asDuration()}};
+      return Computed{{*lhs.asDuration() - *rhs.asDuration()}};
     }
 
-    assertBinary<Number, Number>(lhs, rhs);
+    assertBinary<Num, Num>(lhs, rhs);
 
     auto n1 = lhs.asNumber();
     auto n2 = rhs.asNumber();
@@ -685,64 +742,67 @@ private:
     return output(n1->n - n2->n, *n1, *n2);
   }
 
-  static ComputedValue multiply(const ComputedValue &lhs, const ComputedValue &rhs) {
+  static Computed multiply(const Computed &lhs, const Computed &rhs) {
 
-    assertBinary<Number, Number>(lhs, rhs);
+    assertBinary<Num, Num>(lhs, rhs);
     return output(lhs.asNumber()->n * rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue div(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    if (rhs.asNumber()->n == 0) throw std::runtime_error("Division by zero");
+  static Computed div(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    if (rhs.asNumber()->n.isZero()) throw std::runtime_error("Division by zero");
     return output(lhs.asNumber()->n / rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue modulo(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    if (rhs.asNumber()->n == 0) throw std::runtime_error("Modulo by zero");
-    return output(std::fmod(lhs.asNumber()->n, rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
+  static Computed modulo(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    return output(lhs.asNumber()->n.mod(rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue pow(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    return output(std::pow(lhs.asNumber()->n, rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
+  static Computed pow(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    return output(lhs.asNumber()->n.pow(rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue leftshift(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<long long>(lhs.asNumber()->n) << static_cast<long long>(rhs.asNumber()->n),
+  static Computed leftshift(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    auto by = rhs.asNumber()->n.truncated();
+    if (by < 0 || by > MAX_SHIFT) throw std::runtime_error("Shift count out of range");
+    return output(Value{Integer{lhs.asNumber()->n.truncated() << static_cast<unsigned>(by)}},
                   *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue rightshift(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<long long>(lhs.asNumber()->n) >> static_cast<long long>(rhs.asNumber()->n),
+  static Computed rightshift(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    auto by = rhs.asNumber()->n.truncated();
+    if (by < 0 || by > MAX_SHIFT) throw std::runtime_error("Shift count out of range");
+    return output(Value{Integer{lhs.asNumber()->n.truncated() >> static_cast<unsigned>(by)}},
                   *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue bitwiseor(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<long long>(lhs.asNumber()->n) | static_cast<long long>(rhs.asNumber()->n),
+  static Computed bitwiseor(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    return output(Value{Integer{lhs.asNumber()->n.truncated() | rhs.asNumber()->n.truncated()}},
                   *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue bitwiseAnd(const ComputedValue &lhs, const ComputedValue &rhs) {
-    assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<long long>(lhs.asNumber()->n) & static_cast<long long>(rhs.asNumber()->n),
+  static Computed bitwiseAnd(const Computed &lhs, const Computed &rhs) {
+    assertBinary<Num, Num>(lhs, rhs);
+    return output(Value{Integer{lhs.asNumber()->n.truncated() & rhs.asNumber()->n.truncated()}},
                   *lhs.asNumber(), *rhs.asNumber());
   }
 
-  static ComputedValue output(double n, const Number &lhs, const Number &rhs) {
-    if (std::isnan(n)) throw std::runtime_error("Result is undefined");
+  static Computed output(Value n, const Num &lhs, const Num &rhs) {
+    if (n.isNaN()) throw std::runtime_error("Result is undefined");
 
-    auto result = Number{.n = n,
+    auto result = Num{.n = n,
                          .format = lhs.format,
                          .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
                          .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
-    return ComputedValue{.value = result};
+    return Computed{.value = result};
   }
 
-  ComputedValue executeFunction(const FunctionCall &fn) const {
+  Computed executeFunction(const FunctionCall &fn) const {
     FunctionDatabase db;
 
     auto computedArgs = fn.args | std::views::transform([&](auto &&expr) { return computeExpr(*expr); }) |
@@ -761,13 +821,28 @@ private:
   TimePoint m_now;
 };
 
+static ComputedValue toPublic(const detail::Computed &c) {
+  if (auto n = c.asNumber()) {
+    return ComputedValue{.value = Number{.n = n->n.toDouble(),
+                                         .text = renderValue(n->n, n->format),
+                                         .isExact = n->n.isExact(),
+                                         .format = n->format,
+                                         .unit = n->unit,
+                                         .explicitlyConverted = n->explicitlyConverted,
+                                         .isPercentage = n->isPercentage}};
+  }
+  if (auto d = c.asDateTime()) return ComputedValue{.value = *d};
+  if (auto d = c.asDuration()) return ComputedValue{.value = *d};
+  return ComputedValue{.value = std::get<Boolean>(c.value)};
+}
+
 std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
     Interpreter i{m_unitDb, opts};
 
-    return i.computeExprBase(*ast.root);
+    return toPublic(i.computeExprBase(*ast.root));
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
@@ -779,34 +854,14 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
     Interpreter i{m_unitDb, opts};
     auto result = i.computeExprBase(*ast.root);
 
-    const auto formatNumber = [](const Number &v) -> std::string {
-      constexpr auto formatN = [](const Number &v) {
-        switch (v.format) {
-        case abacus::NumberOutputFormat::Hexadecimal:
-          return std::format("{:#x}", static_cast<long long>(std::round(v.n)));
-        case abacus::NumberOutputFormat::Octal: {
-          // std::format only knows the C prefix, and the lexer wants '0o'
-          auto o = static_cast<long long>(std::round(v.n));
-          return std::format("{}0o{:o}", o < 0 ? "-" : "", o < 0 ? -o : o);
-        }
-        case abacus::NumberOutputFormat::Binary:
-          return std::format("{:#b}", static_cast<long long>(std::round(v.n)));
-        default:
-          if (!isWholeNumber(v.n)) return formatDecimals(v.n);
-          // casting outside the signed 64 bit range is UB
-          if (std::abs(v.n) >= 9223372036854775808.0) return std::format("{:.0f}", v.n);
-          return std::format("{}", static_cast<long long>(v.n));
-        };
-      };
-
+    const auto formatNumber = [](const Num &v) -> std::string {
       auto unitName = v.unit.transform([&](const Number::Unit &u) { return u.raw; }).value_or("");
-
-      return std::format("{}{}", formatN(v), unitName);
+      return std::format("{}{}", renderValue(v.n, v.format), unitName);
     };
 
     auto visitor = [&](const auto &value) -> std::string {
       using T = std::remove_cvref_t<decltype(value)>;
-      if constexpr (std::is_same_v<T, Number>) {
+      if constexpr (std::is_same_v<T, Num>) {
         return formatNumber(value);
       } else if constexpr (std::is_same_v<T, DateTime>) {
         return formatDate(value);
@@ -894,7 +949,8 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
 
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, NumberString>) {
-          os << ident() << "Number " << rang::fg::yellow << value << rang::fg::reset << "\n";
+          os << ident() << "Num " << rang::fg::yellow
+             << renderValue(value, NumberOutputFormat::Decimal) << rang::fg::reset << "\n";
         } else if constexpr (std::is_same_v<T, FunctionCall>) {
           os << ident() << "Fn " << rang::fg::green << value.name << rang::fg::reset << " {\n";
           for (const auto &arg : value.args) {

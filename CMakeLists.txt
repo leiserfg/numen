@@ -88,7 +88,7 @@ if (BUILD_TESTS)
 	endif()
 
 	set(TEST_TARGET abacus-tests)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/datetime.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp)
+	add_executable(${TEST_TARGET} tests/main.cpp tests/datetime.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp tests/value.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	if (NOT MSVC)
@@ -96,7 +96,8 @@ if (BUILD_TESTS)
 	endif()
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
-	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
+	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src ${VENDOR_DIR}/boost-mp/include)
+	target_compile_definitions(${TEST_TARGET} PRIVATE BOOST_MP_STANDALONE=1)
 
 	include(CTest)
 	include(Catch)

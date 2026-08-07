@@ -15,7 +15,7 @@ using namespace abacus;
 
 struct Expression;
 
-using NumberString = double;
+using NumberString = abacus::Value;
 
 namespace {
 double toNumber(std::string_view s) {

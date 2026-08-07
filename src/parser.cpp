@@ -75,7 +75,7 @@ std::optional<double> parseConstant(std::string_view tok) {
   return it->n;
 }
 
-std::unique_ptr<Expression> makeNumberExpr(double n) { return std::make_unique<Expression>(NumberString{n}); }
+std::unique_ptr<Expression> makeNumberExpr(abacus::Value n) { return std::make_unique<Expression>(NumberString{n}); }
 
 std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs,
                                         const std::string &op) {
@@ -138,10 +138,11 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
     if (!tok) break;
 
     if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
-      if (it->n >= 1 && it->n <= 31) {
-        day = std::chrono::day{static_cast<unsigned>(it->n)};
+      auto value = it->n.toDouble();
+      if (value >= 1 && value <= 31) {
+        day = std::chrono::day{static_cast<unsigned>(value)};
       } else {
-        year = std::chrono::year{static_cast<int>(it->n)};
+        year = std::chrono::year{static_cast<int>(value)};
       }
     } else if (auto m = m_dateStringVocab.asMonth(tok->raw)) {
       month = *m;
@@ -395,7 +396,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     if (auto constant = parseConstant(tok->raw)) {
       m_lexer.next();
 
-      auto lhs = makeNumberExpr(*constant);
+      auto lhs = makeNumberExpr(abacus::Value::fromDouble(*constant));
 
       // pi2 = pi * 2
       if (auto n = m_lexer.peak(); n && !isOperatorToken(n->raw) && n->raw != ")") {
@@ -529,12 +530,12 @@ std::optional<Scanned<Duration>> Parser::scanDuration() {
         d.tokenCount += 2;
 
         if (unit->id == "year") {
-          d.data.years = std::chrono::years{static_cast<unsigned>(n.n)};
+          d.data.years = std::chrono::years{static_cast<unsigned>(n.n.toDouble())};
         } else if (unit->id == "month") {
-          d.data.months = std::chrono::months{static_cast<unsigned>(n.n)};
+          d.data.months = std::chrono::months{static_cast<unsigned>(n.n.toDouble())};
         } else {
           d.data.seconds = d.data.seconds.value_or(std::chrono::seconds{0}) +
-                           std::chrono::seconds{static_cast<unsigned>(n.n * unit->factor)};
+                           std::chrono::seconds{static_cast<unsigned>(n.n.toDouble() * unit->factor)};
         }
       } else {
         break;
@@ -640,7 +641,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       if (!(3 < minPrec)) {
         if (auto constant = parseConstant(tok->raw)) {
           m_lexer.next();
-          left = makeBinExpr(std::move(left), std::move(makeNumberExpr(*constant)), std::string{"*"});
+          left = makeBinExpr(std::move(left), makeNumberExpr(abacus::Value::fromDouble(*constant)), std::string{"*"});
           continue;
         } else if (tok->raw == "(") {
           left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});

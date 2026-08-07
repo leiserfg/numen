@@ -1,6 +1,5 @@
 #include "lexer.hpp"
 #include <cctype>
-#include <cmath>
 
 namespace {
 constexpr std::string_view BASE_CHARS = "0123456789abcdef";
@@ -19,7 +18,7 @@ void Lexer::advance(int n) {
 std::optional<Lexer::Token> Lexer::next() {
   State state = State::Reset;
   size_t startPos = m_cursor;
-  double n = 0;
+  abacus::Integer n = 0;
   unsigned base = 10;
   unsigned nfrac = 0;
   int expSign = 1;
@@ -44,14 +43,9 @@ std::optional<Lexer::Token> Lexer::next() {
     case State::NumberExponent:
     case State::Number:
     case State::NumberBase: {
-      // n carries the digits as an integer, scaling it once here keeps the
-      // mantissa exact until the very last operation
       int scale = expSign * static_cast<int>(expValue) - (nfrac ? static_cast<int>(nfrac) - 1 : 0);
 
-      if (scale > 0) { n *= std::pow(base, scale); }
-      if (scale < 0) { n /= std::pow(base, -scale); }
-
-      return makeToken(TokenType::Number, Number{.n = n, .fromBase = base});
+      return makeToken(TokenType::Number, Number{.n = abacus::Value::scaled(n, scale), .fromBase = base});
     }
     case State::String:
       return makeToken(TokenType::String, String{.data = getSelection()});

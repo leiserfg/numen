@@ -1,4 +1,5 @@
 #pragma once
+#include "value.hpp"
 #include <any>
 #include <cctype>
 #include <iostream>
@@ -10,7 +11,7 @@
 class Lexer {
 public:
   struct Number {
-    double n;
+    abacus::Value n;
     unsigned fromBase = 10;
   };
 
