@@ -94,6 +94,22 @@ std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner, std::str
   });
 }
 
+// a clock component only reads as one inside its own range, so anything else is
+// not a time and must not be narrowed into one
+std::optional<unsigned> clockComponent(double value, unsigned limit) {
+  if (value < 0 || value > limit || value != std::trunc(value)) return std::nullopt;
+  return static_cast<unsigned>(value);
+}
+
+std::optional<std::chrono::year> asYear(double value) {
+  // year's conversion to int is explicit, hence the casts
+  constexpr int lowest = static_cast<int>(std::chrono::year::min());
+  constexpr int highest = static_cast<int>(std::chrono::year::max());
+
+  if (value < lowest || value > highest || value != std::trunc(value)) return std::nullopt;
+  return std::chrono::year{static_cast<int>(value)};
+}
+
 bool isRelativeDateToken(std::string_view name) {
   // handle more relative expressions, e.g "last week" etc...
   return name == "time" || name == "date" || name == "now" || name == "yesterday";
@@ -141,10 +157,13 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
 
     if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
       auto value = it->n.toDouble();
-      if (value >= 1 && value <= 31) {
-        day = std::chrono::day{static_cast<unsigned>(value)};
+
+      if (auto dayOfMonth = clockComponent(value, 31); dayOfMonth && value >= 1) {
+        day = std::chrono::day{*dayOfMonth};
+      } else if (auto parsed = asYear(value)) {
+        year = *parsed;
       } else {
-        year = std::chrono::year{static_cast<int>(value)};
+        break;
       }
     } else if (auto m = m_dateStringVocab.asMonth(tok->raw)) {
       month = *m;
@@ -295,14 +314,20 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
     if (auto m = m_lexer.peak(1)) {
 
       if (auto month = m_dateStringVocab.asMonth(m->raw)) {
+        auto dayOfMonth = clockComponent(toNumber(tok->raw), 31);
+        if (!dayOfMonth) return std::nullopt;
+
         DateTimeLiteral d;
-        d.day = std::chrono::day{static_cast<unsigned>(toNumber(tok->raw))};
+        d.day = std::chrono::day{*dayOfMonth};
         d.month = month;
 
         m_lexer.next();
         m_lexer.next();
         if (auto year = m_lexer.peakIf(Lexer::TokenType::Number)) {
-          d.year = std::chrono::year{static_cast<int>(toNumber(year->raw))};
+          auto parsed = asYear(toNumber(year->raw));
+          if (!parsed) return std::nullopt;
+
+          d.year = *parsed;
           m_lexer.next();
         }
 
@@ -321,7 +346,9 @@ std::optional<ParsedTime> Parser::parseTime() {
   std::chrono::hours hrs;
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    hrs = std::chrono::hours{static_cast<unsigned>(toNumber(tok->raw))};
+    auto value = clockComponent(toNumber(tok->raw), 23);
+    if (!value) return std::nullopt;
+    hrs = std::chrono::hours{*value};
   }
 
   using IV = std::initializer_list<std::string_view>;
@@ -336,7 +363,10 @@ std::optional<ParsedTime> Parser::parseTime() {
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    time.minutes = std::chrono::minutes{static_cast<unsigned>(toNumber(tok->raw))};
+    auto value = clockComponent(toNumber(tok->raw), 59);
+    if (!value) return std::nullopt;
+
+    time.minutes = std::chrono::minutes{*value};
     m_lexer.next();
   }
 
@@ -344,7 +374,10 @@ std::optional<ParsedTime> Parser::parseTime() {
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    time.seconds = std::chrono::seconds{static_cast<unsigned>(toNumber(tok->raw))};
+    auto value = clockComponent(toNumber(tok->raw), 59);
+    if (!value) return std::nullopt;
+
+    time.seconds = std::chrono::seconds{*value};
     m_lexer.next();
   }
 
@@ -535,16 +568,11 @@ std::optional<Scanned<Duration>> Parser::scanDuration() {
       if (auto unit = m_unitDb.findUnit(std::string{u.data});
           unit && unit->dimension == dimensions::DURATION) {
 
-        d.tokenCount += 2;
+        auto part = abacus::durationFrom(n.n.toDouble(), *unit);
+        if (!part) break;
 
-        if (unit->id == "year") {
-          d.data.years = std::chrono::years{static_cast<unsigned>(n.n.toDouble())};
-        } else if (unit->id == "month") {
-          d.data.months = std::chrono::months{static_cast<unsigned>(n.n.toDouble())};
-        } else {
-          d.data.seconds = d.data.seconds.value_or(std::chrono::seconds{0}) +
-                           std::chrono::seconds{static_cast<unsigned>(n.n.toDouble() * unit->factor)};
-        }
+        d.tokenCount += 2;
+        d.data = d.data + *part;
       } else {
         break;
       }
@@ -553,7 +581,7 @@ std::optional<Scanned<Duration>> Parser::scanDuration() {
     }
   }
 
-  if (d.data.years || d.data.months || d.data.seconds) { return d; }
+  if (d.tokenCount) { return d; }
 
   return std::nullopt;
 }

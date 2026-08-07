@@ -53,3 +53,89 @@ km to in                    => 39370.07874in
 
 # units flowing through functions
 max(1 km to m, 100)         => 1000m
+
+# years and months normalise into one count, so no component is left negative
+1 year 6 months - 8 months  => 10 months
+2 years 1 month - 3 months  => 1 yr 10 months
+1 year - 2 months           => 10 months
+1 year + 6 months           => 1 yr 6 months
+
+# a whole duration is negated once rather than component by component
+1 year - 18 months          => -6 months
+6 months - 1 year           => -6 months
+1 hour 30 min - 3 hours     => -1 hr 30 min
+
+# subtracting durations needs no common unit, so nothing is floored on the way
+2 months - 1 year           => -10 months
+
+# a duration that cancels out is zero, not blank
+1 year - 12 months          => 0 sec
+1 year 6 months - 1 year 6 months  => 0 sec
+
+# the calendar and clock halves cannot borrow from each other: a month has no
+# fixed length, so each keeps its own sign
+1 year 6 months - 30 min    => 1 yr 6 months -30 min
+
+# a bare duration folds into readable parts when nothing is lost by it
+18 months                   => 1 yr 6 months
+1.5 years                   => 1 yr 6 months
+30 months                   => 2 yrs 6 months
+2.5 hours                   => 2 hr 30 min
+0.5 days                    => 12 hr
+90 seconds                  => 1 min 30 sec
+
+# but not when it has no whole representation, nor when a unit was asked for
+5 ms                        => 5 ms
+5 ms to s                   => 0.005s
+1 min to s                  => 60s
+1 hour to min               => 60min
+
+# part of a month has nowhere to go in the calendar fields, so it carries over
+# into seconds at the average month length instead of being dropped
+1.4 years                   => 1 yr 4 months 3 weeks 3 days 8 hr 23 min 17 sec
+1.9 years                   => 1 yr 10 months 3 weeks 3 days 8 hr 23 min 17 sec
+2.5 months                  => 2 months 2 weeks 1 day 5 hr 14 min 33 sec
+0.5 months                  => 2 weeks 1 day 5 hr 14 min 33 sec
+
+# so adding nothing changes nothing, which was not true while it truncated
+1.4 years + 0 months        => 1 yr 4 months 3 weeks 3 days 8 hr 23 min 17 sec
+1.4 years + 1 month         => 1 yr 5 months 3 weeks 3 days 8 hr 23 min 17 sec
+
+# naming a unit still gets you that unit, undivided
+1.4 years to months         => 16.8months
+1.4 years to days           => 511.3395days
+
+# a week sits between days and months
+7 days                      => 1 week
+10 days                     => 1 week 3 days
+14 days                     => 2 weeks
+6 days                      => 6 days
+21 days                     => 3 weeks
+1 week                      => 1 week
+
+# anything finer than a second lives in its own field, so it neither vanishes
+# nor drags the whole value down to the smallest unit
+1 hour + 5 ms               => 1 hr 5 ms
+1 day + 1 ms                => 1 day 1 ms
+90 seconds + 250 ms         => 1 min 30 sec 250 ms
+2 s - 500 ms                => 1 sec 500 ms
+1.5 s                       => 1 sec 500 ms
+1 s + 1500 ms               => 2 sec 500 ms
+1 us                        => 1 us
+1 ns                        => 1 ns
+
+# it is fine enough to tell apart values a whole second cannot
+1 s + 1 ms == 1 s           => false
+1 s + 1 ms > 1 s            => true
+
+# and it is kept out of total(), so summing years still cannot overflow
+1000 years > 1 year         => true
+500 years == 500 years      => true
+
+# a duration written as several parts promotes each one the same way a lone
+# value does, rather than through a second implementation that truncated
+1yr 500ms                   => 1 yr 500 ms
+1 hour 500 ms               => 1 hr 500 ms
+1.5 yr 3 months             => 1 yr 9 months
+2 days 3 hours 15 min 250 ms  => 2 days 3 hr 15 min 250 ms
+1 year 2 weeks 2 minutes    => 1 yr 2 weeks 2 min

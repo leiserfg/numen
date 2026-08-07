@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 #include "abstract-currency-provider.hpp"
 
@@ -33,6 +34,28 @@ struct Duration {
 
   // anything that is not a calendar unit can collapse as seconds
   std::optional<std::chrono::seconds> seconds;
+  std::optional<std::chrono::nanoseconds> subsecond;
+
+  // every producer returns this, so `subsecond` is always under a second and
+  // always shares the sign of `seconds`. read the fields directly.
+  Duration normalised() const {
+    constexpr auto perSecond = std::chrono::nanoseconds{std::chrono::seconds{1}}.count();
+
+    auto s = seconds.value_or(std::chrono::seconds{0}).count();
+    auto ns = subsecond.value_or(std::chrono::nanoseconds{0}).count();
+
+    s += ns / perSecond;
+    ns %= perSecond;
+
+    if (s > 0 && ns < 0) { --s, ns += perSecond; }
+    if (s < 0 && ns > 0) { ++s, ns -= perSecond; }
+
+    Duration n = *this;
+    n.seconds = std::chrono::seconds{s};
+    n.subsecond = std::chrono::nanoseconds{ns};
+
+    return n;
+  }
 
   std::chrono::seconds total() const {
     return years.value_or(std::chrono::years(0)) + months.value_or(std::chrono::months{0}) +
@@ -44,7 +67,9 @@ struct Duration {
     n.years = years.value_or(std::chrono::years{0}) + rhs.years.value_or(std::chrono::years{0});
     n.months = months.value_or(std::chrono::months{0}) + rhs.months.value_or(std::chrono::months{0});
     n.seconds = seconds.value_or(std::chrono::seconds{0}) + rhs.seconds.value_or(std::chrono::seconds{0});
-    return n;
+    n.subsecond =
+        subsecond.value_or(std::chrono::nanoseconds{0}) + rhs.subsecond.value_or(std::chrono::nanoseconds{0});
+    return n.normalised();
   }
 
   Duration operator-(const Duration &rhs) const {
@@ -52,12 +77,25 @@ struct Duration {
     n.years = years.value_or(std::chrono::years{0}) - rhs.years.value_or(std::chrono::years{0});
     n.months = months.value_or(std::chrono::months{0}) - rhs.months.value_or(std::chrono::months{0});
     n.seconds = seconds.value_or(std::chrono::seconds{0}) - rhs.seconds.value_or(std::chrono::seconds{0});
-    return n;
+    n.subsecond =
+        subsecond.value_or(std::chrono::nanoseconds{0}) - rhs.subsecond.value_or(std::chrono::nanoseconds{0});
+    return n.normalised();
   }
 
-  auto operator<=>(const Duration &rhs) const { return total() <=> rhs.total(); }
-  bool operator==(const Duration &rhs) const { return total() == rhs.total(); }
+  auto operator<=>(const Duration &rhs) const {
+    if (auto order = total() <=> rhs.total(); order != 0) return order;
+    return subsecond.value_or(std::chrono::nanoseconds{0}) <=>
+           rhs.subsecond.value_or(std::chrono::nanoseconds{0});
+  }
+
+  bool operator==(const Duration &rhs) const {
+    return total() == rhs.total() && subsecond.value_or(std::chrono::nanoseconds{0}) ==
+                                         rhs.subsecond.value_or(std::chrono::nanoseconds{0});
+  }
 };
+
+// the single place a value plus a duration unit becomes a Duration
+std::optional<Duration> durationFrom(double value, const UnitDef &unit);
 
 struct Time {
   std::chrono::seconds seconds;

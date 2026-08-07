@@ -396,7 +396,7 @@ min(0.1 + 0.2, 0.3)         => 0.3
 1km + 10%                   => 1.1km
 1km - 10%                   => 0.9km
 1 usd + 10%                 => 1.1usd
-50% of 1 hour               => 0.5hour
+50% of 1 hour               => 30 min
 1 km + 10% == 1.1 km        => true
 
 # conversion binds looser than the arithmetic feeding it

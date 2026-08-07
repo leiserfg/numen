@@ -18,6 +18,7 @@
 #include <format>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <memory>
 #include <ostream>
@@ -28,51 +29,102 @@
 #include <string_view>
 #include <type_traits>
 #include <variant>
+#include <vector>
 
 namespace abacus {
 using namespace abacus::detail;
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
+namespace {
+using namespace std::chrono;
+constexpr auto perMinute = seconds{minutes{1}}.count();
+constexpr auto perHour = seconds{hours{1}}.count();
+constexpr auto perDay = seconds{days{1}}.count();
+constexpr auto perWeek = seconds{weeks{1}}.count();
+constexpr auto perMonth = seconds{months{1}}.count();
+
+constexpr auto nanosPerSecond = nanoseconds{seconds{1}}.count();
+constexpr auto nanosPerMilli = nanoseconds{milliseconds{1}}.count();
+constexpr auto nanosPerMicro = nanoseconds{microseconds{1}}.count();
+} // namespace
+
+std::optional<Duration> durationFrom(double value, const UnitDef &unit) {
+  if (unit.dimension != dimensions::DURATION) return std::nullopt;
+
+  Duration d;
+
+  if (unit.id == "year" || unit.id == "month") {
+    auto asMonths = unit.id == "year" ? value * 12 : value;
+    auto whole = std::trunc(asMonths);
+
+    using MonthRep = std::chrono::months::rep;
+    if (std::abs(whole) > static_cast<double>(std::numeric_limits<MonthRep>::max())) return std::nullopt;
+
+    d.months = std::chrono::months{static_cast<MonthRep>(whole)};
+
+    if (auto rest = asMonths - whole; rest != 0) {
+      d.seconds = std::chrono::seconds{std::llround(rest * perMonth)};
+    }
+
+    return d;
+  }
+
+  auto asNanos = value * unit.factor * nanosPerSecond;
+  if (asNanos != std::trunc(asNanos)) return std::nullopt;
+  if (std::abs(asNanos) > static_cast<double>(std::numeric_limits<long long>::max())) return std::nullopt;
+
+  auto nanos = static_cast<long long>(asNanos);
+  d.seconds = std::chrono::seconds{nanos / nanosPerSecond};
+  d.subsecond = std::chrono::nanoseconds{nanos % nanosPerSecond};
+
+  return d.normalised();
+}
+
 std::string formatDuration(const Duration &d) {
   using namespace std::chrono;
-  auto y = d.years.value_or(years{0});
-  auto m = d.months.value_or(months{0});
-  auto s = d.seconds.value_or(seconds{0});
+
+  auto calendar = d.years.value_or(years{0}).count() * 12 + d.months.value_or(months{0}).count();
+  auto clock = d.seconds.value_or(seconds{0}).count();
+  auto fraction = d.subsecond.value_or(nanoseconds{0}).count();
+
+  std::vector<std::string> parts;
+
+  const auto push = [&](long long n, std::string_view unit, bool plural) {
+    if (n) parts.push_back(std::format("{} {}{}", n, unit, plural && n > 1 ? "s" : ""));
+  };
+
+  const auto group = [&](long long total, auto &&emit) {
+    auto before = parts.size();
+    emit(std::abs(total));
+    if (total < 0 && parts.size() > before) parts[before].insert(0, "-");
+  };
+
+  group(calendar, [&](long long m) {
+    push(m / 12, "yr", true);
+    push(m % 12, "month", true);
+  });
+
+  // the two share one sign, so they are emitted as a single group
+  group(clock != 0 ? clock : fraction, [&](long long) {
+    auto s = std::abs(clock);
+    auto ns = std::abs(fraction);
+
+    push(s / perWeek, "week", true);
+    push(s % perWeek / perDay, "day", true);
+    push(s % perDay / perHour, "hr", false);
+    push(s % perHour / perMinute, "min", false);
+    push(s % perMinute, "sec", false);
+    push(ns / nanosPerMilli, "ms", false);
+    push(ns % nanosPerMilli / nanosPerMicro, "us", false);
+    push(ns % nanosPerMicro, "ns", false);
+  });
+
+  if (parts.empty()) return "0 sec";
 
   std::ostringstream oss;
-
-  auto years = y.count() + m.count() / 12;
-  auto months = m % 12;
-  auto days = s.count() / 86400;
-  auto hours = s.count() % 86400 / 3600;
-  auto minutes = s.count() % 3600 / 60;
-  auto seconds = s.count() - days * 86400 - hours * 3600 - minutes * 60;
-
-  if (years) {
-    oss << years << " yr";
-    if (years > 1) oss << "s";
-  }
-  if (months.count()) {
-    if (!oss.str().empty()) oss << " ";
-    oss << months.count() << " month";
-    if (months.count() > 1) oss << "s";
-  }
-  if (days) {
-    if (!oss.str().empty()) oss << " ";
-    oss << days << " day";
-    if (days > 1) oss << "s";
-  }
-  if (hours) {
-    if (!oss.str().empty()) oss << " ";
-    oss << hours << " hr";
-  }
-  if (minutes) {
-    if (!oss.str().empty()) oss << " ";
-    oss << minutes << " min";
-  }
-  if (seconds) {
-    if (!oss.str().empty()) oss << " ";
-    oss << seconds << " sec";
+  for (std::size_t i = 0; i != parts.size(); ++i) {
+    if (i) oss << " ";
+    oss << parts[i];
   }
 
   return oss.str();
@@ -317,7 +369,12 @@ public:
         if (lhs.asNumber() && rhs.asNumber()) {
           auto nlhs = lhs.asNumber();
           auto nrhs = rhs.asNumber();
-          if (nlhs->unit && nrhs->unit) {
+
+          // converting years into months would floor the fraction, and adding
+          // durations does not need a common unit to begin with
+          bool durationSum = (be.op == "+" || be.op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
+
+          if (nlhs->unit && nrhs->unit && !durationSum) {
             lhs = convertToUnit(lhs.asNumber()->n.toDouble(), nlhs->unit->raw, nrhs->unit->raw);
           }
         }
@@ -367,8 +424,9 @@ public:
             if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"}, unit->name)) {
               auto epoch = v.asDateTime()->time.time_since_epoch();
               auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
-              return Computed{
-                  Num{.n = Value{static_cast<double>(seconds)}, .unit = Number::Unit{.raw = "second"}}};
+              return Computed{Num{.n = Value{static_cast<double>(seconds)},
+                                  .unit = Number::Unit{.raw = "second"},
+                                  .explicitlyConverted = true}};
             }
           }
         }
@@ -460,33 +518,28 @@ public:
       }
     }
 
+    if (auto n = result.asNumber(); n && !n->explicitlyConverted) {
+      if (auto d = foldToDuration(*n)) return Computed{.value = *d};
+    }
+
     return result;
   }
 
 private:
-  std::optional<Duration> promoteDuration(const Computed &v) const {
-    if (auto dur = v.asDuration()) return *dur;
-    auto nb = v.asNumber();
-    if (!nb || !nb->unit) return std::nullopt;
+  std::optional<Duration> foldToDuration(const Num &n) const {
+    if (!n.unit) return std::nullopt;
 
-    auto candidates = m_db.findUnitCandidates(nb->unit->raw);
-
+    auto candidates = m_db.findUnitCandidates(n.unit->raw);
     if (candidates.size() != 1) return std::nullopt;
 
-    auto &unit = candidates[0];
+    return durationFrom(n.n.toDouble(), candidates.front());
+  }
 
-    if (unit.dimension != dimensions::DURATION) return std::nullopt;
+  std::optional<Duration> promoteDuration(const Computed &v) const {
+    if (auto dur = v.asDuration()) return *dur;
+    if (auto n = v.asNumber()) return foldToDuration(*n);
 
-    Duration d;
-
-    if (unit.id == "year")
-      d.years = std::chrono::years{static_cast<int>(nb->n.toDouble())};
-    else if (unit.id == "month")
-      d.months = std::chrono::months{static_cast<int>(nb->n.toDouble())};
-    else
-      d.seconds = std::chrono::seconds{static_cast<int>(nb->n.toDouble() * unit.factor)};
-
-    return d;
+    return std::nullopt;
   }
 
   Computed convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
@@ -558,6 +611,7 @@ private:
     }
   }
 
+  // swappable should be set to true for commutative operators
   template <typename T, typename U>
   static std::optional<std::tuple<const T *, const U *>>
   getTypedOperands(const Computed &lhs, const Computed &rhs, bool swappable = false) {
@@ -576,15 +630,7 @@ private:
     {
       auto dur1 = promoteDuration(lhs);
       auto dur2 = promoteDuration(rhs);
-      if (dur1 && dur2) return Computed{*dur1 + *dur2};
-    }
-
-    if (rhs.isDateTime() && lhs.isNumber()) { return add(rhs, lhs); }
-    if (lhs.asDuration() && rhs.asDateTime()) { return add(rhs, lhs); }
-
-    if (auto ops = getTypedOperands<Duration, Duration>(lhs, rhs, true)) {
-      auto [d1, d2] = *ops;
-      return Computed{*d1 + *d2};
+      if (dur1 && dur2) { return {*dur1 + *dur2}; }
     }
 
     if (auto ops = getTypedOperands<DateTime, Duration>(lhs, rhs, true)) {
@@ -594,41 +640,14 @@ private:
       if (auto y = dur->years) { result.time = shift(result.time, *y); }
       if (auto m = dur->months) { result.time = shift(result.time, *m); }
       if (auto s = dur->seconds) { result.time += *s; }
+      if (auto ns = dur->subsecond) { result.time += *ns; }
 
       return Computed{result};
     }
 
     if (auto ops = getTypedOperands<DateTime, Num>(lhs, rhs, true)) {
       auto [d, n] = *ops;
-
-      if (n->unit) {
-        auto candidates = m_db.findUnitCandidates(n->unit->raw);
-        auto it = std::ranges::find_if(candidates,
-                                       [](const UnitDef &u) { return u.dimension == dimensions::DURATION; });
-        auto second = m_db.findUnit("second");
-
-        if (it != candidates.end()) {
-          if (it->id == "month") {
-            DateTime dt = *d;
-            dt.time = shift(dt.time, std::chrono::months{static_cast<int>(rhs.asNumber()->n.toDouble())});
-            return Computed{.value = dt};
-          }
-
-          if (it->id == "year") {
-            DateTime dt = *d;
-            dt.time = shift(dt.time, std::chrono::years{static_cast<int>(rhs.asNumber()->n.toDouble())});
-            return Computed{.value = dt};
-          }
-
-          // convert everything to seconds, then add it to time
-          auto diff = m_db.convert(n->n.toDouble(), *it, *second);
-          auto time = d->time + std::chrono::seconds(static_cast<int>(diff.value()));
-
-          DateTime dt = *d;
-          dt.time = time;
-          return Computed{dt};
-        }
-      }
+      if (auto dur = foldToDuration(*n)) return add(Computed{.value = *d}, Computed{.value = *dur});
     }
 
     if (auto ops = getTypedOperands<Num, Num>(lhs, rhs, true)) {
@@ -657,14 +676,20 @@ private:
       auto dur = rhs.asDuration();
       auto result = *dt;
 
-      if (auto y = dur->years) result.time = shift(dt->time, -*y);
-      if (auto m = dur->months) result.time = shift(dt->time, -*m);
+      if (auto y = dur->years) result.time = shift(result.time, -*y);
+      if (auto m = dur->months) result.time = shift(result.time, -*m);
       if (auto s = dur->seconds) result.time += -*s;
+      if (auto ns = dur->subsecond) result.time += -*ns;
 
       return Computed{result};
     }
 
     if (lhs.asDuration() && rhs.asDuration()) { return Computed{{*lhs.asDuration() - *rhs.asDuration()}}; }
+
+    if (auto ops = getTypedOperands<DateTime, Num>(lhs, rhs)) {
+      auto [d, n] = *ops;
+      if (auto dur = foldToDuration(*n)) return subtract(Computed{.value = *d}, Computed{.value = *dur});
+    }
 
     assertBinary<Num, Num>(lhs, rhs);
 
