@@ -33,7 +33,6 @@ namespace abacus {
 using namespace abacus::detail;
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
-
 std::string formatDuration(const Duration &d) {
   using namespace std::chrono;
   auto y = d.years.value_or(years{0});
@@ -365,7 +364,7 @@ public:
 
         if (v.isDateTime()) {
           if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-            if (unit->name == "unix") {
+            if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"}, unit->name)) {
               auto epoch = v.asDateTime()->time.time_since_epoch();
               auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
               return Computed{
@@ -524,9 +523,8 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return Computed{.value = Num{.n = Value{v},
-                                   .unit = Number::Unit{.raw = toUnit},
-                                   .explicitlyConverted = true}};
+      return Computed{
+          .value = Num{.n = Value{v}, .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
     }
 
     if (valueCandidates.size() > targetCandidates.size()) {
@@ -702,26 +700,22 @@ private:
 
   static Computed leftshift(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n << rhs.asNumber()->n, *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(lhs.asNumber()->n << rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static Computed rightshift(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n >> rhs.asNumber()->n, *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(lhs.asNumber()->n >> rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static Computed bitwiseor(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n | rhs.asNumber()->n, *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(lhs.asNumber()->n | rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static Computed bitwiseAnd(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n & rhs.asNumber()->n, *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(lhs.asNumber()->n & rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static Computed output(Value n, const Num &lhs, const Num &rhs) {
@@ -880,8 +874,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
 
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, NumberString>) {
-          os << ident() << "Num " << rang::fg::yellow << value.render()
-             << rang::fg::reset << "\n";
+          os << ident() << "Num " << rang::fg::yellow << value.render() << rang::fg::reset << "\n";
         } else if constexpr (std::is_same_v<T, FunctionCall>) {
           os << ident() << "Fn " << rang::fg::green << value.name << rang::fg::reset << " {\n";
           for (const auto &arg : value.args) {

@@ -45,6 +45,11 @@ January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 
 31 Jan 2026 + 1 month       => 2026-02-28 00:00:00 (Etc/UTC)
 
+# conversions
+18 Jan 2001 to unix         => 979776000second
+18 Jan 2001 to unix to ms   => 979776000000ms
+18 Jan 2001 to epoch        => 979776000second
+
 # relative
 now                          => 2026-01-18 00:00:00 (Etc/UTC)
 1 month ago                  => 2025-12-18 00:00:00 (Etc/UTC)
@@ -56,4 +61,3 @@ yesterday                    => 2026-01-17 00:00:00 (Etc/UTC)
 tomorrow                     => 2026-01-19 00:00:00 (Etc/UTC)
 tomorrow - yesterday to days => 2days
 150 years ago                => 1876-01-18 00:00:00 (Etc/UTC)
-
