@@ -128,7 +128,10 @@ public:
   Value operator&(const Value &rhs) const;
   Value operator|(const Value &rhs) const;
 
-  std::string render(NumberOutputFormat format = NumberOutputFormat::Decimal) const;
+  // fixedDecimals caps the fraction where the unit dictates its own precision,
+  // as money does
+  std::string render(NumberOutputFormat format = NumberOutputFormat::Decimal,
+                     std::optional<int> fixedDecimals = std::nullopt) const;
 
   bool operator==(const Value &rhs) const {
     if (isExact() && rhs.isExact()) return *asExact() == *rhs.asExact();
@@ -165,10 +168,11 @@ private:
 
   Integer shiftCount(const Value &rhs) const;
   std::string renderDecimal() const;
+  std::string renderFixed(int decimals) const;
   std::string renderBase(NumberOutputFormat format) const;
   std::string renderScientific(const std::string &plain) const;
 
-  static std::string renderExact(const Exact &r);
+  static std::string renderExact(const Exact &r, int decimals, bool guardTiny);
   static std::string renderInexact(const Inexact &n);
 
   // sized for what enters the inexact world, not for Inexact's width: doubles come

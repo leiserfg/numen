@@ -27,6 +27,8 @@ inline const abacus::EvalConfig &frozenConfig() {
     return abacus::EvalConfig{
         .now = std::chrono::sys_days(now),
         .timezone = std::chrono::locate_zone("UTC"),
+        // without this the ambient locale decides whether currencies auto-convert
+        .locale = "en_US",
     };
   }();
   return config;

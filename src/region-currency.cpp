@@ -11,6 +11,12 @@ struct RegionCurrency {
   std::string_view currency;
 };
 
+struct CurrencyDigits {
+  std::string_view currency;
+  int digits;
+};
+
+#include "currency-digits-table.inc"
 #include "region-currency-table.inc"
 
 bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
@@ -29,6 +35,19 @@ std::optional<std::string_view> currencyForRegion(std::string_view region) {
   if (it != std::end(kRegionCurrencyTable) && it->region == std::string_view(key, 2)) return it->currency;
 
   return std::nullopt;
+}
+
+int currencyDigits(std::string_view currency) {
+  if (currency.size() != 3) return kDefaultCurrencyDigits;
+
+  const char key[3] = {toUpper(currency[0]), toUpper(currency[1]), toUpper(currency[2])};
+  auto it = std::lower_bound(std::begin(kCurrencyDigitsTable), std::end(kCurrencyDigitsTable),
+                             std::string_view(key, 3),
+                             [](const CurrencyDigits &e, std::string_view k) { return e.currency < k; });
+
+  if (it != std::end(kCurrencyDigitsTable) && it->currency == std::string_view(key, 3)) return it->digits;
+
+  return kDefaultCurrencyDigits;
 }
 
 std::optional<std::string_view> currencyForLocale(std::string_view locale) {

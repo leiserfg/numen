@@ -45,24 +45,30 @@ Value Value::operator&(const Value &rhs) const { return Value{Integer{truncated(
 Value Value::operator|(const Value &rhs) const { return Value{Integer{truncated() | rhs.truncated()}}; }
 
 // rounds p/q with integer arithmetic only, so an exact value never meets a float
-std::string Value::renderExact(const Exact &r) {
+std::string Value::renderExact(const Exact &r, int decimals, bool guardTiny) {
   Integer num = numerator(r);
   Integer den = denominator(r);
   bool negative = num < 0;
 
   if (negative) num = -num;
 
-  Integer scale = boost::multiprecision::pow(Integer{10}, MAX_DECIMALS);
+  Integer scale = boost::multiprecision::pow(Integer{10}, static_cast<unsigned>(decimals));
   Integer scaled = (num * scale * 2 + den) / (den * 2);
 
-  if (scaled == 0 && num != 0) { return renderInexact(static_cast<Inexact>(r)); }
+  // a tiny value rounding to nothing would read as an exact zero, unless the unit
+  // is what asked for the precision: a third of a yen really is no yen
+  if (guardTiny && scaled == 0 && num != 0) { return renderInexact(static_cast<Inexact>(r)); }
 
   auto digits = scaled.str();
-  if (digits.size() <= MAX_DECIMALS) digits.insert(0, MAX_DECIMALS + 1 - digits.size(), '0');
-  digits.insert(digits.size() - MAX_DECIMALS, ".");
-  stripTrailingZeroes(digits);
 
-  return (negative && digits != "0" ? "-" : "") + digits;
+  if (decimals > 0) {
+    auto width = static_cast<std::size_t>(decimals);
+    if (digits.size() <= width) digits.insert(0, width + 1 - digits.size(), '0');
+    digits.insert(digits.size() - width, ".");
+    stripTrailingZeroes(digits);
+  }
+
+  return (negative && scaled != 0 ? "-" : "") + digits;
 }
 
 std::string Value::renderInexact(const Inexact &n) {
@@ -134,7 +140,7 @@ std::string Value::renderDecimal() const {
   std::string out;
 
   if (auto e = asExact()) {
-    out = denominator(*e) == 1 ? numerator(*e).str() : renderExact(*e);
+    out = denominator(*e) == 1 ? numerator(*e).str() : renderExact(*e, MAX_DECIMALS, true);
   } else {
     out = renderInexact(*asInexact());
   }
@@ -144,8 +150,19 @@ std::string Value::renderDecimal() const {
   return out;
 }
 
-std::string Value::render(NumberOutputFormat format) const {
-  return format == NumberOutputFormat::Decimal ? renderDecimal() : renderBase(format);
+std::string Value::renderFixed(int decimals) const {
+  if (auto e = asExact()) return renderExact(*e, decimals, false);
+
+  auto s = asInexact()->str(decimals, std::ios_base::fixed);
+  if (decimals > 0) stripTrailingZeroes(s);
+
+  return s;
+}
+
+std::string Value::render(NumberOutputFormat format, std::optional<int> fixedDecimals) const {
+  if (format != NumberOutputFormat::Decimal) return renderBase(format);
+  if (fixedDecimals) return renderFixed(*fixedDecimals);
+  return renderDecimal();
 }
 
 } // namespace abacus

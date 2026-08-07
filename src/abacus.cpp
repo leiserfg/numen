@@ -203,6 +203,14 @@ std::string formatDate(const DateTime &dt) {
   return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, dt.tz->name());
 }
 
+// money is only ever shown on its minor units, e.g. none for jpy and three for bhd
+std::optional<int> unitDecimals(const detail::Num &v) {
+  if (v.unit && v.unit->def && v.unit->def->dimension == dimensions::CURRENCY) {
+    return currencyDigits(v.unit->def->id);
+  }
+  return std::nullopt;
+}
+
 struct FunctionCtx {
   template <typename... Ts> std::tuple<Ts...> unpack() {
     if (args.size() != sizeof...(Ts))
@@ -449,7 +457,7 @@ public:
                                     !n->explicitlyConverted) {
       auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
       if (target && !equalsIgnoreCase(*target, n->unit->def->id)) {
-        return convertToUnit(result.asNumber()->n.toDouble(), n->unit->def->id, *target);
+        result = convertToUnit(result.asNumber()->n.toDouble(), n->unit->def->id, *target);
       }
     }
 
@@ -748,7 +756,7 @@ private:
 static ComputedValue toPublic(const detail::Computed &c) {
   if (auto n = c.asNumber()) {
     return ComputedValue{.value = Number{.n = n->n.toDouble(),
-                                         .text = n->n.render(n->format),
+                                         .text = n->n.render(n->format, unitDecimals(*n)),
                                          .isExact = n->n.isExact(),
                                          .format = n->format,
                                          .unit = n->unit,
@@ -780,7 +788,7 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
 
     const auto formatNumber = [](const Num &v) -> std::string {
       auto unitName = v.unit.transform([&](const Number::Unit &u) { return u.raw; }).value_or("");
-      return std::format("{}{}", v.n.render(v.format), unitName);
+      return std::format("{}{}", v.n.render(v.format, unitDecimals(v)), unitName);
     };
 
     auto visitor = [&](const auto &value) -> std::string {
