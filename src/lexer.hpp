@@ -4,6 +4,8 @@
 #include <cctype>
 #include <iostream>
 #include <optional>
+#include <stdexcept>
+#include <string>
 #include <span>
 #include <string_view>
 #include <variant>
@@ -54,6 +56,15 @@ public:
 
   std::optional<Token> peakIf(TokenType type);
   std::optional<Token> peak(int n = 0);
+
+  // for the places where running out of tokens is a malformed expression rather
+  // than simply the end of one. dereferencing a disengaged peak() is undefined,
+  // and reads whatever the heap left behind.
+  Token peakOrThrow(std::string_view message, int n = 0) {
+    auto tok = peak(n);
+    if (!tok) throw std::runtime_error(std::string{message});
+    return *tok;
+  }
   // get as much string as we can and return that portion
   void advance(int n);
   std::optional<std::string_view> peakString(int n = 1);

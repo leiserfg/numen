@@ -65,3 +65,10 @@
 19/01/2001 > 18/01/2001     => true
 19/01/2001 >= 18/01/2001    => true
 19/01/2001 < 18/01/2001     => false
+
+# comparison is left associative, so a chain compares a boolean against a number
+# rather than reading as a range
+1 < 2 < 3                   => false
+3 > 2 > 1                   => true
+5 == 5 == 5                 => false
+1 == 1 != 0                 => true

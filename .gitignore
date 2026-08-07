@@ -29,9 +29,6 @@ __cmake*
 
 heaptrack*
 
-.claude/*
-!.claude/CLAUDE.md
-
 .omx/
 .codex/
 .gitnexus/
@@ -47,3 +44,5 @@ heaptrack*
 *.pdb
 
 /Testing
+
+/tests/fuzz-corpus/

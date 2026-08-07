@@ -7,3 +7,17 @@ foo(1, 2)                   => !error Unknown function "foo"
 
 # currency conversion without a rate provider
 1 usd to eur                => !error No conversion rate available between usd and eur.
+
+# an argument list that never closes: these read past the end of the token
+# stream before, which is undefined rather than merely wrong
+w(                          => !error Expected ) to close the argument list
+min(                        => !error Expected ) to close the argument list
+min(1                       => !error Expected ) to close the argument list
+min(1,                      => !error Expected ) to close the argument list
+max(1,2                     => !error Expected ) to close the argument list
+&Si(                        => !error Expected ) to close the argument list
+
+# an unclosed group, which used to be accepted silently
+(1 + 2                      => !error Expected ) to close the group
+((1                         => !error Expected ) to close the group
+(1 + (2                     => !error Expected ) to close the group

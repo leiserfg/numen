@@ -389,3 +389,45 @@ min(0.1 + 0.2, 0.3)         => 0.3
 1 mi to km == 1.609344 km   => true
 
 1e300 / 1e299               => 10
+
+# a percentage carries through to the unit of what it applies to
+10% of 1km                  => 0.1km
+200% of 1km                 => 2km
+1km + 10%                   => 1.1km
+1km - 10%                   => 0.9km
+1 usd + 10%                 => 1.1usd
+50% of 1 hour               => 0.5hour
+1 km + 10% == 1.1 km        => true
+
+# conversion binds looser than the arithmetic feeding it
+1+1 to hex                  => 0x2
+1 km to m == 1000           => true
+
+# a word alias keeps the associativity of the symbol it stands for
+2 pow 3 pow 2               => 512
+2 ^ 2 pow 2                 => 16
+5 mod 3 mod 2               => 0
+2 mul 3 mul 4               => 24
+100 div 10 div 5            => 2
+10 minus 3 minus 2          => 5
+
+# a literal in any base is an operand like any other
+0xFF % 10                   => 5
+0b1010 << 2                 => 40
+0o777 & 0xFF                => 255
+1e3 % 7                     => 6
+
+# the edges of the six decimal cap, where the tiny value guard takes over
+0.9999999                   => 1
+1.9999999                   => 2
+1.0000001                   => 1
+0.0000005                   => 5e-07
+0.0000004                   => 4e-07
+
+# right associativity and overflow composing
+2 ^ 2 ^ 2 ^ 2 ^ 2           => inf
+
+# a closed group is unaffected, at any depth
+(1 + 2)                     => 3
+((1+1)/2)*2                 => 2
+(2 + 3) * (4 - 6) / 2       => -5

@@ -58,3 +58,34 @@ TEST_CASE("planned NLP operator phrasings", "[.][future]") {
   assertExpr("100 + 2 to the power of 8", "356");
   assertExpr("2 exp 8", "256");
 }
+
+TEST_CASE("deeply nested and very long input does not overflow the stack", "[robustness]") {
+  abacus::Abacus calc;
+
+  SECTION("nested parentheses") {
+    std::string expr = std::string(200, '(') + "1" + std::string(200, ')');
+    auto res = calc.evaluate(expr);
+    REQUIRE(res);
+    CHECK(res.value() == "1");
+  }
+
+  SECTION("a long chain of the same operator") {
+    std::string expr = "1";
+    for (int i = 0; i < 2000; ++i) {
+      expr += "+1";
+    }
+    auto res = calc.evaluate(expr);
+    REQUIRE(res);
+    CHECK(res.value() == "2001");
+  }
+
+  SECTION("stacked unary operators") {
+    auto even = calc.evaluate(std::string(500, '-') + "1");
+    REQUIRE(even);
+    CHECK(even.value() == "1");
+
+    auto odd = calc.evaluate(std::string(501, '-') + "1");
+    REQUIRE(odd);
+    CHECK(odd.value() == "-1");
+  }
+}

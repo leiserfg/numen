@@ -258,7 +258,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     }
   }
 
-  if (auto tok = m_lexer.peak(); tok->raw == "yesterday") {
+  if (auto tok = m_lexer.peak(); tok && tok->raw == "yesterday") {
     m_lexer.next();
     return RelativeDateTimeLiteral{
         .anchor = Duration{.seconds = std::chrono::days{1}},
@@ -266,7 +266,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     };
   }
 
-  if (auto tok = m_lexer.peak(); tok->raw == "tomorrow") {
+  if (auto tok = m_lexer.peak(); tok && tok->raw == "tomorrow") {
     m_lexer.next();
     return RelativeDateTimeLiteral{
         .anchor = Duration{.seconds = std::chrono::days{1}},
@@ -451,11 +451,12 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
   }
 
-  if (m_lexer.peak() && m_lexer.peak()->raw == "(") {
+  if (auto open = m_lexer.peak(); open && open->raw == "(") {
     m_lexer.next();
     expr = pratParse();
-    if (m_lexer.peak() && m_lexer.peak()->raw != ")") {
-      throw std::runtime_error("expected closing parenthesis");
+
+    if (auto close = m_lexer.peak(); !close || close->raw != ")") {
+      throw std::runtime_error("Expected ) to close the group");
     }
     m_lexer.next();
 
@@ -485,14 +486,17 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
         FunctionCall fn{.name = tok->raw};
 
-        while (true) {
-          auto tok = m_lexer.peak();
-          if (tok->raw == ")") break;
-          fn.args.emplace_back(pratParse());
-          tok = m_lexer.peak();
+        constexpr auto unterminated = "Expected ) to close the argument list";
 
-          if (tok->raw == ")") { break; }
-          if (tok->raw != ",") { throw std::runtime_error("Expected , to add another argument"); }
+        while (true) {
+          if (m_lexer.peakOrThrow(unterminated).raw == ")") break;
+
+          fn.args.emplace_back(pratParse());
+
+          auto tok = m_lexer.peakOrThrow(unterminated);
+          if (tok.raw == ")") { break; }
+          if (tok.raw != ",") { throw std::runtime_error("Expected , to add another argument"); }
+
           m_lexer.next();
         }
 
