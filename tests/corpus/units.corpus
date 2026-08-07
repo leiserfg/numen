@@ -1,9 +1,9 @@
 # length
 1 km to m                   => 1000m
 1 km in m                   => 1000m
-km to in                    => 39370.1in
+km to in                    => 39370.07874in
 5 feet to cm                => 152.4cm
-3 miles to km               => 4.82803km
+3 miles to km               => 4.828032km
 
 # prefix and plural expansion
 1 kilometres to m           => 1000m
@@ -13,7 +13,7 @@ km to in                    => 39370.1in
 2 dl to ml                  => 200ml
 
 # mass
-80 kg to lbs                => 176.37lbs
+80 kg to lbs                => 176.36981lbs
 1 tonne to kg               => 1000kg
 1 pound to kg               => 0.453592kg
 
@@ -24,7 +24,7 @@ km to in                    => 39370.1in
 3 microseconds to ms        => 0.003ms
 
 # temperature
-100 f to c                  => 37.7778c
+100 f to c                  => 37.777778c
 20 c to f                   => 68f
 0 c to k                    => 273.15k
 
@@ -35,14 +35,14 @@ km to in                    => 39370.1in
 1 gib to mib                => 1024mib
 
 # volume
-2 cups to ml                => 473.176ml
+2 cups to ml                => 473.176473ml
 
 # area
-1 acre to sqm               => 4046.86sqm
+1 acre to sqm               => 4046.856422sqm
 
 # speed
-100 mph to kmh              => 160.934kmh
-90 kmh to mph               => 55.9234mph
+100 mph to kmh              => 160.9344kmh
+90 kmh to mph               => 55.923407mph
 
 # implicit conversion in binary expressions
 30min + 1hour               => 1 hr 30 min

@@ -87,6 +87,9 @@ struct Number {
 
   bool explicitlyConverted = false;
 
+  // n holds the fraction, so "50%" is 0.5
+  bool isPercentage = false;
+
   bool operator==(const Number &rhs) const { return n == rhs.n; }
   std::partial_ordering operator<=>(const Number &rhs) const { return n <=> rhs.n; }
 };

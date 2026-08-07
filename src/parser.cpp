@@ -17,7 +17,10 @@ struct OperatorDefinition {
   std::string_view id;
   std::vector<std::string_view> aliases;
   int precedence;
+  bool rightAssociative = false;
 };
+
+constexpr int EXPONENT_PRECEDENCE = 5;
 
 // clang-format off
 const auto OPERATORS = std::to_array<OperatorDefinition>({
@@ -38,7 +41,8 @@ const auto OPERATORS = std::to_array<OperatorDefinition>({
      OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 4},
      OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 4},
      OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 4},
-     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = 5}
+     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = EXPONENT_PRECEDENCE,
+                        .rightAssociative = true}
 });
 // clang-format on
 
@@ -439,7 +443,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       m_lexer.next();
       return std::make_unique<Expression>(UnaryExpression{
           .op = tok->raw,
-          .lhs = parseTerm(),
+          .lhs = pratParse(EXPONENT_PRECEDENCE),
       });
     }
   }
@@ -545,6 +549,17 @@ std::optional<Scanned<Duration>> Parser::scanDuration() {
   return std::nullopt;
 }
 
+// "7 % -3" and "10% - 3" are the same token sequence, only spacing tells them apart
+bool Parser::isPostfixPercent(const Lexer::Token &pct) {
+  auto next = m_lexer.peak(1);
+
+  if (!next) return true;
+  if (next->raw == "+" || next->raw == "-") return m_lexer.isGluedLeft(pct);
+  if (next->type == Lexer::TokenType::Number || next->raw == "(") return false;
+
+  return next->type != Lexer::TokenType::String || !parseConstant(next->raw);
+}
+
 std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
   auto left = parseTerm();
 
@@ -605,6 +620,12 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         left = makeBinExpr(std::move(lhs), std::move(rhs), std::string{"*"});
         continue;
       }
+
+      if (isPostfixPercent(*tok)) {
+        m_lexer.next();
+        left = std::make_unique<Expression>(PercentExpression{.expr = std::move(left)});
+        continue;
+      }
     }
 
     auto it = std::ranges::find_if(
@@ -613,7 +634,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
     if (it != OPERATORS.end()) {
       if (it->precedence < minPrec) break;
       m_lexer.next();
-      auto right = pratParse(it->precedence + 1);
+      auto right = pratParse(it->rightAssociative ? it->precedence : it->precedence + 1);
       left = makeBinExpr(std::move(left), std::move(right), std::string{it->id});
     } else {
       if (!(3 < minPrec)) {

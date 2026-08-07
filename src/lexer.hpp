@@ -1,5 +1,6 @@
 #pragma once
 #include <any>
+#include <cctype>
 #include <iostream>
 #include <optional>
 #include <span>
@@ -14,7 +15,7 @@ public:
   };
 
   enum class OperatorType { Add, Subtract, Multiply, Divide, Pow };
-  enum class State { Reset, Number, Operator, NumberBase, String };
+  enum class State { Reset, Number, Operator, NumberBase, NumberExponentSign, NumberExponent, String };
   enum class TokenType { String, Number, Operator };
 
   struct String {
@@ -55,6 +56,10 @@ public:
   // get as much string as we can and return that portion
   void advance(int n);
   std::optional<std::string_view> peakString(int n = 1);
+
+  bool isGluedLeft(const Token &tok) const {
+    return tok.start > 0 && std::isspace(static_cast<unsigned char>(m_data[tok.start - 1])) == 0;
+  }
 
   // e.g can check whether "to the power of" is next
   bool isWordSequence(std::span<const std::string_view> words);

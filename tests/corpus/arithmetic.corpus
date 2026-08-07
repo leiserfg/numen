@@ -83,7 +83,267 @@ max(min(1, 10),max(1, 5))   => 5
 40% of 10^2                 => 40
 
 # constants
-pi                          => 3.14159
+pi                          => 3.141593
 
 # thousand separators
 1_000_000 + 1_000           => 1001000
+
+# left-associativity of same-precedence operators
+10 - 3 - 2                  => 5
+100 - 10 - 10 - 10          => 70
+100 / 5 / 2                 => 10
+100 / 10 * 10               => 100
+6 / 3 * 2                   => 4
+1 - 2 + 3                   => 2
+10 - 2 + 3                  => 11
+10 - (2 + 3)                => 5
+
+# exponentiation is right-associative
+2 ^ 3 ^ 2                   => 512
+2 ^ 2 ^ 3                   => 256
+4 ^ 3 ^ 0                   => 4
+
+# exponentiation binds tighter than unary minus
+-2^2                        => -4
+-3^2                        => -9
+(-3)^2                      => 9
+(-2)^3                      => -8
+
+# exponent operand may be parenthesized, negative or fractional
+2 ^ (3)                     => 8
+2 ^ (2 + 1)                 => 8
+2 ^ (6 / 2)                 => 8
+16 ^ (0.5)                  => 4
+27 ^ (1/3)                  => 3
+2 ^ -1                      => 0.5
+2 ^ -2                      => 0.25
+2 ^ 0                       => 1
+0 ^ 0                       => 1
+0 ^ 5                       => 0
+1 ^ 100                     => 1
+10 ^ 3                      => 1000
+
+# more precedence
+2 + 3 * 4 - 6 / 3           => 12
+(2 + 3) * (4 - 6) / 2       => -5
+1 + 1 * 2 ^ 2               => 5
+2 ^ 2 * 3                   => 12
+3 * 2 ^ 2                   => 12
+100 / (10 * 10)             => 1
+2 * 10 % 3                  => 2
+10 % 3 * 2                  => 2
+
+# modulo keeps the fractional part
+7.5 % 2                     => 1.5
+5.5 % 2.5                   => 0.5
+10.5 % 3                    => 1.5
+
+# modulo takes the sign of the left operand
+-7 % 3                      => -1
+7 % -3                      => 1
+
+# division by zero must not surface inf/nan to the user
+1 / 0                       => !error Division by zero
+-1 / 0                      => !error Division by zero
+0 / 0                       => !error Division by zero
+5 % 0                       => !error Modulo by zero
+1 / (2 - 2)                 => !error Division by zero
+10 / 0.0                    => !error Division by zero
+
+# a nan reaching the output is an error wherever it came from
+(-1) ^ 0.5                  => !error Result is undefined
+(-8) ^ 0.5                  => !error Result is undefined
+
+# overflow to infinity is deliberately left alone for now
+10 ^ 400                    => inf
+
+# scientific notation, 'e' is an exponent marker when glued to digits
+1e3                         => 1000
+1E3                         => 1000
+1e0                         => 1
+1e-3                        => 0.001
+1.5e3                       => 1500
+2.5e-2                      => 0.025
+1e3 + 1                     => 1001
+2e2 * 2                     => 400
+
+# decimals may omit the leading zero
+.5                          => 0.5
+.5 + .5                     => 1
+0.5 + .25                   => 0.75
+-.5                         => -0.5
+.25 * 4                     => 1
+
+# whole results stay exact past the 64 bit signed range
+2 ^ 64                      => 18446744073709551616
+10000000000 * 1000000000    => 10000000000000000000
+
+# a moderately large decimal is not rewritten in scientific notation
+1234567.5                   => 1234567.5
+12345678 + 0.5              => 12345678.5
+0.1 + 0.2                   => 0.3
+1 / 3                       => 0.333333
+
+# shifts and bitwise ops are not capped to 32 bits
+1 << 31                     => 2147483648
+1 << 32                     => 4294967296
+1 << 40                     => 1099511627776
+1 << 62                     => 4611686018427387904
+3000000000 % 7              => 4
+5000000001 & 1              => 1
+3000000000 | 0              => 3000000000
+
+# percentages work as plain operands, not only through 'of'
+200 * 50%                   => 100
+50% * 200                   => 100
+10% * 10                    => 1
+
+# '+' and '-' take the percentage of the left operand
+100 + 10%                   => 110
+100 - 10%                   => 90
+200 + 25%                   => 250
+
+# each percentage applies to the running total
+150 + 10% + 10%             => 181.5
+150 - 10% - 10%             => 121.5
+100 + 10% - 5               => 105
+1000 - 25%                  => 750
+
+# arithmetic strips the percentage, parentheses do not
+150 + (10% + 10%)           => 150.2
+150 + 10% * 2               => 150.2
+150 + (10%)                 => 165
+10% + 100                   => 100.1
+50% + 50%                   => 1
+50% of 50% of 100           => 25
+
+# '%' is modulo when an operand follows it, spacing settles the '+' and '-' case
+10%3                        => 1
+5%2                         => 1
+100 % 5                     => 0
+7 % -3                      => 1
+100% - 5                    => -4
+
+# signs
+2 - -2                      => 4
+-2 * -2                     => 4
+3 * -2                      => -6
+10 / -2                     => -5
+-10 / -2                    => 5
+-(-(-5))                    => -5
+0 - 5                       => -5
+2 - - -2                    => 0
+
+# zero
+0 * 5                       => 0
+5 * 0                       => 0
+0 / 5                       => 0
+5 - 5                       => 0
+1.5 - 1.5                   => 0
+-0                          => 0
+
+# min/max
+min(3)                      => 3
+max(3)                      => 3
+min(1, 2, 3)                => 1
+max(1, 2, 3, 4, 5)          => 5
+min(-1, -2)                 => -2
+max(-1.5, -2.5)             => -1.5
+min(2 * 3, 4 + 1)           => 5
+max(2 ^ 3, 3 ^ 2)           => 9
+min()                       => !error
+
+# whitespace does not matter around '^' either
+2^(3)                       => 8
+2^(2+1)                     => 8
+27^(1/3)                    => 3
+2^-1                        => 0.5
+
+# word aliases for the arithmetic operators
+2 add 3                     => 5
+2 plus 3                    => 5
+10 minus 4                  => 6
+10 minus 4 plus 2           => 8
+2 add 3 mul 4               => 14
+2 plus 3 pow 2              => 11
+
+# uppercase base prefixes
+0X1F                        => 31
+0B101                       => 5
+0O17                        => 15
+
+# thousand separators anywhere between digits
+1_0_0_0                     => 1000
+0x1_F                       => 31
+1_000.5 + 0_5               => 1005.5
+
+# a base literal stops at the first character that is not a digit in its base
+0b12                        => 1
+0b13                        => 1
+0o7                         => 7
+0xG                         => 0G
+0x1G                        => 1G
+0xFF.5                      => 255
+
+# shifts by and of edge values
+1 << 0                      => 1
+5 >> 0                      => 5
+0 << 5                      => 0
+-1 >> 1                     => -1
+-8 >> 2                     => -2
+-1 & 255                    => 255
+-1 | 0                      => -1
+6 & 3 | 1                   => 3
+
+# bitwise binds tighter than comparison
+1 | 2 == 3                  => true
+1 & 3 == 1                  => true
+
+# output formats
+255 to hexadecimal          => 0xff
+-255 to hex                 => -0xff
+0 to binary                 => 0b0
+0xFF to hex                 => 0xff
+255 to hex to binary        => 0b11111111
+
+# a formatted base must parse back to the same value
+511 to octal                => 0o777
+8 to octal                  => 0o10
+
+# repeating and terminating decimals
+1 / 6                       => 0.166667
+2 / 7                       => 0.285714
+22 / 7                      => 3.142857
+1 / 8                       => 0.125
+
+# remaining scientific notation forms
+1e+3                        => 1000
+1.5E-3                      => 0.0015
+2e-0                        => 2
+1e-300                      => 1e-300
+
+# nesting and long chains
+((((1 + 2) * 3) - 4) / 5)   => 1
+(((((2)))))                 => 2
+1 + (2 + (3 + (4 + 5)))     => 15
+2 ^ 2 ^ 2 ^ 2               => 65536
+-(-(-(-(5))))               => 5
+
+# min/max over many and computed arguments
+min(1, 2, 3, 4, 5, 6, 7, 8) => 1
+max(-0.0001, -0.0002)       => -0.0001
+min(1e3, 2e3)               => 1000
+max(2 ^ 10, 10 ^ 3)         => 1024
+min(0.1 + 0.2, 0.3)         => 0.3
+
+# a trailing percentage needs no gluing, nothing follows it
+5 %                         => 0.05
+
+# numbers that display identically must compare equal
+0.1 + 0.2 == 0.3            => true
+1.1 + 2.2 == 3.3            => true
+0.1 + 0.2 >= 0.3            => true
+0.1 + 0.2 > 0.3             => false
+
+# a whole number should not print hundreds of digits
+1e300                       => 1e+300

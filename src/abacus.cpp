@@ -31,6 +31,20 @@
 namespace abacus {
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
+constexpr int MAX_DECIMALS = 6;
+
+std::string formatDecimals(double n) {
+  auto s = std::format("{:.{}f}", n, MAX_DECIMALS);
+
+  // a non zero value rounding to all zeroes would read as an exact 0
+  if (n != 0 && s.find_first_of("123456789") == std::string::npos) { return std::format("{:g}", n); }
+
+  auto last = s.find_last_not_of('0');
+  s.resize(s[last] == '.' ? last : last + 1);
+
+  return s;
+}
+
 std::string formatDuration(const Duration &d) {
   using namespace std::chrono;
   auto y = d.years.value_or(years{0});
@@ -415,6 +429,15 @@ public:
         }
 
         return c;
+      } else if constexpr (std::is_same_v<T, PercentExpression>) {
+        auto c = computeExpr(*value.expr);
+
+        if (auto n = c.asNumber()) {
+          n->n /= 100;
+          n->isPercentage = true;
+        }
+
+        return c;
       } else if constexpr (std::is_same_v<T, FunctionCall>) {
         return executeFunction(value);
       } else if constexpr (std::is_same_v<T, Duration>) {
@@ -617,7 +640,8 @@ private:
 
     if (auto ops = getTypedOperands<Number, Number>(lhs, rhs, true)) {
       auto [n1, n2] = *ops;
-      return output(lhs.asNumber()->n + rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+      if (n2->isPercentage && !n1->isPercentage) { return output(n1->n + n1->n * n2->n, *n1, *n2); }
+      return output(n1->n + n2->n, *n1, *n2);
     }
 
     throw std::runtime_error(std::format("Cannot add {} to {}", rhs.valueTypeName(), lhs.valueTypeName()));
@@ -652,7 +676,13 @@ private:
     }
 
     assertBinary<Number, Number>(lhs, rhs);
-    return output(lhs.asNumber()->n - rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+
+    if (n2->isPercentage && !n1->isPercentage) { return output(n1->n - n1->n * n2->n, *n1, *n2); }
+
+    return output(n1->n - n2->n, *n1, *n2);
   }
 
   static ComputedValue multiply(const ComputedValue &lhs, const ComputedValue &rhs) {
@@ -663,13 +693,14 @@ private:
 
   static ComputedValue div(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
+    if (rhs.asNumber()->n == 0) throw std::runtime_error("Division by zero");
     return output(lhs.asNumber()->n / rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue modulo(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) % static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
-                  *rhs.asNumber());
+    if (rhs.asNumber()->n == 0) throw std::runtime_error("Modulo by zero");
+    return output(std::fmod(lhs.asNumber()->n, rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue pow(const ComputedValue &lhs, const ComputedValue &rhs) {
@@ -679,29 +710,31 @@ private:
 
   static ComputedValue leftshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) << static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(static_cast<long long>(lhs.asNumber()->n) << static_cast<long long>(rhs.asNumber()->n),
+                  *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue rightshift(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) >> static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(static_cast<long long>(lhs.asNumber()->n) >> static_cast<long long>(rhs.asNumber()->n),
+                  *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue bitwiseor(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) | static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(static_cast<long long>(lhs.asNumber()->n) | static_cast<long long>(rhs.asNumber()->n),
+                  *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue bitwiseAnd(const ComputedValue &lhs, const ComputedValue &rhs) {
     assertBinary<Number, Number>(lhs, rhs);
-    return output(static_cast<int>(lhs.asNumber()->n) & static_cast<int>(rhs.asNumber()->n), *lhs.asNumber(),
-                  *rhs.asNumber());
+    return output(static_cast<long long>(lhs.asNumber()->n) & static_cast<long long>(rhs.asNumber()->n),
+                  *lhs.asNumber(), *rhs.asNumber());
   }
 
   static ComputedValue output(double n, const Number &lhs, const Number &rhs) {
+    if (std::isnan(n)) throw std::runtime_error("Result is undefined");
+
     auto result = Number{.n = n,
                          .format = lhs.format,
                          .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
@@ -750,14 +783,19 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
       constexpr auto formatN = [](const Number &v) {
         switch (v.format) {
         case abacus::NumberOutputFormat::Hexadecimal:
-          return std::format("{:#x}", static_cast<int>(std::round(v.n)));
-        case abacus::NumberOutputFormat::Octal:
-          return std::format("{:#o}", static_cast<int>(std::round(v.n)));
+          return std::format("{:#x}", static_cast<long long>(std::round(v.n)));
+        case abacus::NumberOutputFormat::Octal: {
+          // std::format only knows the C prefix, and the lexer wants '0o'
+          auto o = static_cast<long long>(std::round(v.n));
+          return std::format("{}0o{:o}", o < 0 ? "-" : "", o < 0 ? -o : o);
+        }
         case abacus::NumberOutputFormat::Binary:
-          return std::format("{:#b}", static_cast<int>(std::round(v.n)));
+          return std::format("{:#b}", static_cast<long long>(std::round(v.n)));
         default:
-          return !isWholeNumber(v.n) ? std::format("{:.6g}", v.n)
-                                     : std::format("{}", static_cast<long long>(v.n));
+          if (!isWholeNumber(v.n)) return formatDecimals(v.n);
+          // casting outside the signed 64 bit range is UB
+          if (std::abs(v.n) >= 9223372036854775808.0) return std::format("{:.0f}", v.n);
+          return std::format("{}", static_cast<long long>(v.n));
         };
       };
 

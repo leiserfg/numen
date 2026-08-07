@@ -22,9 +22,16 @@ std::optional<Lexer::Token> Lexer::next() {
   double n = 0;
   unsigned base = 10;
   unsigned nfrac = 0;
+  int expSign = 1;
+  unsigned expValue = 0;
 
   const auto getSelection = [&]() -> std::string_view {
     return m_data.substr(startPos, m_cursor - startPos);
+  };
+
+  const auto hasExponentDigits = [&](std::size_t pos) {
+    if (pos < m_data.size() && (m_data[pos] == '+' || m_data[pos] == '-')) ++pos;
+    return pos < m_data.size() && std::isdigit(m_data[pos]);
   };
 
   const auto makeToken = [&](TokenType type, TokenData data) {
@@ -33,8 +40,17 @@ std::optional<Lexer::Token> Lexer::next() {
 
   auto tryCommit = [&]() -> std::optional<Token> {
     switch (state) {
+    case State::NumberExponentSign:
+    case State::NumberExponent:
     case State::Number:
     case State::NumberBase: {
+      // n carries the digits as an integer, scaling it once here keeps the
+      // mantissa exact until the very last operation
+      int scale = expSign * static_cast<int>(expValue) - (nfrac ? static_cast<int>(nfrac) - 1 : 0);
+
+      if (scale > 0) { n *= std::pow(base, scale); }
+      if (scale < 0) { n /= std::pow(base, -scale); }
+
       return makeToken(TokenType::Number, Number{.n = n, .fromBase = base});
     }
     case State::String:
@@ -67,6 +83,10 @@ std::optional<Lexer::Token> Lexer::next() {
         state = State::String;
         continue;
       }
+      if (c == FRACTION_DELIM && m_cursor + 1 < m_data.size() && std::isdigit(m_data[m_cursor + 1])) {
+        state = State::Number;
+        continue;
+      }
       if (!std::isalnum(c)) {
         state = State::Operator;
         continue;
@@ -96,33 +116,55 @@ std::optional<Lexer::Token> Lexer::next() {
     }
     case State::Number: {
       if (c == FRACTION_DELIM) {
-        if (base == 10 && nfrac == 0) { nfrac = 1; }
+        if (base != 10) { return tryCommit(); }
+        if (nfrac == 0) { nfrac = 1; }
         break;
       }
 
       if (c == THOUSAND_DELIM) break;
 
+      // 'e' is a hex digit in '0xE5' and euler's constant in '2e'
+      if (base == 10 && (c == 'e' || c == 'E') && hasExponentDigits(m_cursor + 1)) {
+        state = State::NumberExponentSign;
+        break;
+      }
+
       const auto pos = BASE_CHARS.find(std::tolower(c));
 
       if (pos == std::string_view::npos || pos >= base) { return tryCommit(); }
 
-      if (nfrac) {
-        n = n + pos / std::pow(base, nfrac);
-        nfrac += 1;
-      } else {
-        n = n * base + pos;
-      }
+      n = n * base + pos;
+      if (nfrac) { nfrac += 1; }
 
+      break;
+    }
+    case State::NumberExponentSign: {
+      state = State::NumberExponent;
+      if (c == '-') {
+        expSign = -1;
+        break;
+      }
+      if (c == '+') break;
+      continue;
+    }
+    case State::NumberExponent: {
+      if (!std::isdigit(c)) { return tryCommit(); }
+      expValue = expValue * 10 + (c - '0');
       break;
     }
     case State::Operator: {
       if (m_cursor - startPos == 0) {
         switch (c) {
+        // none of these take part in a multi-char operator
         case '(':
         case ')':
         case '-':
         case '+':
         case ',':
+        case '^':
+        case '*':
+        case '/':
+        case '%':
           ++m_cursor;
           return tryCommit();
         default:

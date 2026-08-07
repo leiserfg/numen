@@ -2,19 +2,19 @@
 11/08/2025                  => 2025-08-11 00:00:00 (Etc/UTC)
 
 # slashes with spaces around them are division, not a date
-2001 / 1 / 18               => 111.167
+2001 / 1 / 18               => 111.166667
 
 # 'm' means minutes when converting to seconds, not meters
 1m to s                     => 60s
 
 # 'pounds' is mass or gbp depending on the conversion target
-100 pounds to kg            => 45.3592kg
+100 pounds to kg            => 45.359237kg
 1 pounds to usd             => !error No conversion rate available between gbp and usd.
 
 # exact alias wins before prefix decomposition: min is never milli-inch,
 # mi is mile (not mebi), mb stays megabyte (not millibit)
 1 min to s                  => 60s
-1 mi to km                  => 1.60934km
+1 mi to km                  => 1.609344km
 1 mb to b                   => 1000000b
 
 # a token that is a unit by itself is never reinterpreted as a plural:
@@ -27,8 +27,8 @@
 1 Mm to km                  => 1000km
 
 # 'in' is a conversion operator between units, a unit name elsewhere
-1m in in                    => 39.3701in
+1m in in                    => 39.370079in
 
 # adjacent digit + constant is implicit multiplication
-2pi                         => 6.28319
-pi2                         => 6.28319
+2pi                         => 6.283185
+pi2                         => 6.283185

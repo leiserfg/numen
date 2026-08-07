@@ -117,9 +117,13 @@ struct UnitExpression {
   std::unique_ptr<Expression> expr;
 };
 
+struct PercentExpression {
+  std::unique_ptr<Expression> expr;
+};
+
 struct Expression {
   std::variant<BinaryExpression, UnaryExpression, NumberString, DateString, UnitExpression,
-               ConversionExpression, Duration, FunctionCall>
+               ConversionExpression, Duration, FunctionCall, PercentExpression>
       data;
 
   const BinaryExpression *asBinaryExpression() const { return std::get_if<BinaryExpression>(&data); }
@@ -168,6 +172,7 @@ public:
   AST parse();
 
 protected:
+  bool isPostfixPercent(const Lexer::Token &pct);
   std::optional<Scanned<abacus::Duration>> scanDuration();
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
