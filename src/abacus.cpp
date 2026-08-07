@@ -80,6 +80,26 @@ std::optional<Duration> durationFrom(double value, const UnitDef &unit) {
   return d.normalised();
 }
 
+Duration scaleDuration(const Duration &d, double factor) {
+  using namespace std::chrono;
+
+  auto months =
+      (d.years.value_or(years{0}).count() * 12 + d.months.value_or(std::chrono::months{0}).count()) * factor;
+  auto wholeMonths = std::trunc(months);
+
+  auto secs = d.seconds.value_or(seconds{0}).count() * factor +
+              d.subsecond.value_or(nanoseconds{0}).count() * factor / nanosPerSecond +
+              (months - wholeMonths) * perMonth;
+  auto wholeSecs = std::trunc(secs);
+
+  Duration out;
+  out.months = std::chrono::months{static_cast<std::chrono::months::rep>(wholeMonths)};
+  out.seconds = seconds{static_cast<long long>(wholeSecs)};
+  out.subsecond = nanoseconds{std::llround((secs - wholeSecs) * nanosPerSecond)};
+
+  return out.normalised();
+}
+
 std::string formatDuration(const Duration &d) {
   using namespace std::chrono;
 
@@ -702,12 +722,24 @@ private:
   }
 
   static Computed multiply(const Computed &lhs, const Computed &rhs) {
+    if (auto ops = getTypedOperands<Duration, Num>(lhs, rhs, true)) {
+      auto [dur, n] = *ops;
+      if (!n->unit) return Computed{.value = scaleDuration(*dur, n->n.toDouble())};
+    }
 
     assertBinary<Num, Num>(lhs, rhs);
     return output(lhs.asNumber()->n * rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
   }
 
   static Computed div(const Computed &lhs, const Computed &rhs) {
+    if (auto ops = getTypedOperands<Duration, Num>(lhs, rhs)) {
+      auto [dur, n] = *ops;
+      if (!n->unit) {
+        if (n->n.isZero()) throw std::runtime_error("Division by zero");
+        return Computed{.value = scaleDuration(*dur, 1.0 / n->n.toDouble())};
+      }
+    }
+
     assertBinary<Num, Num>(lhs, rhs);
     if (rhs.asNumber()->n.isZero()) throw std::runtime_error("Division by zero");
     return output(lhs.asNumber()->n / rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
