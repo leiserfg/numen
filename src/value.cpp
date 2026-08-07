@@ -1,135 +1,87 @@
 #include "value.hpp"
+#include <algorithm>
 #include <format>
-#include <ios>
+#include <ranges>
 #include <stdexcept>
 
 namespace abacus {
 
 namespace {
 
-std::string toBinary(Integer i) {
-  if (i == 0) return "0";
+constexpr int MAX_DECIMALS = 6;
+constexpr std::size_t MAX_RENDERED_DIGITS = 40;
 
-  std::string out;
-  while (i > 0) {
-    out.insert(out.begin(), (i % 2 == 0) ? '0' : '1');
-    i /= 2;
-  }
-
-  return out;
-}
+// past this a long long cannot hold the value, so it is printed as a plain decimal
+constexpr double LLONG_RANGE = 9223372036854775808.0;
 
 void stripTrailingZeroes(std::string &s) {
   auto last = s.find_last_not_of('0');
   s.resize(s[last] == '.' ? last : last + 1);
 }
 
+// the one base std::format has no specifier for on a long long
+std::string toBinary(unsigned long long i) {
+  if (i == 0) return "0";
+
+  std::string out;
+  for (; i > 0; i /= 2) {
+    out += (i % 2 == 0) ? '0' : '1';
+  }
+  std::ranges::reverse(out);
+
+  return out;
+}
+
 } // namespace
 
-Integer Value::shiftCount(const Value &rhs) const {
-  auto by = rhs.truncated();
-  if (by < 0 || by > MAX_SHIFT) throw std::runtime_error("Shift count out of range");
+Value Value::scaled(double mantissa, int scale) {
+  if (scale == 0) return Value{mantissa};
+  if (scale > 0) return Value{mantissa * std::pow(10.0, scale)};
+
+  return Value{mantissa / std::pow(10.0, -scale)};
+}
+
+Value Value::operator/(const Value &rhs) const {
+  if (rhs.isZero()) throw std::runtime_error("Division by zero");
+
+  return Value{m_n / rhs.m_n};
+}
+
+Value Value::mod(const Value &rhs) const {
+  if (rhs.isZero()) throw std::runtime_error("Modulo by zero");
+
+  return Value{std::fmod(m_n, rhs.m_n)};
+}
+
+long long Value::shiftCount(const Value &rhs) const {
+  auto by = rhs.toInt();
+  if (by < 0 || by > 63) throw std::runtime_error("Shift count out of range");
+
   return by;
 }
 
 Value Value::operator<<(const Value &rhs) const {
-  return Value{Integer{truncated() << static_cast<unsigned>(shiftCount(rhs))}};
+  auto shifted = static_cast<unsigned long long>(toInt()) << shiftCount(rhs);
+  return Value{static_cast<double>(static_cast<long long>(shifted))};
 }
 
 Value Value::operator>>(const Value &rhs) const {
-  return Value{Integer{truncated() >> static_cast<unsigned>(shiftCount(rhs))}};
-}
-
-Value Value::operator&(const Value &rhs) const { return Value{Integer{truncated() & rhs.truncated()}}; }
-
-Value Value::operator|(const Value &rhs) const { return Value{Integer{truncated() | rhs.truncated()}}; }
-
-// rounds p/q with integer arithmetic only, so an exact value never meets a float
-std::string Value::renderExact(const Exact &r, int decimals, bool guardTiny) {
-  Integer num = numerator(r);
-  Integer den = denominator(r);
-  bool negative = num < 0;
-
-  if (negative) num = -num;
-
-  Integer scale = boost::multiprecision::pow(Integer{10}, static_cast<unsigned>(decimals));
-  Integer scaled = (num * scale * 2 + den) / (den * 2);
-
-  // a tiny value rounding to nothing would read as an exact zero, unless the unit
-  // is what asked for the precision: a third of a yen really is no yen
-  if (guardTiny && scaled == 0 && num != 0) { return renderInexact(static_cast<Inexact>(r)); }
-
-  auto digits = scaled.str();
-
-  if (decimals > 0) {
-    auto width = static_cast<std::size_t>(decimals);
-    if (digits.size() <= width) digits.insert(0, width + 1 - digits.size(), '0');
-    digits.insert(digits.size() - width, ".");
-    stripTrailingZeroes(digits);
-  }
-
-  return (negative && scaled != 0 ? "-" : "") + digits;
-}
-
-std::string Value::renderInexact(const Inexact &n) {
-  if (boost::multiprecision::isinf(n)) return n < 0 ? "-inf" : "inf";
-
-  auto s = n.str(MAX_DECIMALS, std::ios_base::fixed);
-
-  // a non zero value rounding to all zeroes would read as an exact 0
-  if (n != 0 && s.find_first_of("123456789") == std::string::npos) {
-    return n.str(MAX_DECIMALS, std::ios_base::fmtflags{});
-  }
-
-  stripTrailingZeroes(s);
-
-  return s;
-}
-
-// cpp_bin_float_quad tops out around 1e4932, past which the exponent has to come
-// from the decimal expansion itself
-std::string Value::renderScientific(const std::string &plain) const {
-  auto narrowed = toInexact();
-  if (!boost::multiprecision::isinf(narrowed)) {
-    return narrowed.str(MAX_DECIMALS, std::ios_base::scientific);
-  }
-
-  std::string_view view{plain};
-  std::string sign;
-
-  if (view.starts_with('-')) {
-    sign = "-";
-    view.remove_prefix(1);
-  }
-
-  auto dot = view.find('.');
-  auto intDigits = dot == std::string_view::npos ? view.size() : dot;
-
-  std::string digits;
-  for (char c : view) {
-    if (c != '.') digits += c;
-  }
-
-  auto frac = digits.substr(1, MAX_DECIMALS);
-  frac.resize(MAX_DECIMALS, '0');
-
-  return std::format("{}{}.{}e+{}", sign, digits.substr(0, 1), frac, intDigits - 1);
+  return Value{static_cast<double>(toInt() >> shiftCount(rhs))};
 }
 
 std::string Value::renderBase(NumberOutputFormat format) const {
-  Integer i = truncated();
+  auto i = toInt();
   bool negative = i < 0;
-
-  if (negative) i = -i;
+  auto magnitude = static_cast<unsigned long long>(negative ? -i : i);
 
   auto [prefix, body] = [&]() -> std::pair<const char *, std::string> {
     switch (format) {
     case NumberOutputFormat::Hexadecimal:
-      return {"0x", i.str(0, std::ios_base::hex)};
+      return {"0x", std::format("{:x}", magnitude)};
     case NumberOutputFormat::Octal:
-      return {"0o", i.str(0, std::ios_base::oct)};
+      return {"0o", std::format("{:o}", magnitude)};
     default:
-      return {"0b", toBinary(i)};
+      return {"0b", toBinary(magnitude)};
     }
   }();
 
@@ -137,32 +89,35 @@ std::string Value::renderBase(NumberOutputFormat format) const {
 }
 
 std::string Value::renderDecimal() const {
+  if (std::isinf(m_n)) return m_n < 0 ? "-inf" : "inf";
+
   std::string out;
 
-  if (auto e = asExact()) {
-    out = denominator(*e) == 1 ? numerator(*e).str() : renderExact(*e, MAX_DECIMALS, true);
+  if (isInteger()) {
+    out = std::abs(m_n) < LLONG_RANGE ? std::format("{}", static_cast<long long>(m_n))
+                                      : std::format("{:.0f}", m_n);
   } else {
-    out = renderInexact(*asInexact());
+    out = std::format("{:.{}f}", m_n, MAX_DECIMALS);
+
+    // a non zero value rounding to all zeroes would read as an exact 0
+    if (out.find_first_of("123456789") == std::string::npos) return std::format("{:g}", m_n);
+
+    stripTrailingZeroes(out);
   }
 
-  if (out.size() > MAX_RENDERED_DIGITS) return renderScientific(out);
+  if (out.size() > MAX_RENDERED_DIGITS) return std::format("{:.{}e}", m_n, MAX_DECIMALS);
 
   return out;
 }
 
-std::string Value::renderFixed(int decimals) const {
-  if (auto e = asExact()) return renderExact(*e, decimals, false);
-
-  auto s = asInexact()->str(decimals, std::ios_base::fixed);
-  if (decimals > 0) stripTrailingZeroes(s);
-
-  return s;
-}
-
 std::string Value::render(NumberOutputFormat format, std::optional<int> fixedDecimals) const {
   if (format != NumberOutputFormat::Decimal) return renderBase(format);
-  if (fixedDecimals) return renderFixed(*fixedDecimals);
-  return renderDecimal();
+  if (!fixedDecimals) return renderDecimal();
+
+  auto out = std::format("{:.{}f}", m_n, *fixedDecimals);
+  if (*fixedDecimals > 0) stripTrailingZeroes(out);
+
+  return out;
 }
 
 } // namespace abacus

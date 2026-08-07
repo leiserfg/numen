@@ -10,7 +10,7 @@
 namespace abacus::detail {
 
 // The interpreter's number. abacus::Number is derived from it at the compute()
-// boundary, which keeps boost out of the installed headers.
+// boundary, where it picks up its rendered text.
 struct Num {
   Value n;
   NumberOutputFormat format = NumberOutputFormat::Decimal;

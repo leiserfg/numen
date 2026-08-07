@@ -18,7 +18,7 @@ void Lexer::advance(int n) {
 std::optional<Lexer::Token> Lexer::next() {
   State state = State::Reset;
   size_t startPos = m_cursor;
-  abacus::Integer n = 0;
+  double n = 0;
   unsigned base = 10;
   unsigned nfrac = 0;
   int expSign = 1;

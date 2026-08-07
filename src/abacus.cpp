@@ -369,7 +369,7 @@ public:
               auto epoch = v.asDateTime()->time.time_since_epoch();
               auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
               return Computed{
-                  Num{.n = Value{static_cast<std::int64_t>(seconds)}, .unit = Number::Unit{.raw = "second"}}};
+                  Num{.n = Value{static_cast<double>(seconds)}, .unit = Number::Unit{.raw = "second"}}};
             }
           }
         }
@@ -508,7 +508,7 @@ private:
       if (!res) throw std::runtime_error(res.error());
 
       return {
-          .value = Num{.n = Value::fromDouble(res.value()),
+          .value = Num{.n = Value{res.value()},
                        .unit = Number::Unit{.raw = toUnit, .def = rhs},
                        .explicitlyConverted = true},
       };
@@ -524,7 +524,7 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return Computed{.value = Num{.n = Value::fromDouble(v),
+      return Computed{.value = Num{.n = Value{v},
                                    .unit = Number::Unit{.raw = toUnit},
                                    .explicitlyConverted = true}};
     }
@@ -757,7 +757,6 @@ static ComputedValue toPublic(const detail::Computed &c) {
   if (auto n = c.asNumber()) {
     return ComputedValue{.value = Number{.n = n->n.toDouble(),
                                          .text = n->n.render(n->format, unitDecimals(*n)),
-                                         .isExact = n->n.isExact(),
                                          .format = n->format,
                                          .unit = n->unit,
                                          .explicitlyConverted = n->explicitlyConverted,

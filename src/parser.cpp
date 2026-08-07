@@ -396,7 +396,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     if (auto constant = parseConstant(tok->raw)) {
       m_lexer.next();
 
-      auto lhs = makeNumberExpr(abacus::Value::fromDouble(*constant));
+      auto lhs = makeNumberExpr(abacus::Value{*constant});
 
       // pi2 = pi * 2
       if (auto n = m_lexer.peak(); n && !isOperatorToken(n->raw) && n->raw != ")") {
@@ -607,26 +607,22 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       continue;
     }
 
-    bool pctOf = false;
+    if (tok->raw == "%" && isPostfixPercent(*tok)) {
+      auto next = m_lexer.peak(1);
+      bool ofFollows = next && next->raw == "of";
 
-    if (tok->raw == "%") {
-      if (auto tok = m_lexer.peak(1); tok && tok->raw == "of") {
-        if (3 < minPrec) { break; }
+      if (ofFollows && 3 < minPrec) { break; }
 
+      m_lexer.next();
+      left = std::make_unique<Expression>(PercentExpression{.expr = std::move(left)});
+
+      // "of" is the same percentage, applied to what comes after it
+      if (ofFollows) {
         m_lexer.next();
-        m_lexer.next();
-
-        auto rhs = parseMul();
-        auto lhs = makeBinExpr(std::move(left), makeNumberExpr(100), "/");
-        left = makeBinExpr(std::move(lhs), std::move(rhs), std::string{"*"});
-        continue;
+        left = makeBinExpr(std::move(left), parseMul(), "*");
       }
 
-      if (isPostfixPercent(*tok)) {
-        m_lexer.next();
-        left = std::make_unique<Expression>(PercentExpression{.expr = std::move(left)});
-        continue;
-      }
+      continue;
     }
 
     auto it = std::ranges::find_if(
@@ -641,7 +637,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       if (!(3 < minPrec)) {
         if (auto constant = parseConstant(tok->raw)) {
           m_lexer.next();
-          left = makeBinExpr(std::move(left), makeNumberExpr(abacus::Value::fromDouble(*constant)), std::string{"*"});
+          left = makeBinExpr(std::move(left), makeNumberExpr(abacus::Value{*constant}), std::string{"*"});
           continue;
         } else if (tok->raw == "(") {
           left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});

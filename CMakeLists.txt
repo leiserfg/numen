@@ -49,17 +49,13 @@ endif()
 
 add_library(${PROJECT_NAME} ${SRCS})
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE BOOST_MP_STANDALONE=1)
 target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
 target_compile_options(${PROJECT_NAME} PRIVATE -g3)
-add_subdirectory(${VENDOR_DIR}/boost-mp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${VENDOR_DIR}
-	${VENDOR_DIR}/boost-mp/include
 )
-target_link_libraries(${PROJECT_NAME} Boost::multiprecision)
 
 if (MSVC)
 	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /W3 /wd4996)
@@ -97,8 +93,7 @@ if (BUILD_TESTS)
 	endif()
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
-	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src ${VENDOR_DIR}/boost-mp/include)
-	target_compile_definitions(${TEST_TARGET} PRIVATE BOOST_MP_STANDALONE=1)
+	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
 
 	include(CTest)
 	include(Catch)

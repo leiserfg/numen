@@ -154,32 +154,28 @@ pi                          => 3.141593
 (-1) ^ 0.5                  => !error Result is undefined
 (-8) ^ 0.5                  => !error Result is undefined
 
-# large integers stay exact rather than saturating to a float
-10 ^ 400 / 10 ^ 399         => 10
-10 ^ 400 == 10 ^ 400        => true
-2 ^ 100                     => 1267650600228229401496703205376
-2 ^ 64                      => 18446744073709551616
-
-# but a result too wide to read is shown in scientific notation
+# a result too wide to read is shown in scientific notation
 2 ^ 1000                    => 1.071509e+301
-10 ^ 400                    => 1.000000e+400
+2 ^ 100                     => 1267650600228229401496703205376
 1e300                       => 1.000000e+300
-10 ^ 400 / 3                => 3.333333e+399
+10 ^ 308                    => 1.000000e+308
+2 ^ 0.5                     => 1.414214
 
-# a value beyond double's range must not narrow to inf on the way out
-10 ^ 400 * pi               => 3.141593e+400
-
-# nor beyond the float fallback's range, where the exponent form has to be
-# derived from the digits themselves
-10 ^ 5000                   => 1.000000e+5000
-10 ^ 5000 / 3               => 3.333333e+4999
--1 * 10 ^ 5000              => -1.000000e+5000
-# past Value's exact exponent ceiling it degrades to a float and overflows,
-# where a shift of the same magnitude would have been refused outright
+# arithmetic is done in a double, so it tops out around 1e308 and overflow
+# shows as inf rather than being reported
+10 ^ 400                    => inf
+10 ^ 5000                   => inf
 2 ^ 20000                   => inf
+10 ^ 5000.5                 => inf
+-1 * 10 ^ 400               => -inf
 
-# past the exact exponent ceiling it degrades to a float, and overflows
-10 ^ 100000                 => inf
+# and once both sides are infinite the result is genuinely undefined
+10 ^ 400 / 10 ^ 399         => !error Result is undefined
+
+# the same ceiling limits how many digits survive
+2 ^ 64                      => 18446744073709551616
+2 ^ 64 + 1                  => 18446744073709551616
+123456789012345678 + 1      => 123456789012345696
 
 # scientific notation, 'e' is an exponent marker when glued to digits
 1e3                         => 1000
@@ -213,11 +209,11 @@ pi                          => 3.141593
 100 pounds to kg == 45.359237 kg      => true
 1 acre to sqm == 4046.8564224 sqm     => true
 
-# shifts are exact and bounded
-1 << 200                    => 1.606938e+60
+# shifts act on a 64 bit integer
+1 << 62                     => 4611686018427387904
+1 << 64                     => !error Shift count out of range
+1 << 200                    => !error Shift count out of range
 1 << -1                     => !error Shift count out of range
-1 << 1024                   => 1.797693e+308
-1 << 1025                   => !error Shift count out of range
 1 << 99999999999            => !error Shift count out of range
 
 # bitwise operands are truncated toward zero, both sides
@@ -383,10 +379,13 @@ min(0.1 + 0.2, 0.3)         => 0.3
 # a trailing percentage needs no gluing, nothing follows it
 5 %                         => 0.05
 
-# numbers that display identically must compare equal
-0.1 + 0.2 == 0.3            => true
-1.1 + 2.2 == 3.3            => true
-0.1 + 0.2 >= 0.3            => true
-0.1 + 0.2 > 0.3             => false
+# comparison is exact, so accumulated error is visible rather than smoothed over
+0.1 + 0.2 == 0.3            => false
+0.1 + 0.2 > 0.3             => true
+0.3 == 0.3                  => true
+
+# a literal still round trips against a value computed from it, because the
+# lexer scales the mantissa once instead of accumulating per digit
+1 mi to km == 1.609344 km   => true
 
 1e300 / 1e299               => 10

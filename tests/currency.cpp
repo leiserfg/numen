@@ -64,9 +64,7 @@ TEST_CASE("rounding money is a formatting concern, not a value one", "[currency]
   auto res = calc.compute("100 usd to eur");
   REQUIRE(res);
 
-  // the rate is a double, so the amount is honestly inexact...
-  CHECK_FALSE(res->asNumber()->isExact);
-  // ...but what gets shown still sits on the minor units
+  // what gets shown sits on the minor units
   CHECK(res->asNumber()->text == "92.35");
 
   // and the full precision survives into further arithmetic
