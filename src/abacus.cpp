@@ -33,75 +33,6 @@ namespace abacus {
 using namespace abacus::detail;
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
-constexpr int MAX_DECIMALS = 6;
-constexpr int MAX_SHIFT = 1000000;
-
-std::string toBinary(Integer i) {
-  if (i == 0) return "0";
-  std::string out;
-  while (i > 0) {
-    out.insert(out.begin(), (i % 2 == 0) ? '0' : '1');
-    i /= 2;
-  }
-  return out;
-}
-
-std::string renderInexact(double n) {
-  auto s = std::format("{:.{}f}", n, MAX_DECIMALS);
-
-  // a non zero value rounding to all zeroes would read as an exact 0
-  if (n != 0 && s.find_first_of("123456789") == std::string::npos) { return std::format("{:g}", n); }
-
-  auto last = s.find_last_not_of('0');
-  s.resize(s[last] == '.' ? last : last + 1);
-
-  return s;
-}
-
-// integer arithmetic throughout, so an exact value never meets a float on its way out
-std::string renderExact(const Exact &r) {
-  Integer num = numerator(r);
-  Integer den = denominator(r);
-  bool negative = num < 0;
-
-  if (negative) num = -num;
-
-  Integer scale = boost::multiprecision::pow(Integer{10}, MAX_DECIMALS);
-  Integer scaled = (num * scale * 2 + den) / (den * 2);
-
-  if (scaled == 0 && num != 0) { return renderInexact(static_cast<double>(r)); }
-
-  auto digits = scaled.str();
-  if (digits.size() <= MAX_DECIMALS) digits.insert(0, MAX_DECIMALS + 1 - digits.size(), '0');
-  digits.insert(digits.size() - MAX_DECIMALS, ".");
-
-  auto last = digits.find_last_not_of('0');
-  digits.resize(digits[last] == '.' ? last : last + 1);
-
-  return (negative && digits != "0" ? "-" : "") + digits;
-}
-
-std::string renderValue(const Value &v, NumberOutputFormat format) {
-  if (format != NumberOutputFormat::Decimal) {
-    Integer i = v.truncated();
-    bool negative = i < 0;
-    if (negative) i = -i;
-    std::string body = format == NumberOutputFormat::Hexadecimal ? i.str(0, std::ios_base::hex)
-                       : format == NumberOutputFormat::Octal     ? i.str(0, std::ios_base::oct)
-                                                                 : toBinary(i);
-    const char *prefix = format == NumberOutputFormat::Hexadecimal ? "0x"
-                         : format == NumberOutputFormat::Octal     ? "0o"
-                                                                   : "0b";
-    return std::format("{}{}{}", negative ? "-" : "", prefix, body);
-  }
-
-  if (auto e = v.asExact()) {
-    if (denominator(*e) == 1) return numerator(*e).str();
-    return renderExact(*e);
-  }
-
-  return renderInexact(static_cast<double>(*v.asInexact()));
-}
 
 std::string formatDuration(const Duration &d) {
   using namespace std::chrono;
@@ -118,7 +49,6 @@ std::string formatDuration(const Duration &d) {
   auto minutes = s.count() % 3600 / 60;
   auto seconds = s.count() - days * 86400 - hours * 3600 - minutes * 60;
 
-  // TODO: proper spacing
   if (years) {
     oss << years << " yr";
     if (years > 1) oss << "s";
@@ -571,8 +501,8 @@ private:
 
       return {
           .value = Num{.n = Value::fromDouble(res.value()),
-                          .unit = Number::Unit{.raw = toUnit, .def = rhs},
-                          .explicitlyConverted = true},
+                       .unit = Number::Unit{.raw = toUnit, .def = rhs},
+                       .explicitlyConverted = true},
       };
     };
 
@@ -586,8 +516,9 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return Computed{
-          .value = Num{.n = Value::fromDouble(v), .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
+      return Computed{.value = Num{.n = Value::fromDouble(v),
+                                   .unit = Number::Unit{.raw = toUnit},
+                                   .explicitlyConverted = true}};
     }
 
     if (valueCandidates.size() > targetCandidates.size()) {
@@ -612,8 +543,7 @@ private:
     throw std::runtime_error("something bad happened");
   }
 
-  template <typename T, typename U = T>
-  static void assertBinary(const Computed &lhs, const Computed &rhs) {
+  template <typename T, typename U = T> static void assertBinary(const Computed &lhs, const Computed &rhs) {
     bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
 
     if (!ok) {
@@ -728,9 +658,7 @@ private:
       return Computed{result};
     }
 
-    if (lhs.asDuration() && rhs.asDuration()) {
-      return Computed{{*lhs.asDuration() - *rhs.asDuration()}};
-    }
+    if (lhs.asDuration() && rhs.asDuration()) { return Computed{{*lhs.asDuration() - *rhs.asDuration()}}; }
 
     assertBinary<Num, Num>(lhs, rhs);
 
@@ -766,39 +694,35 @@ private:
 
   static Computed leftshift(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    auto by = rhs.asNumber()->n.truncated();
-    if (by < 0 || by > MAX_SHIFT) throw std::runtime_error("Shift count out of range");
-    return output(Value{Integer{lhs.asNumber()->n.truncated() << static_cast<unsigned>(by)}},
-                  *lhs.asNumber(), *rhs.asNumber());
+    return output(lhs.asNumber()->n << rhs.asNumber()->n, *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static Computed rightshift(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    auto by = rhs.asNumber()->n.truncated();
-    if (by < 0 || by > MAX_SHIFT) throw std::runtime_error("Shift count out of range");
-    return output(Value{Integer{lhs.asNumber()->n.truncated() >> static_cast<unsigned>(by)}},
-                  *lhs.asNumber(), *rhs.asNumber());
+    return output(lhs.asNumber()->n >> rhs.asNumber()->n, *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static Computed bitwiseor(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(Value{Integer{lhs.asNumber()->n.truncated() | rhs.asNumber()->n.truncated()}},
-                  *lhs.asNumber(), *rhs.asNumber());
+    return output(lhs.asNumber()->n | rhs.asNumber()->n, *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static Computed bitwiseAnd(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(Value{Integer{lhs.asNumber()->n.truncated() & rhs.asNumber()->n.truncated()}},
-                  *lhs.asNumber(), *rhs.asNumber());
+    return output(lhs.asNumber()->n & rhs.asNumber()->n, *lhs.asNumber(),
+                  *rhs.asNumber());
   }
 
   static Computed output(Value n, const Num &lhs, const Num &rhs) {
     if (n.isNaN()) throw std::runtime_error("Result is undefined");
 
     auto result = Num{.n = n,
-                         .format = lhs.format,
-                         .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
-                         .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
+                      .format = lhs.format,
+                      .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
+                      .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
     return Computed{.value = result};
   }
 
@@ -824,7 +748,7 @@ private:
 static ComputedValue toPublic(const detail::Computed &c) {
   if (auto n = c.asNumber()) {
     return ComputedValue{.value = Number{.n = n->n.toDouble(),
-                                         .text = renderValue(n->n, n->format),
+                                         .text = n->n.render(n->format),
                                          .isExact = n->n.isExact(),
                                          .format = n->format,
                                          .unit = n->unit,
@@ -856,7 +780,7 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
 
     const auto formatNumber = [](const Num &v) -> std::string {
       auto unitName = v.unit.transform([&](const Number::Unit &u) { return u.raw; }).value_or("");
-      return std::format("{}{}", renderValue(v.n, v.format), unitName);
+      return std::format("{}{}", v.n.render(v.format), unitName);
     };
 
     auto visitor = [&](const auto &value) -> std::string {
@@ -949,8 +873,8 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
 
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, NumberString>) {
-          os << ident() << "Num " << rang::fg::yellow
-             << renderValue(value, NumberOutputFormat::Decimal) << rang::fg::reset << "\n";
+          os << ident() << "Num " << rang::fg::yellow << value.render()
+             << rang::fg::reset << "\n";
         } else if constexpr (std::is_same_v<T, FunctionCall>) {
           os << ident() << "Fn " << rang::fg::green << value.name << rang::fg::reset << " {\n";
           for (const auto &arg : value.args) {

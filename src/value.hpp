@@ -1,5 +1,6 @@
 #pragma once
 
+#include "abacus/abacus.hpp"
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <compare>
@@ -7,6 +8,7 @@
 #include <cstdint>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <variant>
 
 namespace abacus {
@@ -80,10 +82,6 @@ public:
     return combine(rhs, std::divides{});
   }
 
-  Integer truncated() const {
-    if (auto e = asExact()) return numerator(*e) / denominator(*e);
-    return Integer{static_cast<std::int64_t>(static_cast<double>(*asInexact()))};
-  }
 
   bool isNaN() const {
     auto i = asInexact();
@@ -125,6 +123,13 @@ public:
     return Value{Inexact{boost::multiprecision::pow(toInexact(), rhs.toInexact())}};
   }
 
+  Value operator<<(const Value &rhs) const;
+  Value operator>>(const Value &rhs) const;
+  Value operator&(const Value &rhs) const;
+  Value operator|(const Value &rhs) const;
+
+  std::string render(NumberOutputFormat format = NumberOutputFormat::Decimal) const;
+
   bool operator==(const Value &rhs) const {
     if (isExact() && rhs.isExact()) return *asExact() == *rhs.asExact();
     return closeEnough(toInexact(), rhs.toInexact());
@@ -148,6 +153,24 @@ public:
   }
 
 private:
+  static constexpr int MAX_DECIMALS = 6;
+  static constexpr std::size_t MAX_RENDERED_DIGITS = 40;
+  static constexpr int MAX_SHIFT = 1024;
+
+  // digits below the radix point are dropped, as the bitwise operators always have
+  Integer truncated() const {
+    if (auto e = asExact()) return numerator(*e) / denominator(*e);
+    return Integer{static_cast<std::int64_t>(static_cast<double>(*asInexact()))};
+  }
+
+  Integer shiftCount(const Value &rhs) const;
+  std::string renderDecimal() const;
+  std::string renderBase(NumberOutputFormat format) const;
+  std::string renderScientific(const std::string &plain) const;
+
+  static std::string renderExact(const Exact &r);
+  static std::string renderInexact(const Inexact &n);
+
   // sized for what enters the inexact world, not for Inexact's width: doubles come
   // in carrying ~1e-16 whatever we store them in
   static bool closeEnough(const Inexact &a, const Inexact &b) {

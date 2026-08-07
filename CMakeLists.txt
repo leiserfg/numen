@@ -32,6 +32,7 @@ set(SRCS
 	src/region-currency.cpp
 	src/timezone.cpp
 	src/unit.cpp
+	src/value.cpp
 )
 
 if (BUILD_CURRENCY_PROVIDER)

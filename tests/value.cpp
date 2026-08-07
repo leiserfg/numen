@@ -34,11 +34,44 @@ TEST_CASE("integers stay exact past the double mantissa", "[value]") {
 }
 
 TEST_CASE("scaled builds the value the lexer describes", "[value]") {
-  CHECK(Value::scaled(Integer{"1609344"}, -6) == Value::scaled(Integer{"1609344"}, -6));
   CHECK(Value::scaled(15, 2) == Value{1500});
-  CHECK(Value::scaled(25, -3) == Value::scaled(25, -3));
-  CHECK(Value::scaled(1, 300).isInteger());
   CHECK(Value::scaled(1, 0) == Value{1});
+  CHECK(Value::scaled(1, 300).isInteger());
+
+  // pinned against a known multiple rather than against itself
+  CHECK(Value::scaled(Integer{"1609344"}, -6) * Value{1000000} == Value{1609344});
+  CHECK(Value::scaled(25, -3) * Value{1000} == Value{25});
+  CHECK(Value::scaled(1, -1) * Value{10} == Value{1});
+  CHECK(Value::scaled(1, 300) / Value::scaled(1, 299) == Value{10});
+}
+
+TEST_CASE("fromDouble keeps the fraction", "[value]") {
+  // an implicit conversion to the integer constructor used to swallow it
+  CHECK(Value::fromDouble(1.5).toDouble() == 1.5);
+  CHECK(Value::fromDouble(1.609344).toDouble() == 1.609344);
+  CHECK(Value::fromDouble(0.5) != Value{0});
+}
+
+TEST_CASE("pow is exact only for an integer exponent", "[value]") {
+  CHECK(Value{2}.pow(Value{10}) == Value{1024});
+  CHECK(Value{2}.pow(Value{10}).isExact());
+  CHECK(Value{2}.pow(Value{-1}) == Value::scaled(5, -1));
+  CHECK(Value{2}.pow(Value{-2}) == Value::scaled(25, -2));
+  CHECK(Value::scaled(5, -1).pow(Value{2}) == Value::scaled(25, -2));
+
+  // beyond the exact ceiling it degrades rather than trying to build the integer
+  CHECK(!Value{10}.pow(Value{100000}).isExact());
+  CHECK(!Value{2}.pow(Value::scaled(5, -1)).isExact());
+
+  CHECK_THROWS(Value{0}.pow(Value{-1}));
+}
+
+TEST_CASE("mod keeps the fraction and the sign of the left operand", "[value]") {
+  CHECK(Value::scaled(75, -1).mod(Value{2}) == Value::scaled(15, -1));
+  CHECK(Value::scaled(55, -1).mod(Value::scaled(25, -1)) == Value::scaled(5, -1));
+  CHECK(Value{-7}.mod(Value{3}) == Value{-1});
+  CHECK(Value{7}.mod(Value{-3}) == Value{1});
+  CHECK_THROWS(Value{5}.mod(Value{0}));
 }
 
 TEST_CASE("inexactness is contagious", "[value]") {

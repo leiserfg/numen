@@ -154,12 +154,29 @@ pi                          => 3.141593
 (-1) ^ 0.5                  => !error Result is undefined
 (-8) ^ 0.5                  => !error Result is undefined
 
-# large integers stay exact rather than saturating to a float.
-# they currently print in full, however many digits that is -- an
-# unresolved question, which is why these assert relationships instead
+# large integers stay exact rather than saturating to a float
 10 ^ 400 / 10 ^ 399         => 10
 10 ^ 400 == 10 ^ 400        => true
 2 ^ 100                     => 1267650600228229401496703205376
+2 ^ 64                      => 18446744073709551616
+
+# but a result too wide to read is shown in scientific notation
+2 ^ 1000                    => 1.071509e+301
+10 ^ 400                    => 1.000000e+400
+1e300                       => 1.000000e+300
+10 ^ 400 / 3                => 3.333333e+399
+
+# a value beyond double's range must not narrow to inf on the way out
+10 ^ 400 * pi               => 3.141593e+400
+
+# nor beyond the float fallback's range, where the exponent form has to be
+# derived from the digits themselves
+10 ^ 5000                   => 1.000000e+5000
+10 ^ 5000 / 3               => 3.333333e+4999
+-1 * 10 ^ 5000              => -1.000000e+5000
+# past Value's exact exponent ceiling it degrades to a float and overflows,
+# where a shift of the same magnitude would have been refused outright
+2 ^ 20000                   => inf
 
 # past the exact exponent ceiling it degrades to a float, and overflows
 10 ^ 100000                 => inf
@@ -190,6 +207,26 @@ pi                          => 3.141593
 12345678 + 0.5              => 12345678.5
 0.1 + 0.2                   => 0.3
 1 / 3                       => 0.333333
+
+# a printed value compares equal to the same value typed back in
+1 mi to km == 1.609344 km   => true
+100 pounds to kg == 45.359237 kg      => true
+1 acre to sqm == 4046.8564224 sqm     => true
+
+# shifts are exact and bounded
+1 << 200                    => 1.606938e+60
+1 << -1                     => !error Shift count out of range
+1 << 1024                   => 1.797693e+308
+1 << 1025                   => !error Shift count out of range
+1 << 99999999999            => !error Shift count out of range
+
+# bitwise operands are truncated toward zero, both sides
+1.5 & 3                     => 1
+7.9 | 8                     => 15
+2.5 << 2                    => 8
+10.9 >> 1                   => 5
+-1.5 & 3                    => 3
+1.5 << 1.9                  => 2
 
 # shifts and bitwise ops are not capped to 32 bits
 1 << 31                     => 2147483648
