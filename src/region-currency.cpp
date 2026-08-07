@@ -16,8 +16,8 @@ struct CurrencyDigits {
   int digits;
 };
 
-#include "currency-digits-table.inc"
-#include "region-currency-table.inc"
+#include "gen/currency-digits-table.inc"
+#include "gen/region-currency-table.inc"
 
 bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
 char toUpper(char c) { return static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
@@ -65,9 +65,7 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale) {
     // the region subtag is the first 2-letter tag after the language;
     // 4-letter tags are scripts, 3-digit tags are UN M49 areas not present
     // in the table
-    if (!language && tag.size() == 2 && isAlpha(tag[0]) && isAlpha(tag[1])) {
-      return currencyForRegion(tag);
-    }
+    if (!language && tag.size() == 2 && isAlpha(tag[0]) && isAlpha(tag[1])) { return currencyForRegion(tag); }
 
     language = false;
     start = end + 1;

@@ -43,7 +43,7 @@ def main():
             f"// ({xml_path.name}). Do not edit by hand.",
         ]
 
-    out_path = ROOT / "src/region-currency-table.inc"
+    out_path = ROOT / "src/gen/region-currency-table.inc"
     lines = banner() + ["constexpr RegionCurrency kRegionCurrencyTable[] = {"]
     for code in sorted(table):
         lines.append(f'    {{"{code}", "{table[code]}"}},')
@@ -64,7 +64,7 @@ def main():
         assert len(code) == 3 and code.isupper(), code
         assert 0 <= n <= 9, (code, n)
 
-    out_path = ROOT / "src/currency-digits-table.inc"
+    out_path = ROOT / "src/gen/currency-digits-table.inc"
     lines = banner() + [
         f"constexpr int kDefaultCurrencyDigits = {default};",
         "",

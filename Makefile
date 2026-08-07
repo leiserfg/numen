@@ -16,6 +16,11 @@ fuzzer:
 clean:
 	rm -rf build build-debug build-fuzzer
 
+format:
+	find ./src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i
+	find ./tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i
+.PHONY: format
+
 re: clean all
 
 .PHONY: all test debug fuzzer clean re

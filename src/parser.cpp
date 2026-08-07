@@ -75,7 +75,9 @@ std::optional<double> parseConstant(std::string_view tok) {
   return it->n;
 }
 
-std::unique_ptr<Expression> makeNumberExpr(abacus::Value n) { return std::make_unique<Expression>(NumberString{n}); }
+std::unique_ptr<Expression> makeNumberExpr(abacus::Value n) {
+  return std::make_unique<Expression>(NumberString{n});
+}
 
 std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs, std::unique_ptr<Expression> rhs,
                                         const std::string &op) {
