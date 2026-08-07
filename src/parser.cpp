@@ -159,7 +159,9 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
 
   if (month && year && !hasDay) { day = std::chrono::day{1}; }
 
-  if ((hasDay && (month || year)) || (month && year)) {
+  // the month is what makes this a date at all: without it "0 9" and "2001 5"
+  // are just two numbers that happen to sit next to each other
+  if (month && (hasDay || year)) {
     DateTimeLiteral lit;
 
     lit.month = month;

@@ -1,7 +1,7 @@
 #include "abacus/abacus.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include "region-currency.hpp"
-#include "vicinae-currency-provider.hpp"
+#include "mock-currency-provider.hpp"
 
 TEST_CASE("Locale to currency mapping") {
   using abacus::currencyForLocale;
@@ -25,32 +25,8 @@ TEST_CASE("Locale to currency mapping") {
   REQUIRE_FALSE(currencyForLocale("").has_value());
 }
 
-namespace {
-
-// deliberately awkward rates, so the snapping is visible in the result
-class FixedRateProvider : public AbstractCurrencyProvider {
-public:
-  std::optional<double> getRate(const std::string &code) const override {
-    if (code == "usd") return 1.0;
-    if (code == "eur") return 0.9234567;
-    if (code == "jpy") return 157.891234;
-    if (code == "krw") return 1234.5678;
-    return std::nullopt;
-  }
-
-  void updateRates() override {}
-};
-
-abacus::Abacus fixedRateCalc() {
-  abacus::Abacus calc{};
-  calc.setCurrencyProvider(std::make_unique<FixedRateProvider>());
-  return calc;
-}
-
-} // namespace
-
 TEST_CASE("currency results snap to the minor units of the target", "[currency]") {
-  auto calc = fixedRateCalc();
+  auto calc = test::mockCalc();
 
   // eur takes two decimals, jpy and krw none
   CHECK(calc.evaluate("100 usd to eur") == "92.35eur");
@@ -59,7 +35,7 @@ TEST_CASE("currency results snap to the minor units of the target", "[currency]"
 }
 
 TEST_CASE("rounding money is a formatting concern, not a value one", "[currency]") {
-  auto calc = fixedRateCalc();
+  auto calc = test::mockCalc();
 
   auto res = calc.compute("100 usd to eur");
   REQUIRE(res);
@@ -72,7 +48,7 @@ TEST_CASE("rounding money is a formatting concern, not a value one", "[currency]
 }
 
 TEST_CASE("a currency is not padded out to its minor units", "[currency]") {
-  auto calc = fixedRateCalc();
+  auto calc = test::mockCalc();
 
   // the minor units cap the precision, they do not pad it: rendering money
   // properly is the caller's job, and half of the convention reads worse than none
@@ -83,7 +59,7 @@ TEST_CASE("a currency is not padded out to its minor units", "[currency]") {
 }
 
 TEST_CASE("a currency amount lands on its minor units even without a conversion", "[currency]") {
-  auto calc = fixedRateCalc();
+  auto calc = test::mockCalc();
 
   CHECK(calc.evaluate("0.22392323090 usd") == "0.22usd");
   CHECK(calc.evaluate("10.005 usd") == "10.01usd");
@@ -115,12 +91,18 @@ TEST_CASE("minor unit digits come from CLDR", "[currency]") {
   CHECK(currencyDigits("") == 2);
 }
 
-TEST_CASE("Use currency provider") {
-  abacus::Abacus calc{};
-  auto currency = std::make_unique<VicinaeCurrencyProvider>();
+TEST_CASE("the provider supplies the rates a conversion uses", "[currency]") {
+  abacus::Abacus calc;
+  auto provider = std::make_unique<test::MockCurrencyProvider>();
+  auto *handle = provider.get();
 
-  currency->updateRates();
-  calc.setCurrencyProvider(std::move(currency));
+  calc.setCurrencyProvider(std::move(provider));
+  provider = nullptr;
 
-  REQUIRE(calc.evaluate("100 usd to eur"));
+  CHECK(calc.evaluate("100 usd to eur") == "92.35eur");
+  CHECK(calc.evaluate("100 usd to gbp") == "78.91gbp");
+
+  // an unknown code has no rate, so the conversion cannot be done
+  CHECK_FALSE(calc.evaluate("100 usd to zzz"));
+  CHECK(handle->updateCount() == 0);
 }
