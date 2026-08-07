@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.21)
 set(PROJECT_NAME abacus)
 project(${PROJECT_NAME})
 set(CMAKE_CXX_STANDARD 23)
@@ -8,10 +8,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(BUILD_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
 option(BUILD_REPL "Build the repl program" ON)
 option(BUILD_TESTS "Build the test suite" ON)
-option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." ON)
-option(ENABLE_SANITIZERS "Build with the address and undefined behaviour sanitizers." OFF)
+option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
-# a bare `cmake -B build` should not silently produce an unoptimised library
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
@@ -22,20 +20,18 @@ if (BUILD_FUZZER)
 		message(FATAL_ERROR "BUILD_FUZZER requires clang (got '${CMAKE_CXX_COMPILER_ID}'). Configure with -DCMAKE_CXX_COMPILER=clang++.")
 	endif()
 
-	# coverage feedback is only useful if the library itself is instrumented, so
-	# this has to reach every target rather than just the fuzz entry point.
-	# 'fuzzer-no-link' instruments without pulling in the driver's main().
+	# global: coverage feedback needs the library instrumented, not just the entry point
 	add_compile_options(-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
 	add_link_options(-fsanitize=address,undefined)
 endif()
 
-if (ENABLE_SANITIZERS)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 	if (MSVC)
-		message(FATAL_ERROR "ENABLE_SANITIZERS is only supported for gcc and clang.")
+		add_compile_options(/fsanitize=address)
+	else()
+		add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+		add_link_options(-fsanitize=address,undefined)
 	endif()
-	# the frame pointer is what makes the sanitizer reports readable
-	add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
-	add_link_options(-fsanitize=address,undefined)
 endif()
 
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
@@ -130,6 +126,5 @@ if (BUILD_FUZZER)
 	target_link_libraries(${FUZZ_TARGET} PRIVATE ${PROJECT_NAME})
 	target_include_directories(${FUZZ_TARGET} PRIVATE ./include)
 
-	# only the fuzz target links the driver, which is what supplies main()
 	target_link_options(${FUZZ_TARGET} PRIVATE -fsanitize=fuzzer)
 endif()

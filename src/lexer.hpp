@@ -57,9 +57,6 @@ public:
   std::optional<Token> peakIf(TokenType type);
   std::optional<Token> peak(int n = 0);
 
-  // for the places where running out of tokens is a malformed expression rather
-  // than simply the end of one. dereferencing a disengaged peak() is undefined,
-  // and reads whatever the heap left behind.
   Token peakOrThrow(std::string_view message, int n = 0) {
     auto tok = peak(n);
     if (!tok) throw std::runtime_error(std::string{message});

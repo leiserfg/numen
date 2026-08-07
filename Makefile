@@ -1,21 +1,21 @@
 all:
-	cmake -GNinja -DBUILD_TESTS=ON -B build
-	cmake --build build
+	cmake --preset default
+	cmake --build --preset default
 
 test: all
-	./build/abacus-tests
+	ctest --preset default
 
-clean:
-	rm -rf build
+debug:
+	cmake --preset debug
+	cmake --build --preset debug
 
 fuzzer:
-	cmake -GNinja -DBUILD_FUZZER=ON -DBUILD_REPL=OFF -DBUILD_TESTS=OFF -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -B build-fuzzer
-	cmake --build build-fuzzer
-.PHONY: fuzzer
+	cmake --preset fuzzer
+	cmake --build --preset fuzzer
 
-fuzz: fuzzer
-	./build-fuzzer/abacus-fuzz tests/fuzz-corpus -only_ascii=1 -max_total_time=60
-.PHONY: fuzz
+clean:
+	rm -rf build build-debug build-fuzzer
 
 re: clean all
 
+.PHONY: all test debug fuzzer clean re
