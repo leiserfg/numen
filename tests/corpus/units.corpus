@@ -53,3 +53,30 @@ km to in                    => 39370.07874in
 
 # units flowing through functions
 max(1 km to m, 100)         => 1000m
+
+# like over like cancels, leaving a plain number
+1 km / 100 m                => 10
+100 usd / 4 usd             => 25
+1 hour / 30 min             => 2
+1 kg / 500 g                => 2
+1 km / 1 km                 => 1
+
+# a unit survives being scaled by a plain number
+1 km / 2                    => 0.5km
+1 km * 2                    => 2km
+2 * 1 km                    => 2km
+1 km + 100 m                => 1100m
+
+# but there is no way to name a squared or reciprocal unit yet, so those are
+# refused rather than labelled with one of the operands
+1 km * 1 km                 => !error Cannot multiply two units
+1 usd * 1 usd               => !error Cannot multiply two units
+1 km * 100 m                => !error Cannot multiply two units
+2 / 1 km                    => !error Cannot divide by a unit
+1 / 1 s                     => !error Cannot divide by a unit
+
+# raising to anything but 0 or 1 has the same problem
+2 m ^ 2                     => !error Cannot raise a unit to that power
+2 m ^ 0.5                   => !error Cannot raise a unit to that power
+2 m ^ 1                     => 2m
+2 m ^ 0                     => 1

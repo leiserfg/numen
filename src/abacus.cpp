@@ -728,7 +728,15 @@ private:
     }
 
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n * rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+
+    // there is no way to name the square of a unit yet, so refuse rather than
+    // keep one of the two and pretend
+    if (n1->unit && n2->unit) throw std::runtime_error("Cannot multiply two units");
+
+    return output(n1->n * n2->n, *n1, *n2);
   }
 
   static Computed div(const Computed &lhs, const Computed &rhs) {
@@ -742,7 +750,18 @@ private:
 
     assertBinary<Num, Num>(lhs, rhs);
     if (rhs.asNumber()->n.isZero()) throw std::runtime_error("Division by zero");
-    return output(lhs.asNumber()->n / rhs.asNumber()->n, *lhs.asNumber(), *rhs.asNumber());
+
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+
+    // the operands were brought to a common unit before this, so like over like
+    // cancels and the result is a plain number
+    if (n1->unit && n2->unit) return output(n1->n / n2->n, *n1, *n2, std::nullopt);
+
+    // and the reciprocal of a unit has no name yet
+    if (n2->unit) throw std::runtime_error("Cannot divide by a unit");
+
+    return output(n1->n / n2->n, *n1, *n2);
   }
 
   static Computed modulo(const Computed &lhs, const Computed &rhs) {
@@ -752,7 +771,16 @@ private:
 
   static Computed pow(const Computed &lhs, const Computed &rhs) {
     assertBinary<Num, Num>(lhs, rhs);
-    return output(lhs.asNumber()->n.pow(rhs.asNumber()->n), *lhs.asNumber(), *rhs.asNumber());
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+    auto raised = n1->n.pow(n2->n);
+
+    if (n1->unit) {
+      if (n2->n.isZero()) return output(raised, *n1, *n2, std::nullopt);
+      if (!(n2->n == Value{1})) throw std::runtime_error("Cannot raise a unit to that power");
+    }
+
+    return output(raised, *n1, *n2);
   }
 
   static Computed leftshift(const Computed &lhs, const Computed &rhs) {
@@ -776,11 +804,15 @@ private:
   }
 
   static Computed output(Value n, const Num &lhs, const Num &rhs) {
+    return output(n, lhs, rhs, rhs.unit.or_else([&]() { return lhs.unit; }));
+  }
+
+  static Computed output(Value n, const Num &lhs, const Num &rhs, std::optional<Number::Unit> unit) {
     if (n.isNaN()) throw std::runtime_error("Result is undefined");
 
     auto result = Num{.n = n,
                       .format = lhs.format,
-                      .unit = rhs.unit.or_else([&]() { return lhs.unit; }),
+                      .unit = std::move(unit),
                       .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
     return Computed{.value = result};
   }
