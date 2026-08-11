@@ -480,19 +480,25 @@ public:
 
             if (!n->unit) return Computed{.value = value};
 
-            bool sourceIsSimple = !n->unit->resolved || n->unit->resolved->sole();
-            if (unit->isSimple() && sourceIsSimple) {
+            // a single token can still name a composition, so ask what it
+            // resolved to rather than how it was spelled
+            auto target = buildTarget(*unit);
+            bool plainTarget = unit->isSimple() && target.sole();
+            bool plainSource = !n->unit->resolved || n->unit->resolved->sole();
+
+            // the plain path is the only one that knows about offsets, and the
+            // only one that can settle an ambiguous token against its target
+            if (plainTarget && plainSource) {
               return convertToUnit(n->n.toDouble(), n->unit->raw, unit->simpleName());
             }
 
-            return convertToCompound(*n, *unit);
+            return convertCompound(*n, std::move(target));
           }
         }
         if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
           throw std::runtime_error(
-              std::format("Cannot convert a {} to {}", v.valueTypeName(), unit->isSimple()
-                                                                              ? std::string{unit->simpleName()}
-                                                                              : buildTarget(*unit).render()));
+              std::format("Cannot convert a {} to {}", v.valueTypeName(),
+                          unit->isSimple() ? std::string{unit->simpleName()} : buildTarget(*unit).render()));
         }
 
         throw std::runtime_error(std::format("Cannot convert a {} to that", v.valueTypeName()));
@@ -505,8 +511,8 @@ public:
         // unit only makes sense for a number, ignore it otherwise
         if (auto n = c.asNumber()) {
           n->unit = Number::Unit{.raw = std::string{ue.unit}};
-          if (auto candidates = m_db.findUnitCandidates(ue.unit); candidates.size() == 1) {
-            n->unit->resolved = soleUnit(candidates.front(), std::string{ue.unit});
+          if (auto candidates = m_db.findCompounds(ue.unit); candidates.size() == 1) {
+            n->unit->resolved = std::move(candidates.front());
           }
         }
 
@@ -633,20 +639,22 @@ private:
     std::vector<UnitTerm> terms;
 
     for (const auto &named_term : named.terms) {
-      auto candidates = m_db.findUnitCandidates(named_term.name);
+      auto candidates = m_db.findCompounds(named_term.name);
       if (candidates.empty()) {
         throw std::runtime_error(std::format("Unknown unit \"{}\"", named_term.name));
       }
 
-      auto def = candidates.front();
-      auto exponent = static_cast<std::int8_t>(named_term.exponent);
-      auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == def.id; });
+      // the named term may itself be a composition, as in "to kmh"
+      for (const auto &part : candidates.front().terms) {
+        auto exponent = static_cast<std::int8_t>(part.exponent * named_term.exponent);
+        auto known =
+            std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == part.def.id; });
 
-      if (known == terms.end()) {
-        terms.push_back(
-            UnitTerm{.def = def, .display = std::string{named_term.name}, .exponent = exponent});
-      } else {
-        known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
+        if (known == terms.end()) {
+          terms.push_back(UnitTerm{.def = part.def, .display = part.display, .exponent = exponent});
+        } else {
+          known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
+        }
       }
     }
 
@@ -659,9 +667,18 @@ private:
     resolveToDefault(source);
     const auto &from = *source.unit->resolved;
 
+    // Allow implict conversion such as "150 km/h to in", by promoting rhs to in/h
+    if (!from.sole() && target.sole()) {
+      auto convertible =
+          dimensionOf(from.terms[0].def.dimension) == dimensionOf(target.terms[0].def.dimension);
+
+      if (from.terms[0].def.dimension == target.terms[0].def.dimension) {
+        target.terms.insert(target.terms.end(), from.terms.begin() + 1, from.terms.end());
+      }
+    }
+
     if (from.dimension() != target.dimension()) {
-      throw std::runtime_error(
-          std::format("Incompatible units: {} to {}", from.render(), target.render()));
+      throw std::runtime_error(std::format("Incompatible units: {} to {}", from.render(), target.render()));
     }
 
     validateTerms(from.terms);
@@ -700,9 +717,9 @@ private:
   void resolveToDefault(Num &n) const {
     if (n.unit->resolved) return;
 
-    auto candidates = m_db.findUnitCandidates(n.unit->raw);
+    auto candidates = m_db.findCompounds(n.unit->raw);
     if (candidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", n.unit->raw)); }
-    n.unit->resolved = soleUnit(candidates.front(), n.unit->raw);
+    n.unit->resolved = std::move(candidates.front());
   }
 
   static bool isComposed(const Number::Unit &unit) { return unit.resolved && !unit.resolved->sole(); }
@@ -1132,11 +1149,9 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
     auto result = i.computeExprBase(*ast.root);
 
     const auto formatNumber = [](const Num &v) -> std::string {
-      auto unitName = v.unit
-                          .transform([&](const Number::Unit &u) {
-                            return u.resolved ? u.resolved->render() : u.raw;
-                          })
-                          .value_or("");
+      auto unitName =
+          v.unit.transform([&](const Number::Unit &u) { return u.resolved ? u.resolved->render() : u.raw; })
+              .value_or("");
       return std::format("{}{}", v.n.render(v.format, unitDecimals(v)), unitName);
     };
 

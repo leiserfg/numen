@@ -137,7 +137,7 @@ bool Parser::isTimezoneToken(std::string_view name) {
 
 std::optional<OpaqueUnit> Parser::parseUnit() {
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (!m_unitDb.findUnitCandidates(tok->raw).empty()) { return tok->raw; }
+    if (!m_unitDb.findCompounds(tok->raw).empty()) { return tok->raw; }
   }
   return std::nullopt;
 }
@@ -156,7 +156,7 @@ std::optional<NamedUnit> Parser::parseConversionTarget() {
 
     auto next = m_lexer.peak(1);
     if (!next || next->type != Lexer::TokenType::String) break;
-    if (m_unitDb.findUnitCandidates(next->raw).empty()) break;
+    if (m_unitDb.findCompounds(next->raw).empty()) break;
 
     m_lexer.next();
     m_lexer.next();

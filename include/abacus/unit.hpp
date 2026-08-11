@@ -95,6 +95,14 @@ struct CompoundUnit {
 
 CompoundUnit soleUnit(UnitDef def, std::string display);
 
+// a spelling that stands for a composition rather than a unit of its own, so it
+// states no factor: that follows from the parts. the composition is also what
+// gets displayed, so it is spelled short
+struct CompoundAlias {
+  std::string_view name;
+  std::string_view composition;
+};
+
 class UnitDatabase {
 public:
   UnitDatabase() noexcept;
@@ -107,6 +115,11 @@ public:
 
   std::optional<UnitDef> findUnit(const std::string &id) const;
 
+  // the compound behind a token: a plain unit gives one term, an alias like
+  // "kmh" gives its composition. this is what callers doing arithmetic want,
+  // findUnitCandidates being the atomic-only view underneath it
+  std::vector<CompoundUnit> findCompounds(std::string_view q) const;
+
   std::expected<double, std::string> factorOf(const UnitDef &unit) const;
 
   std::expected<double, std::string> convert(double n, const UnitDef &from, const UnitDef &to) const;
@@ -116,6 +129,7 @@ public:
   void setCurrencyProvider(const AbstractCurrencyProvider &provider) { m_currencyProvider = &provider; }
 
 private:
+  std::optional<CompoundUnit> expandComposition(std::string_view spec) const;
   std::vector<UnitDef> matchExact(std::string_view q) const;
   std::vector<UnitDef> expandPrefixed(std::string_view q) const;
 

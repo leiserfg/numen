@@ -207,7 +207,7 @@ pi                          => 3.141593
 # a printed value compares equal to the same value typed back in
 1 mi to km == 1.609344 km   => true
 100 pounds to kg == 45.359237 kg      => true
-1 acre to sqm == 4046.8564224 sqm     => true
+1 acre to m*m == 4046.8564224 m*m     => true
 
 # shifts act on a 64 bit integer
 1 << 62                     => 4611686018427387904

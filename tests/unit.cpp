@@ -29,20 +29,38 @@ TEST_CASE("a compound's dimension is the sum of its terms", "[unit][compound]") 
   CHECK(CompoundUnit{{term(db, "km"), term(db, "m", -1)}}.dimension() == Dimension{});
 }
 
-TEST_CASE("a compound's factor agrees with the equivalent named unit", "[unit][compound]") {
+TEST_CASE("an alias expands to the composition it names", "[unit][compound]") {
   UnitDatabase db;
 
-  auto factorOf = [&](const std::string &id) {
-    auto def = db.findUnit(id);
-    REQUIRE(def);
-    return def->factor;
+  auto expand = [&](const std::string &name) {
+    auto found = db.findCompounds(name);
+    REQUIRE(found.size() == 1);
+    return found.front();
   };
 
-  CHECK(CompoundUnit{{term(db, "km", 2)}}.factor() == factorOf("sqkm"));
-  CHECK(CompoundUnit{{term(db, "m", 2)}}.factor() == factorOf("sqm"));
-  CHECK_THAT((CompoundUnit{{term(db, "km"), term(db, "h", -1)}}.factor()),
-             Catch::Matchers::WithinRel(factorOf("kmh"), 1e-12));
-  CHECK(CompoundUnit{{term(db, "m"), term(db, "s", -1)}}.factor() == factorOf("mps"));
+  CHECK(expand("sqm").render() == "m²");
+  CHECK(expand("kmh").render() == "km/h");
+  CHECK(expand("kph").render() == "km/h");
+  CHECK(expand("mph").render() == "mi/h");
+
+  CHECK(expand("km2").dimension() == dimensionOf(dimensions::AREA));
+  CHECK(expand("mps").dimension() == dimensionOf(dimensions::SPEED));
+
+  // the factor now follows from the parts rather than being stated
+  CHECK(expand("sqkm").factor() == 1e6);
+  CHECK(expand("sqft").factor() == 0.3048 * 0.3048);
+  CHECK_THAT(expand("kmh").factor(), Catch::Matchers::WithinRel(1000.0 / 3600, 1e-12));
+  CHECK_THAT(expand("mph").factor(), Catch::Matchers::WithinRel(0.44704, 1e-12));
+}
+
+// the units that are not products of anything we have stay atomic, so nothing
+// enforces their factor except this
+TEST_CASE("an atomic unit still agrees with its composed equivalent", "[unit][compound]") {
+  abacus::Abacus calc;
+
+  CHECK(calc.evaluate("1 hectare to m*m") == "10000m²");
+  CHECK(calc.evaluate("1 acre to m*m") == "4046.856422m²");
+  CHECK(calc.evaluate("1 knot to m/s") == "0.514444m/s");
 }
 
 TEST_CASE("a compound renders the way it was typed", "[unit][compound]") {

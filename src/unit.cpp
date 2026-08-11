@@ -220,6 +220,50 @@ std::vector<UnitDef> UnitDatabase::findUnitCandidates(std::string_view q) const 
 
 void UnitDatabase::registerUnit(UnitDef unit) { m_units.emplace_back(std::move(unit)); }
 
+// "km/h" or "m^2": terms separated by / and *, each optionally raised to a
+// power. only ever fed the built-in alias table, so a failure is a table bug
+std::optional<CompoundUnit> UnitDatabase::expandComposition(std::string_view spec) const {
+  CompoundUnit out;
+  std::int8_t sign = 1;
+
+  for (std::size_t i = 0; i <= spec.size();) {
+    auto end = spec.find_first_of("/*", i);
+    auto token = spec.substr(i, end == std::string_view::npos ? end : end - i);
+
+    std::int8_t exponent = 1;
+    if (auto caret = token.find('^'); caret != std::string_view::npos) {
+      exponent = static_cast<std::int8_t>(token[caret + 1] - '0');
+      token = token.substr(0, caret);
+    }
+
+    // the atomic view, so a composition can never refer to another alias
+    auto candidates = findUnitCandidates(token);
+    if (candidates.empty()) return std::nullopt;
+
+    out.terms.push_back(UnitTerm{.def = candidates.front(),
+                                 .display = std::string{token},
+                                 .exponent = static_cast<std::int8_t>(exponent * sign)});
+
+    if (end == std::string_view::npos) break;
+    sign = spec[end] == '/' ? -1 : 1;
+    i = end + 1;
+  }
+
+  return out;
+}
+
+std::vector<CompoundUnit> UnitDatabase::findCompounds(std::string_view q) const {
+  for (const auto &alias : units::compoundAliases()) {
+    if (!equalsIgnoreCase(alias.name, q)) continue;
+    if (auto expanded = expandComposition(alias.composition)) return {*expanded};
+  }
+
+  return findUnitCandidates(q) | std::views::transform([&](const UnitDef &def) {
+           return soleUnit(def, std::string{q});
+         }) |
+         std::ranges::to<std::vector>();
+}
+
 std::optional<UnitDef> UnitDatabase::findUnit(const std::string &id) const {
   if (auto units = findUnitCandidates(id); !units.empty()) { return units.front(); }
   return std::nullopt;

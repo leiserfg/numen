@@ -72,16 +72,10 @@ std::span<const UnitDef> units::builtins() {
     {.id = "teaspoon",   .aliases = {"tsp"},        .factor = 0.00492892159375e-3, .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
 
     // area
-    {.id = "square meter",     .aliases = {"sqm", "m2"},   .factor = 1,            .dimension = dimensions::AREA, .family = families::METRIC},
-    {.id = "square kilometer", .aliases = {"sqkm", "km2"}, .factor = 1e6,          .dimension = dimensions::AREA, .family = families::METRIC},
     {.id = "hectare",          .aliases = {"ha"},          .factor = 1e4,          .dimension = dimensions::AREA, .family = families::METRIC},
-    {.id = "square foot",      .aliases = {"sqft", "ft2"}, .factor = 0.09290304,   .dimension = dimensions::AREA, .family = families::IMPERIAL},
     {.id = "acre",             .aliases = {},              .factor = 4046.8564224, .dimension = dimensions::AREA, .family = families::IMPERIAL},
 
     // speed
-    {.id = "meter per second",   .aliases = {"mps"},        .factor = 1,             .dimension = dimensions::SPEED, .family = families::METRIC},
-    {.id = "kilometer per hour", .aliases = {"kmh", "kph"}, .factor = 1000.0 / 3600, .dimension = dimensions::SPEED, .family = families::METRIC},
-    {.id = "mile per hour",      .aliases = {"mph"},        .factor = 0.44704,       .dimension = dimensions::SPEED, .family = families::IMPERIAL},
     {.id = "knot",               .aliases = {"kt"},         .factor = 1852.0 / 3600, .dimension = dimensions::SPEED, .family = families::IMPERIAL},
 
     // currency (rates come from the currency provider; identity only)
@@ -134,3 +128,24 @@ std::span<const UnitDef> units::builtins() {
 
   return BUILTIN_UNITS;
 }
+
+// spellings that stand for a composition. the composition doubles as the
+// rendered form, so it is written with short aliases
+// clang-format off
+std::span<const CompoundAlias> units::compoundAliases() {
+  static constexpr auto ALIASES = std::to_array<CompoundAlias>({
+      {.name = "mps",  .composition = "m/s"},
+      {.name = "kmh",  .composition = "km/h"},
+      {.name = "kph",  .composition = "km/h"},
+      {.name = "mph",  .composition = "mi/h"},
+      {.name = "sqm",  .composition = "m^2"},
+      {.name = "m2",   .composition = "m^2"},
+      {.name = "sqkm", .composition = "km^2"},
+      {.name = "km2",  .composition = "km^2"},
+      {.name = "sqft", .composition = "ft^2"},
+      {.name = "ft2",  .composition = "ft^2"},
+  });
+
+  return ALIASES;
+}
+// clang-format on

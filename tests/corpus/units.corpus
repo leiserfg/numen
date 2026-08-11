@@ -38,11 +38,11 @@ km to in                    => 39370.07874in
 2 cups to ml                => 473.176473ml
 
 # area
-1 acre to sqm               => 4046.856422sqm
+1 acre to sqm               => 4046.856422m²
 
 # speed
-100 mph to kmh              => 160.9344kmh
-90 kmh to mph               => 55.923407mph
+100 mph to kmh              => 160.9344km/h
+90 kmh to mph               => 55.923407mi/h
 
 # implicit conversion in binary expressions
 30min + 1hour               => 1 hr 30 min
@@ -98,10 +98,10 @@ max(1 km to m, 100)         => 1000m
 
 # a conversion target may be composed too, and agrees with the named unit
 100 mph to km/hr            => 160.9344km/hr
-100 km / 2 hr to mph        => 31.06856mph
+100 km / 2 hr to mph        => 31.06856mi/h
 50 m / 1 s to km/hr         => 180km/hr
 1 km/hr to m/s              => 0.277778m/s
-1 km * 1 km to sqkm         => 1sqkm
+1 km * 1 km to sqkm         => 1km²
 1 sqkm to km*km             => 1km²
 1 acre to m*m               => 4046.856422m²
 
@@ -151,7 +151,7 @@ max(1 km to m, 100)         => 1000m
 500 mb to gb                => 0.5gb
 1 sqm to acre               => 0.000247acre
 1 ha to acre                => 2.471054acre
-1 acre to sqm to acre       => 1acre
+1 acre to m*m to acre       => 1acre
 
 # function arguments are computed independently, so min/max used to compare the
 # bare numbers and answer that 1 km was smaller than 999 m
@@ -165,3 +165,36 @@ min(1 km, 1 hr)             => !error Incompatible units: hr to km
 
 # a plain number among the arguments means they are not all comparable
 max(1 km to m, 100)         => 1000m
+
+# a named compound is its composition, so it behaves identically however it was
+# spelled. "60 kmh * 2 hr" used to give 120kmh·hr because kmh was atomic and
+# had no hour term for the hour to cancel against
+60 kmh * 2 hr               => 120km
+60 km/h * 2 hr              => 120km
+1 sqm / 1 m                 => 1m
+1 m*m / 1 m                 => 1m
+1 sqm * 1 m                 => 1m³
+1 kmh + 1 km/h              => 2km/h
+1 mph * 2 hr                => 2mi
+2 mps * 3 s                 => 6m
+
+# so does the promotion of a bare target against a composed source
+150 kmh to in               => 5905511.811024in/h
+150 km/h to in              => 5905511.811024in/h
+
+# the composition is what gets displayed, aliases are only spellings
+1 kmh                       => 1km/h
+1 sqm                       => 1m²
+1 sqkm                      => 1km²
+1 mph                       => 1mi/h
+
+# units that are not products of anything we have stay atomic, and still
+# convert against the composed form
+1 hectare to m*m            => 10000m²
+1 knot to m/s               => 0.514444m/s
+1 acre                      => 1acre
+
+# dimensions are unchanged by the rewrite
+1 kmh to mph                => 0.621371mi/h
+1 sqkm to hectare           => 100hectare
+1 kmh * 1 kmh               => 1km²/h²
