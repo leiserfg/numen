@@ -6,7 +6,7 @@ foo(1, 2)                   => !error Unknown function "foo"
 1m to 150                   => !error
 
 # currency conversion without a rate provider
-1 usd to eur                => !error No conversion rate available between usd and eur.
+1 usd to eur                => !error No conversion rate available for usd.
 
 # an argument list that never closes: these read past the end of the token
 # stream before, which is undefined rather than merely wrong

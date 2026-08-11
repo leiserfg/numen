@@ -15,8 +15,11 @@ constexpr double toSeconds(auto d) { return std::chrono::duration<double>(d).cou
 // Factors are relative to a per-dimension base unit.
 // Sources: NIST SP 811 (exact defined conversions), ISO 4217 (currency codes).
 
+// must stay function-local: at namespace scope a consumer's own static Abacus
+// can be constructed before this table is, and read it empty
+std::span<const UnitDef> units::builtins() {
 // clang-format off
-static const auto BUILTIN_UNITS = std::to_array<UnitDef>({
+  static const auto BUILTIN_UNITS = std::to_array<UnitDef>({
     // length
     {.id = "meter",      .aliases = {"m", "metre"}, .factor = 1,        .dimension = dimensions::LENGTH, .family = families::METRIC,   .prefixable = true},
     {.id = "micrometer", .aliases = {"micron"},     .factor = 1e-6,     .dimension = dimensions::LENGTH, .family = families::METRIC},
@@ -59,14 +62,14 @@ static const auto BUILTIN_UNITS = std::to_array<UnitDef>({
     {.id = "petabyte", .aliases = {"pb"},        .factor = 1e15,  .dimension = dimensions::DATA, .family = families::DATA},
 
     // volume
-    {.id = "liter",      .aliases = {"l", "litre"}, .factor = 1,                .dimension = dimensions::VOLUME, .family = families::METRIC,   .prefixable = true},
+    {.id = "liter",      .aliases = {"l", "litre"}, .factor = 1e-3,             .dimension = dimensions::VOLUME, .family = families::METRIC,   .prefixable = true},
     // US customary
-    {.id = "gallon",     .aliases = {"gal"},        .factor = 3.785411784,      .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
-    {.id = "quart",      .aliases = {"qt"},         .factor = 0.946352946,      .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
-    {.id = "pint",       .aliases = {"pt"},         .factor = 0.473176473,      .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
-    {.id = "cup",        .aliases = {},             .factor = 0.2365882365,     .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
-    {.id = "tablespoon", .aliases = {"tbsp"},       .factor = 0.01478676478125, .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
-    {.id = "teaspoon",   .aliases = {"tsp"},        .factor = 0.00492892159375, .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "gallon",     .aliases = {"gal"},        .factor = 3.785411784e-3,   .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "quart",      .aliases = {"qt"},         .factor = 0.946352946e-3,   .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "pint",       .aliases = {"pt"},         .factor = 0.473176473e-3,   .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "cup",        .aliases = {},             .factor = 0.2365882365e-3,  .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "tablespoon", .aliases = {"tbsp"},       .factor = 0.01478676478125e-3, .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
+    {.id = "teaspoon",   .aliases = {"tsp"},        .factor = 0.00492892159375e-3, .dimension = dimensions::VOLUME, .family = families::IMPERIAL},
 
     // area
     {.id = "square meter",     .aliases = {"sqm", "m2"},   .factor = 1,            .dimension = dimensions::AREA, .family = families::METRIC},
@@ -126,7 +129,8 @@ static const auto BUILTIN_UNITS = std::to_array<UnitDef>({
     {.id = "pen", .aliases = {"sol"},                       .dimension = dimensions::CURRENCY, .family = families::CURRENCY},
     {.id = "btc", .aliases = {"bitcoin"},                   .dimension = dimensions::CURRENCY, .family = families::CURRENCY},
     {.id = "eth", .aliases = {"ether", "ethereum"},         .dimension = dimensions::CURRENCY, .family = families::CURRENCY},
-});
+  });
 // clang-format on
 
-std::span<const UnitDef> units::builtins() { return BUILTIN_UNITS; }
+  return BUILTIN_UNITS;
+}

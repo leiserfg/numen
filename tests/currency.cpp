@@ -106,3 +106,24 @@ TEST_CASE("the provider supplies the rates a conversion uses", "[currency]") {
   CHECK_FALSE(calc.evaluate("100 usd to zzz"));
   CHECK(handle->updateCount() == 0);
 }
+
+TEST_CASE("a rate applies inside a composed unit too", "[currency][compound]") {
+  auto calc = test::mockCalc();
+
+  CHECK(calc.evaluate("100 usd / 2 hr to eur/hr") == "46.172835eur/hr");
+  CHECK(calc.evaluate("1000 usd / 1 kg to eur/kg") == "923.4567eur/kg");
+
+  // the hour is a factor on both sides, so only the rate is left to apply
+  CHECK(calc.evaluate("60 usd / 1 hr to eur/min") == "0.923457eur/min");
+
+  // money per something is a rate, money times money is nothing at all
+  CHECK_FALSE(calc.evaluate("1 usd * 1 usd"));
+  CHECK_FALSE(calc.evaluate("1 usd / 1 hr to eur*eur"));
+
+  // the same currency cancels before any rate is consulted, which is why this
+  // works even on a calculator with no provider at all
+  CHECK(calc.evaluate("100 usd / 2 hr to usd/hr") == "50usd/hr");
+  CHECK(abacus::Abacus{}.evaluate("100 usd / 2 hr to usd/hr") == "50usd/hr");
+
+  CHECK_FALSE(calc.evaluate("100 usd / 2 hr to zzz/hr"));
+}

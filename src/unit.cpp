@@ -3,7 +3,9 @@
 #include "builtin-units.hpp"
 #include "utils.hpp"
 #include <array>
+#include <cmath>
 #include <format>
+#include <map>
 #include <algorithm>
 #include <iostream>
 #include <ranges>
@@ -76,6 +78,95 @@ UnitDatabase::UnitDatabase() noexcept {
   }
 }
 
+DimensionTraits traitsOf(std::string_view name) {
+  if (name == dimensions::LENGTH) return {.signature = {.length = 1}};
+  if (name == dimensions::MASS) return {.signature = {.mass = 1}};
+  if (name == dimensions::DURATION) return {.signature = {.time = 1}};
+  if (name == dimensions::DATA) return {.signature = {.data = 1}};
+  if (name == dimensions::TEMPERATURE) return {.signature = {.temperature = 1}};
+  if (name == dimensions::AREA) return {.signature = {.length = 2}};
+  if (name == dimensions::VOLUME) return {.signature = {.length = 3}};
+  if (name == dimensions::SPEED) return {.signature = {.length = 1, .time = -1}};
+
+  if (name == dimensions::CURRENCY) {
+    return {.signature = {.currency = 1},
+            .composition = Composition::RateOnly,
+            .dynamicFactor = true};
+  }
+
+  return {};
+}
+
+Dimension CompoundUnit::dimension() const {
+  Dimension d;
+
+  for (const auto &term : terms) {
+    auto base = dimensionOf(term.def.dimension);
+    d.length += base.length * term.exponent;
+    d.mass += base.mass * term.exponent;
+    d.time += base.time * term.exponent;
+    d.currency += base.currency * term.exponent;
+    d.data += base.data * term.exponent;
+    d.temperature += base.temperature * term.exponent;
+  }
+
+  return d;
+}
+
+double CompoundUnit::factor() const {
+  double f = 1;
+  for (const auto &term : terms) {
+    f *= std::pow(term.def.factor, term.exponent);
+  }
+  return f;
+}
+
+bool CompoundUnit::hasStableFactor() const {
+  return std::ranges::none_of(
+      terms, [](const UnitTerm &term) { return traitsOf(term.def.dimension).dynamicFactor; });
+}
+
+std::string CompoundUnit::render() const {
+  auto name = [](const UnitTerm &term) {
+    auto exponent = std::abs(term.exponent);
+    if (exponent == 1) return term.display;
+    if (exponent == 2) return term.display + "²";
+    if (exponent == 3) return term.display + "³";
+    return std::format("{}^{}", term.display, exponent);
+  };
+
+  std::vector<std::string> over, under;
+
+  for (const auto &term : terms) {
+    if (term.exponent > 0) { over.push_back(name(term)); }
+    if (term.exponent < 0) { under.push_back(name(term)); }
+  }
+
+  auto join = [](const std::vector<std::string> &parts) {
+    std::string out;
+    for (const auto &part : parts) {
+      if (!out.empty()) out += "·";
+      out += part;
+    }
+    return out;
+  };
+
+  if (under.empty()) return join(over);
+  // "usd/person·day" would read as (usd/person)·day
+  if (under.size() > 1) return std::format("{}/({})", join(over), join(under));
+
+  return std::format("{}/{}", join(over), under.front());
+}
+
+const UnitDef *CompoundUnit::sole() const {
+  if (terms.size() != 1 || terms.front().exponent != 1) return nullptr;
+  return &terms.front().def;
+}
+
+CompoundUnit soleUnit(UnitDef def, std::string display) {
+  return CompoundUnit{{UnitTerm{.def = std::move(def), .display = std::move(display)}}};
+}
+
 std::vector<UnitDef> UnitDatabase::matchExact(std::string_view q) const {
   return m_units | std::views::filter([&](const UnitDef &unit) {
            return equalsIgnoreCase(unit.id, q) ||
@@ -134,6 +225,51 @@ std::optional<UnitDef> UnitDatabase::findUnit(const std::string &id) const {
   return std::nullopt;
 }
 
+std::expected<double, std::string> UnitDatabase::factorOf(const UnitDef &unit) const {
+  if (!traitsOf(unit.dimension).dynamicFactor) return unit.factor;
+
+  if (!m_currencyProvider) return std::unexpected("No currency provider is configured");
+
+  // a rate is how many of this unit one base unit buys: the reciprocal of a factor
+  auto rate = m_currencyProvider->getRate(unit.id);
+  if (!rate || *rate == 0) {
+    return std::unexpected(std::format("No conversion rate available for {}.", unit.id));
+  }
+
+  return 1 / *rate;
+}
+
+std::expected<double, std::string> UnitDatabase::conversionRatio(const CompoundUnit &from,
+                                                                 const CompoundUnit &to) const {
+  std::map<std::string, std::pair<UnitDef, int>> net;
+
+  auto accumulate = [&](const CompoundUnit &unit, int sign) {
+    for (const auto &term : unit.terms) {
+      auto &[def, exponent] = net[term.def.id];
+      def = term.def;
+      exponent += term.exponent * sign;
+    }
+  };
+
+  accumulate(from, 1);
+  accumulate(to, -1);
+
+  double ratio = 1;
+
+  for (const auto &[id, entry] : net) {
+    const auto &[def, exponent] = entry;
+    // the same unit on both sides cancels, so it never needs a rate looked up
+    if (exponent == 0) continue;
+
+    auto base = factorOf(def);
+    if (!base) return std::unexpected(base.error());
+
+    ratio *= std::pow(*base, exponent);
+  }
+
+  return ratio;
+}
+
 std::expected<double, std::string> UnitDatabase::convert(double n, const UnitDef &from,
                                                          const UnitDef &to) const {
   if (from.id == to.id) { return n; }
@@ -143,20 +279,12 @@ std::expected<double, std::string> UnitDatabase::convert(double n, const UnitDef
         std::format("No idea how to convert {} to {}, as they are not of the same type.", from.id, to.id));
   }
 
-  double fromFactor = from.factor;
-  double toFactor = to.factor;
+  auto fromFactor = factorOf(from);
+  if (!fromFactor) return std::unexpected(fromFactor.error());
 
-  if (from.dimension == dimensions::CURRENCY) {
-    auto lhsRate = m_currencyProvider->getRate(from.id);
-    auto rhsRate = m_currencyProvider->getRate(to.id);
+  auto toFactor = factorOf(to);
+  if (!toFactor) return std::unexpected(toFactor.error());
 
-    if (!lhsRate || !rhsRate) {
-      return std::unexpected(std::format("No conversion rate available between {} and {}.", from.id, to.id));
-    }
-
-    return n / lhsRate.value() * rhsRate.value();
-  }
-
-  auto base = n * fromFactor + from.offset;
-  return (base - to.offset) / toFactor;
+  auto base = n * *fromFactor + from.offset;
+  return (base - to.offset) / *toFactor;
 }

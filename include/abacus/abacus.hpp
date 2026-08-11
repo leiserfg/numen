@@ -121,8 +121,11 @@ struct Number {
   NumberOutputFormat format;
 
   struct Unit {
-    std::string_view raw;
-    std::optional<UnitDef> def;
+    // owned: a view into the expression would dangle for callers of compute()
+    std::string raw;
+    std::optional<CompoundUnit> resolved;
+
+    const UnitDef *def() const { return resolved ? resolved->sole() : nullptr; }
   };
 
   std::optional<Unit> unit;

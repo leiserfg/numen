@@ -50,8 +50,17 @@ struct TimezoneOffset {
 
 using TimezoneLike = std::variant<NamedTimezone, TimezoneOffset>;
 
-struct NamedUnit {
+struct NamedUnitTerm {
   std::string_view name;
+  int exponent = 1;
+};
+
+struct NamedUnit {
+  std::vector<NamedUnitTerm> terms;
+
+  // only a single token can be resolved against a sibling
+  bool isSimple() const { return terms.size() == 1 && terms.front().exponent == 1; }
+  std::string_view simpleName() const { return terms.front().name; }
 };
 
 struct NamedNumberFormat {
@@ -144,13 +153,14 @@ public:
   Parser(std::string_view data, const UnitDatabase &unitDb);
 
   std::optional<OpaqueUnit> parseUnit();
+  std::optional<NamedUnit> parseConversionTarget();
 
   bool isTimezoneToken(std::string_view name);
   std::optional<DateTimeLiteral> parseYYYYMMDD();
   std::optional<DateTimeLiteral> parseNaturalDateLiteral();
   std::optional<DateTimeLiteral> parseDate();
   // [<hour>]:[minute]:[second]
-  std::optional<ParsedTime> parseTime();
+  std::optional<ParsedTime> parseTime(bool afterDate = false);
   std::optional<TimezoneLike> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
   std::optional<RelativeDateTimeLiteral> parseRelativeDateTimeLiteral();

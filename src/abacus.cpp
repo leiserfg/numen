@@ -276,8 +276,8 @@ std::string formatDate(const DateTime &dt) {
 
 // money is only ever shown on its minor units, e.g. none for jpy and three for bhd
 std::optional<int> unitDecimals(const detail::Num &v) {
-  if (v.unit && v.unit->def && v.unit->def->dimension == dimensions::CURRENCY) {
-    return currencyDigits(v.unit->def->id);
+  if (v.unit && v.unit->def() && v.unit->def()->dimension == dimensions::CURRENCY) {
+    return currencyDigits(v.unit->def()->id);
   }
   return std::nullopt;
 }
@@ -394,9 +394,7 @@ public:
           // durations does not need a common unit to begin with
           bool durationSum = (be.op == "+" || be.op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
 
-          if (nlhs->unit && nrhs->unit && !durationSum) {
-            lhs = convertToUnit(lhs.asNumber()->n.toDouble(), nlhs->unit->raw, nrhs->unit->raw);
-          }
+          if (!durationSum) { reconcileUnits(lhs, rhs, be.op); }
         }
 
         if (be.op == "+") { return add(lhs, rhs); }
@@ -440,8 +438,9 @@ public:
         }
 
         if (v.isDateTime()) {
-          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-            if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"}, unit->name)) {
+          if (auto unit = std::get_if<NamedUnit>(&conv.target); unit && unit->isSimple()) {
+            if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"},
+                                      unit->simpleName())) {
               auto epoch = v.asDateTime()->time.time_since_epoch();
               auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
               return Computed{Num{.n = Value{static_cast<double>(seconds)},
@@ -452,8 +451,8 @@ public:
         }
 
         if (auto d = v.asDuration()) {
-          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-            return convertToUnit(d->total().count(), "second", unit->name);
+          if (auto unit = std::get_if<NamedUnit>(&conv.target); unit && unit->isSimple()) {
+            return convertToUnit(d->total().count(), "second", unit->simpleName());
           }
         }
 
@@ -481,11 +480,22 @@ public:
 
             if (!n->unit) return Computed{.value = value};
 
-            auto converted = convertToUnit(n->n.toDouble(), n->unit->raw, unit->name);
-            return converted;
+            bool sourceIsSimple = !n->unit->resolved || n->unit->resolved->sole();
+            if (unit->isSimple() && sourceIsSimple) {
+              return convertToUnit(n->n.toDouble(), n->unit->raw, unit->simpleName());
+            }
+
+            return convertToCompound(*n, *unit);
           }
         }
-        throw std::runtime_error("unexpected conversion flow");
+        if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+          throw std::runtime_error(
+              std::format("Cannot convert a {} to {}", v.valueTypeName(), unit->isSimple()
+                                                                              ? std::string{unit->simpleName()}
+                                                                              : buildTarget(*unit).render()));
+        }
+
+        throw std::runtime_error(std::format("Cannot convert a {} to that", v.valueTypeName()));
       } else if constexpr (std::is_same_v<T, NumberString>) {
         return Computed{.value = Num{value}};
       } else if constexpr (std::is_same_v<T, UnitExpression>) {
@@ -494,9 +504,9 @@ public:
 
         // unit only makes sense for a number, ignore it otherwise
         if (auto n = c.asNumber()) {
-          n->unit = Number::Unit{.raw = ue.unit};
+          n->unit = Number::Unit{.raw = std::string{ue.unit}};
           if (auto candidates = m_db.findUnitCandidates(ue.unit); candidates.size() == 1) {
-            n->unit->def = candidates.front();
+            n->unit->resolved = soleUnit(candidates.front(), std::string{ue.unit});
           }
         }
 
@@ -529,12 +539,12 @@ public:
   Computed computeExprBase(const Expression &expr) const {
     auto result = computeExpr(expr);
 
-    if (auto n = result.asNumber(); n && n->unit && n->unit->def &&
-                                    n->unit->def->dimension == dimensions::CURRENCY &&
+    if (auto n = result.asNumber(); n && n->unit && n->unit->def() &&
+                                    n->unit->def()->dimension == dimensions::CURRENCY &&
                                     !n->explicitlyConverted) {
       auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
-      if (target && !equalsIgnoreCase(*target, n->unit->def->id)) {
-        result = convertToUnit(result.asNumber()->n.toDouble(), n->unit->def->id, *target);
+      if (target && !equalsIgnoreCase(*target, n->unit->def()->id)) {
+        result = convertToUnit(result.asNumber()->n.toDouble(), n->unit->def()->id, *target);
       }
     }
 
@@ -549,6 +559,9 @@ private:
   std::optional<Duration> foldToDuration(const Num &n) const {
     if (!n.unit) return std::nullopt;
 
+    // the settled reading beats re-deriving one, which may still be ambiguous
+    if (auto def = n.unit->def()) return durationFrom(n.n.toDouble(), *def);
+
     auto candidates = m_db.findUnitCandidates(n.unit->raw);
     if (candidates.size() != 1) return std::nullopt;
 
@@ -562,43 +575,21 @@ private:
     return std::nullopt;
   }
 
-  Computed convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
+  // the unambiguous side decides the other: in "1m to s" the second operand is
+  // what makes "m" a minute. nullopt when both are ambiguous
+  std::optional<std::pair<UnitDef, UnitDef>> resolvePair(std::string_view fromUnit,
+                                                         std::string_view toUnit) const {
     auto valueCandidates = m_db.findUnitCandidates(fromUnit);
     auto targetCandidates = m_db.findUnitCandidates(toUnit);
 
     if (valueCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", fromUnit)); }
     if (targetCandidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", toUnit)); }
 
-    auto convert = [&](double n, const UnitDef &lhs, const UnitDef &rhs) -> Computed {
-      if (lhs.dimension != rhs.dimension) {
-        throw std::runtime_error(std::format("Incompatible units: {} ({}) to {} ({})", lhs.id, lhs.dimension,
-                                             rhs.id, rhs.dimension));
-      }
-
-      auto res = m_db.convert(n, lhs, rhs);
-
-      if (!res) throw std::runtime_error(res.error());
-
-      return {
-          .value = Num{.n = Value{res.value()},
-                       .unit = Number::Unit{.raw = toUnit, .def = rhs},
-                       .explicitlyConverted = true},
-      };
-    };
-
-    // only one choice on both sides, there is no ambiguity
     if (valueCandidates.size() == 1 && targetCandidates.size() == 1) {
-      auto lhs = valueCandidates.front();
-      auto rhs = targetCandidates.front();
-      return convert(v, lhs, rhs);
+      return std::pair{valueCandidates.front(), targetCandidates.front()};
     }
 
-    // we are unable to infer what unit should be used, we need to
-    // wait for more info...
-    if (valueCandidates.size() > 1 && targetCandidates.size() > 1) {
-      return Computed{
-          .value = Num{.n = Value{v}, .unit = Number::Unit{.raw = toUnit}, .explicitlyConverted = true}};
-    }
+    if (valueCandidates.size() > 1 && targetCandidates.size() > 1) { return std::nullopt; }
 
     if (valueCandidates.size() > targetCandidates.size()) {
       auto rhs = targetCandidates.front();
@@ -607,19 +598,234 @@ private:
       if (lhs == valueCandidates.end()) {
         throw std::runtime_error(std::format("Incompatible units: no common family"));
       }
-      return convert(v, *lhs, rhs);
+      return std::pair{*lhs, rhs};
     }
 
-    if (targetCandidates.size() > valueCandidates.size()) {
-      auto lhs = valueCandidates.front();
-      auto rhs = std::ranges::find_if(targetCandidates,
-                                      [&](const UnitDef &unit) { return unit.dimension == lhs.dimension; });
-      if (rhs == targetCandidates.end()) {
-        throw std::runtime_error(std::format("Incompatible units: no common type"));
-      }
-      return convert(v, lhs, *rhs);
+    auto lhs = valueCandidates.front();
+    auto rhs = std::ranges::find_if(targetCandidates,
+                                    [&](const UnitDef &unit) { return unit.dimension == lhs.dimension; });
+    if (rhs == targetCandidates.end()) {
+      throw std::runtime_error(std::format("Incompatible units: no common type"));
     }
-    throw std::runtime_error("something bad happened");
+    return std::pair{lhs, *rhs};
+  }
+
+  // callers holding both readings must come here: convertToUnit rediscovers them
+  // from the tokens and cannot when both are ambiguous
+  Computed convertResolved(double v, const UnitDef &from, const UnitDef &to, std::string display) const {
+    if (from.dimension != to.dimension) {
+      throw std::runtime_error(std::format("Incompatible units: {} ({}) to {} ({})", from.id, from.dimension,
+                                           to.id, to.dimension));
+    }
+
+    auto res = m_db.convert(v, from, to);
+
+    if (!res) throw std::runtime_error(res.error());
+
+    return {
+        .value = Num{.n = Value{res.value()},
+                     .unit = Number::Unit{.raw = display, .resolved = soleUnit(to, display)},
+                     .explicitlyConverted = true},
+    };
+  }
+
+  CompoundUnit buildTarget(const NamedUnit &named) const {
+    std::vector<UnitTerm> terms;
+
+    for (const auto &named_term : named.terms) {
+      auto candidates = m_db.findUnitCandidates(named_term.name);
+      if (candidates.empty()) {
+        throw std::runtime_error(std::format("Unknown unit \"{}\"", named_term.name));
+      }
+
+      auto def = candidates.front();
+      auto exponent = static_cast<std::int8_t>(named_term.exponent);
+      auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == def.id; });
+
+      if (known == terms.end()) {
+        terms.push_back(
+            UnitTerm{.def = def, .display = std::string{named_term.name}, .exponent = exponent});
+      } else {
+        known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
+      }
+    }
+
+    std::erase_if(terms, [](const UnitTerm &term) { return term.exponent == 0; });
+    return CompoundUnit{std::move(terms)};
+  }
+
+  Computed convertCompound(const Num &n, CompoundUnit target) const {
+    Num source = n;
+    resolveToDefault(source);
+    const auto &from = *source.unit->resolved;
+
+    if (from.dimension() != target.dimension()) {
+      throw std::runtime_error(
+          std::format("Incompatible units: {} to {}", from.render(), target.render()));
+    }
+
+    validateTerms(from.terms);
+    validateTerms(target.terms);
+
+    auto ratio = m_db.conversionRatio(from, target);
+    if (!ratio) throw std::runtime_error(ratio.error());
+
+    auto display = target.render();
+
+    return Computed{.value = Num{.n = Value{n.n.toDouble() * *ratio},
+                                 .unit = Number::Unit{.raw = display, .resolved = std::move(target)},
+                                 .explicitlyConverted = true}};
+  }
+
+  Computed convertToCompound(const Num &n, const NamedUnit &named) const {
+    return convertCompound(n, buildTarget(named));
+  }
+
+  Computed convertToUnit(double v, std::string_view fromUnit, std::string_view toUnit) const {
+    auto pair = resolvePair(fromUnit, toUnit);
+
+    // we are unable to infer what unit should be used, we need to
+    // wait for more info...
+    if (!pair) {
+      return Computed{.value = Num{.n = Value{v},
+                                   .unit = Number::Unit{.raw = std::string{toUnit}},
+                                   .explicitlyConverted = true}};
+    }
+
+    return convertResolved(v, pair->first, pair->second, std::string{toUnit});
+  }
+
+  static bool composes(std::string_view op) { return op == "*" || op == "/"; }
+
+  void resolveToDefault(Num &n) const {
+    if (n.unit->resolved) return;
+
+    auto candidates = m_db.findUnitCandidates(n.unit->raw);
+    if (candidates.empty()) { throw std::runtime_error(std::format("Unknown unit \"{}\"", n.unit->raw)); }
+    n.unit->resolved = soleUnit(candidates.front(), n.unit->raw);
+  }
+
+  static bool isComposed(const Number::Unit &unit) { return unit.resolved && !unit.resolved->sole(); }
+
+  void reconcileCompounds(Computed &lhs, Computed &rhs) const {
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+
+    resolveToDefault(*n1);
+    resolveToDefault(*n2);
+
+    const auto &ca = *n1->unit->resolved;
+    const auto &cb = *n2->unit->resolved;
+
+    bool keepLhs = ca.hasStableFactor() && cb.hasStableFactor() && ca.factor() > cb.factor();
+
+    if (keepLhs) {
+      rhs = convertCompound(*n2, ca);
+    } else {
+      lhs = convertCompound(*n1, cb);
+    }
+  }
+
+  void reconcileUnits(Computed &lhs, Computed &rhs, std::string_view op) const {
+    auto n1 = lhs.asNumber();
+    auto n2 = rhs.asNumber();
+    if (!n1 || !n2) return;
+
+    // each side reads on its own terms: "2 m * 3 s" must not let the second
+    // operand turn the metre into a minute
+    if (composes(op) || op == "^") {
+      if (n1->unit) resolveToDefault(*n1);
+      if (n2->unit) resolveToDefault(*n2);
+    }
+
+    if (!n1->unit || !n2->unit) return;
+
+    UnitDef a, b;
+
+    if (composes(op)) {
+      auto da = n1->unit->def();
+      auto db = n2->unit->def();
+      if (!da || !db || da->dimension != db->dimension) return;
+      a = *da;
+      b = *db;
+    } else {
+      // a composed unit renders its name, so "km/h" is not in the table
+      if (isComposed(*n1->unit) || isComposed(*n2->unit)) {
+        reconcileCompounds(lhs, rhs);
+        return;
+      }
+
+      auto pair = resolvePair(n1->unit->raw, n2->unit->raw);
+      if (!pair) return;
+      a = pair->first;
+      b = pair->second;
+    }
+
+    // larger wins, so "1 km + 100 m" reads as 1.1km. a factor that moves has no
+    // size to rank by, so there the right-hand side decides
+    bool keepLhs = !traitsOf(a.dimension).dynamicFactor && a.factor > b.factor;
+
+    // the kept side holds the settled reading, so "1m + 30s" still knows its
+    // "m" is a minute once the other side is gone
+    if (keepLhs) {
+      n1->unit->resolved = soleUnit(a, n1->unit->raw);
+      rhs = convertResolved(n2->n.toDouble(), b, a, n1->unit->raw);
+    } else {
+      n2->unit->resolved = soleUnit(b, n2->unit->raw);
+      lhs = convertResolved(n1->n.toDouble(), a, b, n2->unit->raw);
+    }
+  }
+
+  static void validateTerms(const std::vector<UnitTerm> &terms) {
+    for (const auto &term : terms) {
+      // 0°C is a point on a scale, not a quantity that can be multiplied out
+      if (term.def.offset != 0 && (terms.size() > 1 || term.exponent != 1)) {
+        throw std::runtime_error(std::format("Cannot build a compound unit out of {}", term.def.id));
+      }
+
+      if (compositionOf(term.def.dimension) != Composition::RateOnly) continue;
+
+      // "usd/kg" and "km/usd" mean something, "usd·kg" and "usd²" do not
+      bool alone = std::ranges::none_of(terms, [&](const UnitTerm &other) {
+        return other.def.id != term.def.id && (other.exponent > 0) == (term.exponent > 0);
+      });
+
+      if (std::abs(term.exponent) != 1 || !alone) {
+        throw std::runtime_error(
+            std::format("{} can only be combined with other units as a rate", term.def.id));
+      }
+    }
+  }
+
+  // nullopt once everything cancels, which is what makes "1 km / 100 m" plain
+  static std::optional<Number::Unit> composeUnits(const Num &n1, const Num &n2, int sign) {
+    std::vector<UnitTerm> terms;
+
+    auto merge = [&](const Number::Unit &unit, int s) {
+      if (!unit.resolved) { throw std::runtime_error(std::format("Unknown unit \"{}\"", unit.raw)); }
+
+      for (const auto &term : unit.resolved->terms) {
+        auto exponent = static_cast<std::int8_t>(term.exponent * s);
+        auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == term.def.id; });
+
+        if (known == terms.end()) {
+          terms.push_back(UnitTerm{.def = term.def, .display = term.display, .exponent = exponent});
+        } else {
+          known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
+        }
+      }
+    };
+
+    if (n1.unit) merge(*n1.unit, 1);
+    if (n2.unit) merge(*n2.unit, sign);
+
+    std::erase_if(terms, [](const UnitTerm &term) { return term.exponent == 0; });
+    if (terms.empty()) return std::nullopt;
+
+    validateTerms(terms);
+
+    CompoundUnit compound{std::move(terms)};
+    return Number::Unit{.raw = compound.render(), .resolved = compound};
   }
 
   template <typename T, typename U = T> static void assertBinary(const Computed &lhs, const Computed &rhs) {
@@ -732,11 +938,7 @@ private:
     auto n1 = lhs.asNumber();
     auto n2 = rhs.asNumber();
 
-    // there is no way to name the square of a unit yet, so refuse rather than
-    // keep one of the two and pretend
-    if (n1->unit && n2->unit) throw std::runtime_error("Cannot multiply two units");
-
-    return output(n1->n * n2->n, *n1, *n2);
+    return output(n1->n * n2->n, *n1, *n2, composeUnits(*n1, *n2, 1));
   }
 
   static Computed div(const Computed &lhs, const Computed &rhs) {
@@ -754,14 +956,7 @@ private:
     auto n1 = lhs.asNumber();
     auto n2 = rhs.asNumber();
 
-    // the operands were brought to a common unit before this, so like over like
-    // cancels and the result is a plain number
-    if (n1->unit && n2->unit) return output(n1->n / n2->n, *n1, *n2, std::nullopt);
-
-    // and the reciprocal of a unit has no name yet
-    if (n2->unit) throw std::runtime_error("Cannot divide by a unit");
-
-    return output(n1->n / n2->n, *n1, *n2);
+    return output(n1->n / n2->n, *n1, *n2, composeUnits(*n1, *n2, -1));
   }
 
   static Computed modulo(const Computed &lhs, const Computed &rhs) {
@@ -775,12 +970,28 @@ private:
     auto n2 = rhs.asNumber();
     auto raised = n1->n.pow(n2->n);
 
-    if (n1->unit) {
-      if (n2->n.isZero()) return output(raised, *n1, *n2, std::nullopt);
-      if (!(n2->n == Value{1})) throw std::runtime_error("Cannot raise a unit to that power");
+    if (!n1->unit || n2->n == Value{1}) return output(raised, *n1, *n2);
+    if (n2->n.isZero()) return output(raised, *n1, *n2, std::nullopt);
+
+    auto exponent = n2->n.toDouble();
+    // a fractional power would need a root of the dimension, and exponents are
+    // stored in a byte
+    if (exponent != std::trunc(exponent) || std::abs(exponent) > 9) {
+      throw std::runtime_error("Cannot raise a unit to that power");
     }
 
-    return output(raised, *n1, *n2);
+    if (!n1->unit->resolved) { throw std::runtime_error(std::format("Unknown unit \"{}\"", n1->unit->raw)); }
+
+    auto terms = n1->unit->resolved->terms;
+
+    for (auto &term : terms) {
+      term.exponent = static_cast<std::int8_t>(term.exponent * static_cast<int>(exponent));
+    }
+
+    validateTerms(terms);
+
+    CompoundUnit compound{std::move(terms)};
+    return output(raised, *n1, *n2, Number::Unit{.raw = compound.render(), .resolved = compound});
   }
 
   static Computed leftshift(const Computed &lhs, const Computed &rhs) {
@@ -817,11 +1028,63 @@ private:
     return Computed{.value = result};
   }
 
+  // arguments are computed independently, so without this "min(1 km, 999 m)"
+  // compares the bare numbers and answers 1 km
+  void reconcileArguments(std::vector<Computed> &args) const {
+    if (args.size() < 2) return;
+
+    for (auto &arg : args) {
+      auto n = arg.asNumber();
+      // a plain number among them, as in "max(1 km to m, 100)"
+      if (!n || !n->unit) return;
+      resolveToDefault(*n);
+    }
+
+    const CompoundUnit *target = &*args.front().asNumber()->unit->resolved;
+
+    bool rankable = true;
+
+    for (auto &arg : args) {
+      const auto &unit = *arg.asNumber()->unit->resolved;
+
+      if (unit.dimension() != target->dimension()) {
+        throw std::runtime_error(
+            std::format("Incompatible units: {} to {}", unit.render(), target->render()));
+      }
+
+      rankable = rankable && unit.hasStableFactor();
+    }
+
+    if (rankable) {
+      for (auto &arg : args) {
+        const auto &unit = *arg.asNumber()->unit->resolved;
+        if (unit.factor() > target->factor()) target = &unit;
+      }
+    }
+
+    auto chosen = *target;
+
+    for (auto &arg : args) {
+      auto n = arg.asNumber();
+      auto from = n->unit->resolved->sole();
+      auto to = chosen.sole();
+
+      // only the plain path knows about offsets, which affine units need
+      if (from && to) {
+        arg = convertResolved(n->n.toDouble(), *from, *to, chosen.render());
+      } else {
+        arg = convertCompound(*n, chosen);
+      }
+    }
+  }
+
   Computed executeFunction(const FunctionCall &fn) const {
     FunctionDatabase db;
 
     auto computedArgs = fn.args | std::views::transform([&](auto &&expr) { return computeExpr(*expr); }) |
                         std::ranges::to<std::vector>();
+
+    reconcileArguments(computedArgs);
 
     if (auto handler = db.findFunction(fn.name)) {
       FunctionCtx ctx{computedArgs};
@@ -869,7 +1132,11 @@ std::expected<std::string, std::string> Abacus::evaluate(const std::string_view 
     auto result = i.computeExprBase(*ast.root);
 
     const auto formatNumber = [](const Num &v) -> std::string {
-      auto unitName = v.unit.transform([&](const Number::Unit &u) { return u.raw; }).value_or("");
+      auto unitName = v.unit
+                          .transform([&](const Number::Unit &u) {
+                            return u.resolved ? u.resolved->render() : u.raw;
+                          })
+                          .value_or("");
       return std::format("{}{}", v.n.render(v.format, unitDecimals(v)), unitName);
     };
 
@@ -918,7 +1185,12 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
             if constexpr (std::is_same_v<T, TimezoneLike>) {
               return std::visit([](const auto &tz) { return std::format("Timezone({})", tz.name); }, value);
             } else if constexpr (std::is_same_v<T, NamedUnit>) {
-              return std::format("Unit({})", value.name);
+              std::string name;
+              for (const auto &term : value.terms) {
+                if (!name.empty()) name += term.exponent < 0 ? "/" : "*";
+                name += term.name;
+              }
+              return std::format("Unit({})", name);
             } else {
               static_assert(std::is_same_v<T, NamedNumberFormat>);
               return std::format("NumericFormat({})", value.name);

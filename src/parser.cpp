@@ -22,8 +22,11 @@ struct OperatorDefinition {
 
 constexpr int EXPONENT_PRECEDENCE = 5;
 
+// must stay function-local: at namespace scope a consumer evaluating during its
+// own static initialisation finds this empty and every operator unrecognised
+const auto &operators() {
 // clang-format off
-const auto OPERATORS = std::to_array<OperatorDefinition>({
+  static const auto OPERATORS = std::to_array<OperatorDefinition>({
      OperatorDefinition{.id = "==", .aliases = {"=="}, .precedence = 1},
      OperatorDefinition{.id = "!=", .aliases = {"!="}, .precedence = 1},
      OperatorDefinition{.id = ">", .aliases = {">"}, .precedence = 1},
@@ -43,8 +46,11 @@ const auto OPERATORS = std::to_array<OperatorDefinition>({
      OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 4},
      OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = EXPONENT_PRECEDENCE,
                         .rightAssociative = true}
-});
+  });
 // clang-format on
+
+  return OPERATORS;
+}
 
 struct ConstantDef {
   std::string_view name;
@@ -63,7 +69,7 @@ constexpr auto CONSTANTS = std::to_array<ConstantDef>({
 namespace {
 
 bool isOperatorToken(std::string_view tok) {
-  return std::ranges::any_of(OPERATORS, [&](auto &&op) { return std::ranges::contains(op.aliases, tok); });
+  return std::ranges::any_of(operators(), [&](auto &&op) { return std::ranges::contains(op.aliases, tok); });
 }
 
 std::optional<double> parseConstant(std::string_view tok) {
@@ -134,6 +140,30 @@ std::optional<OpaqueUnit> Parser::parseUnit() {
     if (!m_unitDb.findUnitCandidates(tok->raw).empty()) { return tok->raw; }
   }
   return std::nullopt;
+}
+
+// only a real unit token may follow the slash, so "1 km to m / 2" still divides
+// the result rather than naming metres per two
+std::optional<NamedUnit> Parser::parseConversionTarget() {
+  auto head = m_lexer.peak();
+  if (!head || head->type != Lexer::TokenType::String) return std::nullopt;
+
+  m_lexer.next();
+  NamedUnit target{.terms = {NamedUnitTerm{.name = head->raw}}};
+
+  while (auto op = m_lexer.peak()) {
+    if (op->raw != "/" && op->raw != "*") break;
+
+    auto next = m_lexer.peak(1);
+    if (!next || next->type != Lexer::TokenType::String) break;
+    if (m_unitDb.findUnitCandidates(next->raw).empty()) break;
+
+    m_lexer.next();
+    m_lexer.next();
+    target.terms.push_back(NamedUnitTerm{.name = next->raw, .exponent = op->raw == "/" ? -1 : 1});
+  }
+
+  return target;
 }
 
 // Jan 18 2021
@@ -300,12 +330,12 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
 
 std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto d = parseYYYYMMDD()) {
-    d->time = parseTime();
+    d->time = parseTime(true);
     return d;
   }
 
   if (auto d = parseNaturalDateLiteral()) {
-    d->time = parseTime();
+    d->time = parseTime(true);
     return d;
   }
 
@@ -331,7 +361,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
           m_lexer.next();
         }
 
-        d.time = parseTime();
+        d.time = parseTime(true);
         return d;
       }
     }
@@ -342,18 +372,34 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
   return std::nullopt;
 }
 
-std::optional<ParsedTime> Parser::parseTime() {
-  std::chrono::hours hrs;
+std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
+  std::chrono::hours hrs{};
 
-  if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    auto value = clockComponent(toNumber(tok->raw), 23);
+  auto head = m_lexer.peakIf(Lexer::TokenType::Number);
+
+  if (head) {
+    auto value = clockComponent(toNumber(head->raw), 23);
     if (!value) return std::nullopt;
     hrs = std::chrono::hours{*value};
   }
 
   using IV = std::initializer_list<std::string_view>;
 
-  if (auto tok = m_lexer.peak(1); !tok || !std::ranges::contains(IV{":", "h"}, tok->raw)) return std::nullopt;
+  auto sep = m_lexer.peak(1);
+  if (!sep || !std::ranges::contains(IV{":", "h"}, sep->raw)) return std::nullopt;
+
+  // "h" also names the hour unit, so it only separates a clock when glued
+  if (sep->raw == "h") {
+    if (!head || !head->isAdjacent(*sep)) return std::nullopt;
+
+    // on its own "12h" is twelve hours far more often than noon, so it needs
+    // its minutes. after a date there is nothing else it could mean
+    if (!afterDate) {
+      auto mins = m_lexer.peak(2);
+      if (!mins || mins->type != Lexer::TokenType::Number || !sep->isAdjacent(*mins)) return std::nullopt;
+    }
+  }
+
   m_lexer.next();
 
   ParsedTime time;
@@ -619,9 +665,15 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         continue;
       }
 
-      if (auto tz = parseTimezone()) {
-        left = std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = tz.value()});
-        continue;
+      // the timezone table matches the last part of a zone name, so "gb" and
+      // "acre" shadow the units. after a conversion operator the unit is meant
+      if (parseUnit().transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
+              .value_or(true)) {
+        if (auto tz = parseTimezone()) {
+          left =
+              std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = tz.value()});
+          continue;
+        }
       }
 
       if (auto fmt = parseNumberFormat()) {
@@ -630,15 +682,12 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         continue;
       }
 
-      auto unit = m_lexer.peak();
+      auto unit = parseConversionTarget();
 
-      if (!unit || unit->type != Lexer::TokenType::String)
-        throw std::runtime_error("expected unit after conversion operator");
-
-      m_lexer.next();
+      if (!unit) throw std::runtime_error("expected unit after conversion operator");
 
       left = std::make_unique<Expression>(
-          ConversionExpression{.b = std::move(left), .target = NamedUnit{unit->raw}});
+          ConversionExpression{.b = std::move(left), .target = std::move(*unit)});
 
       continue;
     }
@@ -662,9 +711,9 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
     }
 
     auto it = std::ranges::find_if(
-        OPERATORS, [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
+        operators(), [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
 
-    if (it != OPERATORS.end()) {
+    if (it != operators().end()) {
       if (it->precedence < minPrec) break;
       m_lexer.next();
       auto right = pratParse(it->rightAssociative ? it->precedence : it->precedence + 1);

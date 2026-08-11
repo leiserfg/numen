@@ -61,3 +61,36 @@ yesterday                    => 2026-01-17 00:00:00 (Etc/UTC)
 tomorrow                     => 2026-01-19 00:00:00 (Etc/UTC)
 tomorrow - yesterday to days => 2days
 150 years ago                => 1876-01-18 00:00:00 (Etc/UTC)
+
+# "h" names the hour unit as well as separating a clock time. on its own it
+# only reads as a clock when glued to its minutes, so "12h" is twelve hours.
+# this used to split at 24 instead: "23 h" was 11pm and "24 h" a day
+14h30                        => 2026-01-18 14:30:00 (Etc/UTC)
+12h40                        => 2026-01-18 12:40:00 (Etc/UTC)
+0h05                         => 2026-01-18 00:05:00 (Etc/UTC)
+
+12h                          => 12 hr
+14h                          => 14 hr
+2h                           => 2 hr
+23h                          => 23 hr
+24h                          => 1 day
+25h                          => 1 day 1 hr
+99h                          => 4 days 3 hr
+
+2 h                          => 2 hr
+23 h                         => 23 hr
+24 h                         => 1 day
+2 h + 30 min                 => 2 hr 30 min
+12h + 30 min                 => 12 hr 30 min
+14h to min                   => 840min
+1 h * 3                      => 3 hr
+
+# after a date there is nothing else it could be, so the minutes are optional
+18 Jan 2026 12h              => 2026-01-18 12:00:00 (Etc/UTC)
+18 Jan 2026 12h40            => 2026-01-18 12:40:00 (Etc/UTC)
+
+# the colon form is unambiguous and needs none of this
+12:40                        => 2026-01-18 12:40:00 (Etc/UTC)
+
+# a datetime only converts to a timezone, a format, or the epoch
+now to km                    => !error Cannot convert a DateTime to km

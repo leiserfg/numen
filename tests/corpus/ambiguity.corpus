@@ -25,7 +25,7 @@ Jan 2021                    => 2021-01-01 00:00:00 (Etc/UTC)
 
 # 'pounds' is mass or gbp depending on the conversion target
 100 pounds to kg            => 45.359237kg
-1 pounds to usd             => !error No conversion rate available between gbp and usd.
+1 pounds to usd             => !error No conversion rate available for gbp.
 
 # exact alias wins before prefix decomposition: min is never milli-inch,
 # mi is mile (not mebi), mb stays megabyte (not millibit)
@@ -57,3 +57,30 @@ pi2                         => 6.283185
 e2                          => 5.436564
 1e-3                        => 0.001
 1e - 3                      => -0.281718
+
+# only two names in the table match more than one unit: 'm' is a meter or a
+# minute, 'pound' is a mass or gbp. everything else that looks ambiguous is
+# settled by exact aliases winning over prefix decomposition.
+
+# an operator whose operands must share a dimension resolves the token by
+# matching its sibling
+1m + 30s                    => 1 min 30 sec
+1m to s                     => 60s
+1m to in                    => 39.370079in
+100 pounds to kg            => 45.359237kg
+
+# multiplication and division compose rather than convert, so a sibling cannot
+# settle anything and the token falls back to its first reading in the table
+1m / 1s                     => 1m/s
+60m / 1s                    => 60m/s
+1m * 2                      => 2m
+1m * 1s                     => 1m·s
+
+# the same ambiguous token on both sides has no sibling to settle it and no
+# conversion to perform, which used to lose the reading entirely
+1m * 1m                     => 1m²
+1m / 1m                     => 1
+
+# addition has nothing to resolve against either, so the token stays a bare
+# label the way it does on its own
+1m + 1m                     => 2m

@@ -46,3 +46,5 @@ heaptrack*
 /Testing
 
 /tests/fuzz-corpus/
+
+/docs

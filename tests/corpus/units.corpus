@@ -65,18 +65,103 @@ max(1 km to m, 100)         => 1000m
 1 km / 2                    => 0.5km
 1 km * 2                    => 2km
 2 * 1 km                    => 2km
-1 km + 100 m                => 1100m
 
-# but there is no way to name a squared or reciprocal unit yet, so those are
-# refused rather than labelled with one of the operands
-1 km * 1 km                 => !error Cannot multiply two units
-1 usd * 1 usd               => !error Cannot multiply two units
-1 km * 100 m                => !error Cannot multiply two units
-2 / 1 km                    => !error Cannot divide by a unit
-1 / 1 s                     => !error Cannot divide by a unit
+# when two operands share a dimension the larger unit wins, so the result reads
+# the way the bigger of the two was typed, whichever side it was on
+1 km + 100 m                => 1.1km
+100 m + 1 km                => 1.1km
+1 kg + 500 g                => 1.5kg
+500 g + 1 kg                => 1.5kg
 
-# raising to anything but 0 or 1 has the same problem
-2 m ^ 2                     => !error Cannot raise a unit to that power
-2 m ^ 0.5                   => !error Cannot raise a unit to that power
+# multiplying or dividing composes a new unit
+1 km * 1 km                 => 1km²
+1 km * 100 m                => 0.1km²
+100 m * 1 km                => 0.1km²
+100 km / 2 hr               => 50km/hr
+2 / 1 km                    => 2/km
+1 / 1 s                     => 1/s
+10 m * 2 s                  => 20m·s
+100 usd / 4 hr              => 25usd/hr
+
+# exponents add, so a unit over itself cancels back to a plain number
+1 km * 1 km / 1 km          => 1km
+100 km / 2 hr * 2 hr        => 100km
+
+# powers multiply the exponents
+2 m ^ 2                     => 4m²
+2 m ^ 3                     => 8m³
 2 m ^ 1                     => 2m
 2 m ^ 0                     => 1
+
+# a fractional power would need a root of the dimension, which has no meaning
+2 m ^ 0.5                   => !error Cannot raise a unit to that power
+
+# a conversion target may be composed too, and agrees with the named unit
+100 mph to km/hr            => 160.9344km/hr
+100 km / 2 hr to mph        => 31.06856mph
+50 m / 1 s to km/hr         => 180km/hr
+1 km/hr to m/s              => 0.277778m/s
+1 km * 1 km to sqkm         => 1sqkm
+1 sqkm to km*km             => 1km²
+1 acre to m*m               => 4046.856422m²
+
+# only a real unit may follow the operator, so these still apply to the result
+1 km to m / 2               => 500m
+1 km to m * 2               => 2000m
+
+# the dimensions still have to match
+1 km to km/hr               => !error Incompatible units: km to km/hr
+
+# a rate is just another factor, but the same currency on both sides cancels
+# before any rate is needed. these run without a provider, hence the error
+100 usd / 2 hr to usd/hr    => 50usd/hr
+100 usd / 2 hr to eur/hr    => !error No conversion rate available for eur.
+
+# money divides into other things to give a rate, and that is all it does
+100 usd / 2 hr              => 50usd/hr
+2 / 1 usd                   => 2/usd
+100 usd / 2 usd             => 50
+50 usd / 1 hr * 8 hr        => 400usd
+
+1 usd * 1 usd               => !error usd can only be combined with other units as a rate
+2 usd ^ 2                   => !error usd can only be combined with other units as a rate
+1 usd * 2 kg                => !error usd can only be combined with other units as a rate
+
+# an affine unit is a point on a scale, so it has no square or reciprocal
+20 c * 3 m                  => !error Cannot build a compound unit out of celsius
+2 c ^ 2                     => !error Cannot build a compound unit out of celsius
+1 / 1 c                     => !error Cannot build a compound unit out of celsius
+
+# a composed unit renders its name rather than carrying one the table knows, so
+# adding two of them must not go looking for "km/h" in the unit list
+150km/h + 100km/h           => 250km/h
+150km/h - 50km/h            => 100km/h
+150km/h > 100km/h           => true
+1 m*m + 1 m*m               => 2m²
+1 usd/hr + 1 usd/hr         => 2usd/hr
+
+# the larger unit still wins, and the dimensions still have to match
+150km/h + 10m/s             => 51.666667m/s
+10m/s + 150km/h             => 51.666667m/s
+1 km/h + 1 kg               => !error Incompatible units: km/h to kg
+
+# the timezone table matches on the last part of a zone name, so "gb" (Great
+# Britain) and "acre" (Brazil/Acre) used to be eaten before the unit was tried
+1 tb to gb                  => 1000gb
+500 mb to gb                => 0.5gb
+1 sqm to acre               => 0.000247acre
+1 ha to acre                => 2.471054acre
+1 acre to sqm to acre       => 1acre
+
+# function arguments are computed independently, so min/max used to compare the
+# bare numbers and answer that 1 km was smaller than 999 m
+min(1 km, 999 m)            => 0.999km
+max(1 km, 999 m)            => 1km
+min(1 hr, 30 min)           => 0.5hr
+max(2 kg, 500 g)            => 2kg
+min(5 m/s, 10 km/h)         => 2.777778m/s
+min(20 c, 50 f)             => 10c
+min(1 km, 1 hr)             => !error Incompatible units: hr to km
+
+# a plain number among the arguments means they are not all comparable
+max(1 km to m, 100)         => 1000m
