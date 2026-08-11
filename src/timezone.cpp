@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <iostream>
 #include <ranges>
 #include <string_view>
 
@@ -48,6 +49,13 @@ constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
     {.name = "Russia", .target = "Europe/Moscow"},
     {.name = "Beijing", .target = "Asia/Shanghai"},
     {.name = "China", .target = "Asia/Shanghai"},
+
+    {.name = "PST", .target = "America/Los_Angeles"},
+    {.name = "PDT", .target = "America/Los_Angeles"},
+    {.name = "EST", .target = "America/New_York"},
+    {.name = "EDT", .target = "America/New_York"},
+    {.name = "CST", .target = "America/Chicago"},
+    {.name = "CDT", .target = "America/Chicago"},
 });
 // clang-format on
 

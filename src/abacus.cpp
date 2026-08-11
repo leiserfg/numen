@@ -8,7 +8,6 @@
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
-#include <bits/chrono.h>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -229,8 +228,7 @@ TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time
 DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now) {
   auto tz = d.timezone
                 .and_then([](auto &&t) -> std::optional<const std::chrono::time_zone *> {
-                  if (auto n = std::get_if<NamedTimezone>(&t)) { return TimezoneDB{}.query(n->name); }
-                  return std::nullopt;
+                  return TimezoneDB{}.query(t.name);
                 })
                 .value_or(&userTz);
 
@@ -261,15 +259,22 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
 
   auto instant = std::visit(visitor, d.value);
 
-  return DateTime{.time = instant, .tz = tz};
+  return DateTime{
+      .time = instant, .tz = tz, .offset = d.timezone ? d.timezone->offset : std::chrono::seconds{}};
 }
 
 std::string formatDate(const DateTime &dt) {
   if (!dt.tz) { return std::format("{:%Y-%m-%d %H:%M:%S} (UTC)", dt.time); }
 
+  const auto instant = dt.time + dt.offset;
   const auto userTz = std::chrono::current_zone();
-  const auto zt = userTz == dt.tz ? std::chrono::zoned_time{dt.tz, userTz->to_local(dt.time)}
-                                  : std::chrono::zoned_time{dt.tz, dt.time};
+  const auto zt = userTz == dt.tz ? std::chrono::zoned_time{dt.tz, userTz->to_local(instant)}
+                                  : std::chrono::zoned_time{dt.tz, instant};
+
+  if (dt.offset.count() != 0) {
+    auto hours = std::chrono::floor<std::chrono::hours>(dt.offset);
+    return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+})", zt, dt.tz->name(), hours.count());
+  }
 
   return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, dt.tz->name());
 }
@@ -336,13 +341,6 @@ public:
 
       return Computed{.value = *max};
     });
-
-    /*
-registerFunction("sin", [&](FunctionCtx ctx) {
-  auto [lhs] = ctx.unpack<double>();
-  return Computed{.value = std::sin(lhs)};
-});
-    */
   }
 
   void registerFunction(std::string_view name, FunctionHandler handler) {
@@ -420,19 +418,15 @@ public:
         const auto &conv = value;
         auto v = computeExpr(*conv.b);
 
-        if (auto tzl = std::get_if<TimezoneLike>(&conv.target)) {
+        if (auto tzl = std::get_if<TimezoneOffset>(&conv.target)) {
           if (!v.isDateTime())
             throw std::runtime_error("Only datetime expressions can be "
                                      "converted to another timezone");
 
           auto d = *v.asDateTime();
 
-          if (auto ntz = std::get_if<NamedTimezone>(tzl)) {
-            d.tz = TimezoneDB{}.query(ntz->name);
-          } else if (auto otz = std::get_if<TimezoneOffset>(tzl)) {
-            // d.tz = std::chrono::locate_zone(otz->name);
-            d.offset = otz->offset;
-          }
+          d.tz = TimezoneDB{}.query(tzl->name);
+          d.offset = tzl->offset;
 
           return Computed{d};
         }
@@ -647,8 +641,7 @@ private:
       // the named term may itself be a composition, as in "to kmh"
       for (const auto &part : candidates.front().terms) {
         auto exponent = static_cast<std::int8_t>(part.exponent * named_term.exponent);
-        auto known =
-            std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == part.def.id; });
+        auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == part.def.id; });
 
         if (known == terms.end()) {
           terms.push_back(UnitTerm{.def = part.def, .display = part.display, .exponent = exponent});
@@ -1197,8 +1190,8 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
         } else if constexpr (std::is_same_v<T, ConversionExpression>) {
           auto visitor = [](const auto &value) -> std::string {
             using T = std::remove_cvref_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, TimezoneLike>) {
-              return std::visit([](const auto &tz) { return std::format("Timezone({})", tz.name); }, value);
+            if constexpr (std::is_same_v<T, TimezoneOffset>) {
+              return std::format("Timezone({})", value.name);
             } else if constexpr (std::is_same_v<T, NamedUnit>) {
               std::string name;
               for (const auto &term : value.terms) {
@@ -1234,19 +1227,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
                << "\n";
           }
 
-          if (value.timezone) {
-            auto v = [](const auto &tz) -> std::string {
-              using T = std::remove_cvref_t<decltype(tz)>;
-              if constexpr (std::is_same_v<T, TimezoneOffset>) {
-                return std::format("Timezone({}+{})", tz.name, tz.offset.count());
-              } else {
-                static_assert(std::is_same_v<T, NamedTimezone>);
-                return std::format("Timezone({})", tz.name);
-              }
-            };
-
-            os << ident() << "\ttimezone " << std::visit(v, *value.timezone) << "\n";
-          }
+          if (value.timezone) { os << ident() << "\ttimezone " << value.timezone->name << "\n"; }
 
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, NumberString>) {

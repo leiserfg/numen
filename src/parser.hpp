@@ -39,16 +39,10 @@ struct BinaryExpression {
 // while "1m to in" should be "1 meter to inches"
 using OpaqueUnit = std::string_view;
 
-struct NamedTimezone {
-  std::string_view name;
-};
-
 struct TimezoneOffset {
   std::string_view name;
   std::chrono::seconds offset = std::chrono::seconds(0);
 };
-
-using TimezoneLike = std::variant<NamedTimezone, TimezoneOffset>;
 
 struct NamedUnitTerm {
   std::string_view name;
@@ -67,7 +61,7 @@ struct NamedNumberFormat {
   std::string_view name;
 };
 
-using ConversionTarget = std::variant<NamedUnit, TimezoneLike, NamedNumberFormat>;
+using ConversionTarget = std::variant<NamedUnit, TimezoneOffset, NamedNumberFormat>;
 
 struct ConversionExpression {
   std::unique_ptr<Expression> b;
@@ -108,7 +102,7 @@ struct RelativeDateTimeLiteral {
 
 struct DateString {
   std::variant<DateTimeLiteral, RelativeDateTimeLiteral, std::string_view> value;
-  std::optional<TimezoneLike> timezone;
+  std::optional<TimezoneOffset> timezone;
 };
 
 struct UnaryExpression {
@@ -161,7 +155,7 @@ public:
   std::optional<DateTimeLiteral> parseDate();
   // [<hour>]:[minute]:[second]
   std::optional<ParsedTime> parseTime(bool afterDate = false);
-  std::optional<TimezoneLike> parseTimezone();
+  std::optional<TimezoneOffset> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
   std::optional<RelativeDateTimeLiteral> parseRelativeDateTimeLiteral();
 

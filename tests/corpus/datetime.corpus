@@ -43,12 +43,21 @@ January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 # timezones
 2001/01/18 New York         => 2001-01-18 00:00:00 (America/New_York)
 
+now to utc					=> 2026-01-18 00:00:00 (Etc/UTC)
+now to gmt					=> 2026-01-18 00:00:00 (Etc/GMT)
+now to utc+9                => 2026-01-18 09:00:00 (Etc/UTC+9)
+now to utc+2                => 2026-01-18 02:00:00 (Etc/UTC+2)
+now to utc+2                => 2026-01-18 02:00:00 (Etc/UTC+2)
+now to utc-3                => 2026-01-17 21:00:00 (Etc/UTC-3)
+
 31 Jan 2026 + 1 month       => 2026-02-28 00:00:00 (Etc/UTC)
 
 # conversions
-18 Jan 2001 to unix         => 979776000second
-18 Jan 2001 to unix to ms   => 979776000000ms
-18 Jan 2001 to epoch        => 979776000second
+18 Jan 2001 to unix           => 979776000second
+18 Jan 2001 to unix timestamp => 979776000second
+18 Jan 2001 to unix ts to ms  => 979776000000ms
+18 Jan 2001 to unix to ms     => 979776000000ms
+18 Jan 2001 to epoch          => 979776000second
 
 # relative
 now                          => 2026-01-18 00:00:00 (Etc/UTC)

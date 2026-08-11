@@ -428,22 +428,30 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   return time;
 }
 
-std::optional<TimezoneLike> Parser::parseTimezone() {
+std::optional<TimezoneOffset> Parser::parseTimezone() {
   if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
-    auto isRelativeOffsetTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
-                                                  [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
+    auto isOffsettableTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
+                                               [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
+    constexpr auto isValidOffset = [](auto offset) { return offset >= 0 && offset <= 23; };
 
-    if (isRelativeOffsetTz) {
-      TimezoneOffset tz;
-      tz.name = str->raw;
+    if (isOffsettableTz) {
+      TimezoneOffset tz{.name = str->raw};
+
       m_lexer.next();
+
       if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
         if (str->raw == "+" || str->raw == "-") {
+          int sign = str->raw == "+" ? 1 : -1;
           m_lexer.next();
-          if (auto time = parseTime()) {
-            if (auto h = time->hours) { tz.offset += std::chrono::hours(*h); }
-            if (auto m = time->minutes) tz.offset += std::chrono::minutes(*m);
-            if (auto s = time->seconds) tz.offset += std::chrono::seconds(*s);
+
+          // we only support hour offsets, such as UTC+1 or UTC-1
+          // In rare scenarios, people write UTC+1:30 but this is really uncommon so
+          // we don't support it.
+
+          if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && isValidOffset(n->n)) {
+            tz.offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
+            m_lexer.next();
+            return tz;
           }
         }
       }
@@ -453,7 +461,7 @@ std::optional<TimezoneLike> Parser::parseTimezone() {
   }
 
   return greedyParse(3, [&](std::string_view word) { return isTimezoneToken(word); })
-      .transform([](auto &&str) { return NamedTimezone(str); });
+      .transform([](auto &&str) { return TimezoneOffset(str); });
 }
 
 std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
