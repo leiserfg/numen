@@ -22,10 +22,8 @@ struct OperatorDefinition {
 
 constexpr int EXPONENT_PRECEDENCE = 5;
 
-// must stay function-local: at namespace scope a consumer evaluating during its
-// own static initialisation finds this empty and every operator unrecognised
 const auto &operators() {
-// clang-format off
+  // clang-format off
   static const auto OPERATORS = std::to_array<OperatorDefinition>({
      OperatorDefinition{.id = "==", .aliases = {"=="}, .precedence = 1},
      OperatorDefinition{.id = "!=", .aliases = {"!="}, .precedence = 1},
@@ -47,7 +45,7 @@ const auto &operators() {
      OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = EXPONENT_PRECEDENCE,
                         .rightAssociative = true}
   });
-// clang-format on
+  // clang-format on
 
   return OPERATORS;
 }
@@ -486,7 +484,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         return makeBinExpr(std::move(lhs), parseMul(), "*");
       }
 
-      return lhs;
+      return std::move(lhs);
     }
 
     if (auto date = parseDate()) {
@@ -667,7 +665,8 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
       // the timezone table matches the last part of a zone name, so "gb" and
       // "acre" shadow the units. after a conversion operator the unit is meant
-      if (parseUnit().transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
+      if (parseUnit()
+              .transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
               .value_or(true)) {
         if (auto tz = parseTimezone()) {
           left =
@@ -710,8 +709,9 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       continue;
     }
 
-    auto it = std::ranges::find_if(
-        operators(), [&](const OperatorDefinition &op) { return std::ranges::contains(op.aliases, tok->raw); });
+    auto it = std::ranges::find_if(operators(), [&](const OperatorDefinition &op) {
+      return std::ranges::contains(op.aliases, tok->raw);
+    });
 
     if (it != operators().end()) {
       if (it->precedence < minPrec) break;
@@ -721,8 +721,8 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
     } else {
       if (!(3 < minPrec)) {
         if (auto constant = parseConstant(tok->raw)) {
-          m_lexer.next();
-          left = makeBinExpr(std::move(left), makeNumberExpr(abacus::Value{*constant}), std::string{"*"});
+          auto rhs = parseTerm();
+          left = makeBinExpr(std::move(left), std::move(rhs), std::string{"*"});
           continue;
         } else if (tok->raw == "(") {
           left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});

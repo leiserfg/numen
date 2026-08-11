@@ -17,6 +17,10 @@ km to in                    => 39370.07874in
 1 tonne to kg               => 1000kg
 1 pound to kg               => 0.453592kg
 
+# multiplied constants usage with units
+1pi km                      => 3.141593km
+pi1 km                      => 3.141593km
+
 # duration
 1m to s                     => 60s
 2 weeks to days             => 14days
