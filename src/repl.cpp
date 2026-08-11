@@ -1,4 +1,5 @@
 #include "abacus/abacus.hpp"
+#include "rang/rang.hpp"
 #include <iostream>
 #include <string>
 #ifdef BUILD_CURRENCY_PROVIDER
@@ -22,7 +23,7 @@ void process(abacus::Abacus &calc, const std::string &s) {
     if (!res) {
       std::cout << "Error: " << res.error() << "\n";
     } else {
-      std::cout << res.value() << "\n";
+      std::cout << line << " = " << rang::fg::green << res.value() << rang::fg::reset << "\n";
     }
   }
 }

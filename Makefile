@@ -3,7 +3,7 @@ all:
 	cmake --build --preset default
 
 test: all
-	ctest --preset default
+	./build/abacus-tests
 
 debug:
 	cmake --preset debug

@@ -89,6 +89,10 @@ endif()
 if (BUILD_REPL)
 	set(REPL_TARGET repl)
 	add_executable(${REPL_TARGET} src/repl.cpp)
+	target_include_directories(${REPL_TARGET} PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/include
+		${VENDOR_DIR}
+	)
 	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME})
 	target_include_directories(${REPL_TARGET} PRIVATE ./include)
 endif()
