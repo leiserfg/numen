@@ -300,7 +300,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
         m_lexer.advance(duration->tokenCount + 1);
         return RelativeDateTimeLiteral{
-            .anchor = duration->data,
+            .delta = duration->data,
             .direction = RelativeDateTimeLiteral::Direction::Past,
         };
       }
@@ -310,7 +310,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto tok = m_lexer.peak(); tok && tok->raw == "yesterday") {
     m_lexer.next();
     return RelativeDateTimeLiteral{
-        .anchor = Duration{.seconds = std::chrono::days{1}},
+        .delta = Duration{.seconds = std::chrono::days{1}},
         .direction = RelativeDateTimeLiteral::Direction::Past,
     };
   }
@@ -318,7 +318,7 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto tok = m_lexer.peak(); tok && tok->raw == "tomorrow") {
     m_lexer.next();
     return RelativeDateTimeLiteral{
-        .anchor = Duration{.seconds = std::chrono::days{1}},
+        .delta = Duration{.seconds = std::chrono::days{1}},
         .direction = RelativeDateTimeLiteral::Direction::Future,
     };
   }
@@ -682,15 +682,15 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
               .transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
               .value_or(true)) {
         if (auto tz = parseTimezone()) {
-          left =
-              std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = tz.value()});
+          left = std::make_unique<Expression>(
+              ConversionExpression{.lhs = std::move(left), .target = tz.value()});
           continue;
         }
       }
 
       if (auto fmt = parseNumberFormat()) {
         left =
-            std::make_unique<Expression>(ConversionExpression{.b = std::move(left), .target = fmt.value()});
+            std::make_unique<Expression>(ConversionExpression{.lhs = std::move(left), .target = fmt.value()});
         continue;
       }
 
@@ -699,7 +699,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       if (!unit) throw std::runtime_error("expected unit after conversion operator");
 
       left = std::make_unique<Expression>(
-          ConversionExpression{.b = std::move(left), .target = std::move(*unit)});
+          ConversionExpression{.lhs = std::move(left), .target = std::move(*unit)});
 
       continue;
     }

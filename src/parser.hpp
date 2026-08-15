@@ -1,6 +1,7 @@
 #pragma once
 #include "abacus/unit.hpp"
 #include "abacus/abacus.hpp"
+#include "concepts.hpp"
 #include "lexer.hpp"
 #include <bits/chrono.h>
 #include <cassert>
@@ -10,6 +11,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <variant>
 
 using namespace abacus;
 
@@ -64,7 +67,7 @@ struct NamedNumberFormat {
 using ConversionTarget = std::variant<NamedUnit, TimezoneOffset, NamedNumberFormat>;
 
 struct ConversionExpression {
-  std::unique_ptr<Expression> b;
+  std::unique_ptr<Expression> lhs;
   ConversionTarget target;
 };
 
@@ -96,7 +99,7 @@ template <typename T> struct Scanned {
 };
 
 struct RelativeDateTimeLiteral {
-  std::variant<Duration, std::chrono::weekday> anchor;
+  std::variant<Duration, std::chrono::weekday> delta;
   enum class Direction : std::uint8_t { Past, Future } direction;
 };
 
@@ -129,13 +132,38 @@ struct Expression {
                ConversionExpression, Duration, FunctionCall, PercentExpression>
       data;
 
-  const BinaryExpression *asBinaryExpression() const { return std::get_if<BinaryExpression>(&data); }
+  const BinaryExpression *asBinaryExpression() const { return as<BinaryExpression>(); }
 
-  const UnaryExpression *asUnaryExpression() const { return std::get_if<UnaryExpression>(&data); }
+  const UnaryExpression *asUnaryExpression() const { return as<UnaryExpression>(); }
 
-  const ConversionExpression *asConversion() const { return std::get_if<ConversionExpression>(&data); }
+  const ConversionExpression *asConversion() const { return as<ConversionExpression>(); }
 
-  const FunctionCall *asFunction() const { return std::get_if<FunctionCall>(&data); }
+  const FunctionCall *asFunction() const { return as<FunctionCall>(); }
+
+  template <concepts::VariantAlternative<decltype(data)> T> T *as() { return std::get_if<T>(&data); }
+  template <concepts::VariantAlternative<decltype(data)> T> const T *as() const {
+    return std::get_if<T>(&data);
+  }
+  template <concepts::VariantAlternative<decltype(data)> T> bool is() const {
+    return std::holds_alternative<T>(data);
+  }
+
+  template <concepts::VariantAlternative<decltype(data)> T> bool contains() const {
+    return std::visit(
+        [&](const auto &data) {
+          using U = std::remove_cvref_t<decltype(data)>;
+          if constexpr (std::is_same_v<T, U>) { return true; }
+          if constexpr (std::is_same_v<U, UnaryExpression>) { return data.lhs->template contains<T>(); }
+          if constexpr (std::is_same_v<U, BinaryExpression>) {
+            return data.lhs->template contains<T>() || data.rhs->template contains<T>();
+          }
+          if constexpr (std::is_same_v<U, ConversionExpression>) { return data.lhs->template contains<T>(); }
+          if constexpr (std::is_same_v<U, UnitExpression>) { return data.expr->template contains<T>(); }
+          if constexpr (std::is_same_v<U, PercentExpression>) { return data.expr->template contains<T>(); }
+          return false;
+        },
+        data);
+  }
 };
 
 struct AST {

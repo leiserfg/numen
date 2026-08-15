@@ -209,6 +209,7 @@ public:
 
   std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
   std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
+
   void printAST(const std::string &expr) const;
 
   void setCurrencyProvider(std::unique_ptr<AbstractCurrencyProvider> provider) {

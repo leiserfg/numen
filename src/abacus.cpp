@@ -251,7 +251,7 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
               return now;
             }
           },
-          value.anchor);
+          value.delta);
     } else {
       return now;
     }
@@ -422,7 +422,7 @@ public:
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
         const auto &conv = value;
-        auto v = computeExpr(*conv.b);
+        auto v = computeExpr(*conv.lhs);
 
         if (auto tzl = std::get_if<TimezoneOffset>(&conv.target)) {
           if (!v.isDateTime())
@@ -1214,7 +1214,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
           os << ident() << "Convert " << rang::fg::green << std::visit(visitor, value.target)
              << rang::fg::reset << " {\n";
 
-          printASTNode(os, *value.b, depth + 1);
+          printASTNode(os, *value.lhs, depth + 1);
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, UnitExpression>) {
           os << ident() << "Unit " << rang::fg::green << value.unit << rang::fg::reset << " {\n";
@@ -1254,6 +1254,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
 void Abacus::printAST(const std::string &expr) const {
   Parser parser{expr, m_unitDb};
   auto ast = parser.parse();
+
   printASTNode(std::cout, *ast.root, 0);
 }
 
