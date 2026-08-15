@@ -1,3 +1,5 @@
+PY := /usr/bin/env python
+
 all:
 	cmake --preset default
 	cmake --build --preset default
@@ -15,6 +17,11 @@ fuzzer:
 
 clean:
 	rm -rf build build-debug build-fuzzer
+
+gen:
+	$(PY) ./scripts/gen-currency-tables.py
+	$(PY) ./scripts/gen-timezone-tables.py
+.PHONY: gen
 
 format:
 	find ./src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i

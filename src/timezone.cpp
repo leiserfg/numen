@@ -1,88 +1,154 @@
 #include "timezone.hpp"
+#include "unicode.hpp"
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
-#include <iostream>
+#include <cstdint>
+#include <optional>
 #include <ranges>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 
+using namespace std::literals;
+
 namespace {
-auto splitOnAny(auto s, std::string_view delims) {
-  return s |
-         std::views::chunk_by([delims](char a, char b) { return delims.contains(a) == delims.contains(b); }) |
-         std::views::filter([delims](auto &&chunk) { return !delims.contains(chunk.front()); });
+
+struct GeoEntry {
+  uint32_t name;
+  uint32_t population;
+  uint16_t tz;
+  uint16_t admin1;
 };
 
-bool matchesTz(std::string_view query, std::string_view name) {
-  if (equalsIgnoreCase(name, query)) { return true; }
+struct GeoQualifier {
+  uint32_t name;
+  uint16_t id;
+  bool isCountry;
+};
 
-  auto parts = name | std::views::split(std::string_view{"/"});
-  auto last = std::ranges::fold_left(parts, std::string_view{}, [](auto &&, auto &&x) { return x; });
+#include "gen/geo-tz-tables.inc"
 
-  if (!last.empty()) {
-    std::string_view delims{"_/ "};
-    auto queryWords = splitOnAny(query, delims);
-    auto words = splitOnAny(last, delims);
+std::string_view geoName(uint32_t offset) {
+  auto chunk = kGeoNameChunks[offset / kGeoNameChunkSize].substr(offset % kGeoNameChunkSize);
+  return chunk.substr(0, chunk.find('\0'));
+}
 
-    return std::ranges::equal(queryWords, words, [](auto &&w1, auto &&w2) {
-      return equalsIgnoreCase(std::string_view{w1}, std::string_view{w2});
-    });
+auto lookup(const auto &table, std::string_view name) {
+  return std::ranges::equal_range(table, name, {}, [](const auto &e) { return geoName(e.name); });
+}
+
+bool inScope(const GeoEntry &entry, std::ranges::range auto &&scopes) {
+  return std::ranges::any_of(scopes, [&](const GeoQualifier &q) {
+    return q.isCountry ? kGeoAdmin1Country[entry.admin1] == q.id : entry.admin1 == q.id;
+  });
+}
+
+const GeoEntry *findGeoEntry(std::string_view name, std::string_view qualifier) {
+  auto entries = lookup(kGeoEntries, name);
+  if (entries.empty()) return nullptr;
+
+  const GeoEntry *best = nullptr;
+  if (qualifier.empty()) {
+    best = &*std::ranges::max_element(entries, {}, &GeoEntry::population);
+  } else {
+    auto scopes = lookup(kGeoQualifiers, qualifier);
+    for (const auto &entry : entries) {
+      if (inScope(entry, scopes) && (!best || entry.population > best->population)) best = &entry;
+    }
+  }
+  return best;
+}
+
+std::optional<std::string_view> queryGeoDb(std::string_view query) {
+  auto normalized = normalizeName(query);
+  std::string_view q{normalized};
+
+  for (auto split = q.size(); split != std::string_view::npos; split = q.rfind(' ', split - 1)) {
+    if (auto entry = findGeoEntry(q.substr(0, split), split < q.size() ? q.substr(split + 1) : ""sv)) {
+      return kGeoTzNames[entry->tz];
+    }
+    if (split == 0) break;
   }
 
-  return false;
+  return std::nullopt;
+}
+
+const std::chrono::time_zone *locateZone(std::string_view name) {
+  try {
+    return std::chrono::locate_zone(name);
+  } catch (const std::runtime_error &) { return nullptr; }
+}
+
+// clang-format off
+constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
+    {.name = "nyc", .target = "America/New_York"},
+    {.name = "dc", .target = "America/New_York"},
+    // the state outweighs the district in the geo database
+    {.name = "washington", .target = "America/New_York"},
+    {.name = "sf", .target = "America/Los_Angeles"},
+
+    {.name = "PST", .target = "America/Los_Angeles"},
+    {.name = "PDT", .target = "America/Los_Angeles"},
+    {.name = "PT", .target = "America/Los_Angeles"},
+    {.name = "MST", .target = "America/Denver"},
+    {.name = "MDT", .target = "America/Denver"},
+    {.name = "CST", .target = "America/Chicago"},
+    {.name = "CDT", .target = "America/Chicago"},
+    {.name = "EST", .target = "America/New_York"},
+    {.name = "EDT", .target = "America/New_York"},
+    {.name = "BST", .target = "Europe/London"},
+    {.name = "CET", .target = "Europe/Paris"},
+    {.name = "CEST", .target = "Europe/Paris"},
+    {.name = "EET", .target = "Europe/Athens"},
+    {.name = "EEST", .target = "Europe/Athens"},
+    {.name = "MSK", .target = "Europe/Moscow"},
+    {.name = "IST", .target = "Asia/Kolkata"},
+    {.name = "HKT", .target = "Asia/Hong_Kong"},
+    {.name = "KST", .target = "Asia/Seoul"},
+    {.name = "JST", .target = "Asia/Tokyo"},
+    {.name = "AEST", .target = "Australia/Sydney"},
+    {.name = "AEDT", .target = "Australia/Sydney"},
+});
+// clang-format on
+
+bool sameZoneName(std::string_view query, std::string_view name) {
+  return std::ranges::equal(query, name, [](unsigned char a, unsigned char b) {
+    if (a == ' ') a = '_';
+    if (b == ' ') b = '_';
+    return std::tolower(a) == std::tolower(b);
+  });
 }
 
 }; // namespace
 
-struct CustomTzLink {
-  std::string_view name;
-  std::string_view target;
-};
-
-constexpr auto NewYorkTz = "America/New_York";
-
-// clang-format off
-constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
-    {.name = "nyc", .target = NewYorkTz},
-    {.name = "Europe", .target = "Europe/Paris"},
-    {.name = "Russia", .target = "Europe/Moscow"},
-    {.name = "Beijing", .target = "Asia/Shanghai"},
-    {.name = "China", .target = "Asia/Shanghai"},
-
-    {.name = "PST", .target = "America/Los_Angeles"},
-    {.name = "PDT", .target = "America/Los_Angeles"},
-    {.name = "EST", .target = "America/New_York"},
-    {.name = "EDT", .target = "America/New_York"},
-    {.name = "CST", .target = "America/Chicago"},
-    {.name = "CDT", .target = "America/Chicago"},
-});
-// clang-format on
+std::span<const CustomTzLink> TimezoneDB::customLinks() { return CUSTOM_LINKS; }
 
 const std::chrono::time_zone *TimezoneDB::userTz() const { return std::chrono::get_tzdb().current_zone(); }
 
 const std::chrono::time_zone *TimezoneDB::query(std::string_view query) const {
   const auto &db = std::chrono::get_tzdb();
 
-  {
-    auto it = std::ranges::find_if(
-        db.zones, [&query](const std::chrono::time_zone &tz) { return matchesTz(query, tz.name()); });
-
-    if (it != db.zones.end()) { return &*it; }
+  if (auto it =
+          std::ranges::find_if(CUSTOM_LINKS, [&](auto &&link) { return equalsIgnoreCase(link.name, query); });
+      it != CUSTOM_LINKS.end()) {
+    return locateZone(it->target);
   }
 
-  {
-    auto linkIt = std::ranges::find_if(db.links, [&query](const std::chrono::time_zone_link &link) {
-      return matchesTz(query, link.name());
-    });
-
-    if (linkIt != db.links.end()) { return std::chrono::locate_zone(linkIt->target()); }
+  if (auto it = std::ranges::find_if(db.zones, [&](auto &&tz) { return sameZoneName(query, tz.name()); });
+      it != db.zones.end()) {
+    return &*it;
   }
 
-  auto linkIt = std::ranges::find_if(
-      CUSTOM_LINKS, [&query](const CustomTzLink &link) { return matchesTz(query, link.name); });
+  if (auto name = queryGeoDb(query)) { return locateZone(*name); }
 
-  if (linkIt != CUSTOM_LINKS.end()) { return std::chrono::locate_zone(linkIt->target); }
+  // after the geo database: Greenwich and GB are places before being legacy links
+  if (auto it = std::ranges::find_if(db.links, [&](auto &&link) { return sameZoneName(query, link.name()); });
+      it != db.links.end()) {
+    return locateZone(it->target());
+  }
 
   return nullptr;
 }

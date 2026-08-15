@@ -56,6 +56,7 @@ set(SRCS
 	src/parser.cpp
 	src/region-currency.cpp
 	src/timezone.cpp
+	src/unicode.cpp
 	src/unit.cpp
 	src/value.cpp
 )

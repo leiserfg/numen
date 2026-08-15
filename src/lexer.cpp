@@ -1,5 +1,6 @@
 #include "lexer.hpp"
 #include <cctype>
+#include <cstdint>
 
 namespace {
 constexpr std::string_view BASE_CHARS = "0123456789abcdef";
@@ -37,6 +38,8 @@ std::optional<Lexer::Token> Lexer::next() {
     return Token{.raw = getSelection(), .type = type, .data = data, .start = startPos, .end = m_cursor};
   };
 
+  constexpr auto isValidChar = [](std::uint8_t c) { return std::isalpha(c) || c & 0x80; };
+
   auto tryCommit = [&]() -> std::optional<Token> {
     switch (state) {
     case State::NumberExponentSign:
@@ -73,7 +76,7 @@ std::optional<Lexer::Token> Lexer::next() {
         startPos += 1;
         break;
       }
-      if (std::isalpha(c)) {
+      if (isValidChar(c)) {
         state = State::String;
         continue;
       }
@@ -170,7 +173,7 @@ std::optional<Lexer::Token> Lexer::next() {
       break;
     }
     case State::String: {
-      if (!std::isalpha(c)) { return tryCommit(); }
+      if (!isValidChar(c)) { return tryCommit(); }
       break;
     }
     }

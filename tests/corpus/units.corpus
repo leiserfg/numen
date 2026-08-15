@@ -149,13 +149,14 @@ max(1 km to m, 100)         => 1000m
 10m/s + 150km/h             => 51.666667m/s
 1 km/h + 1 kg               => !error Incompatible units: km/h to kg
 
-# the timezone table matches on the last part of a zone name, so "gb" (Great
-# Britain) and "acre" (Brazil/Acre) used to be eaten before the unit was tried
+# places shadow units: "gb" (Great Britain) is a legacy tzdb link, "acre" and
+# "mile" are towns. after a conversion operator the unit is meant
 1 tb to gb                  => 1000gb
 500 mb to gb                => 0.5gb
 1 sqm to acre               => 0.000247acre
 1 ha to acre                => 2.471054acre
 1 acre to m*m to acre       => 1acre
+5 km to mile                => 3.106856mile
 
 # function arguments are computed independently, so min/max used to compare the
 # bare numbers and answer that 1 km was smaller than 999 m

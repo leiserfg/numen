@@ -465,7 +465,7 @@ std::optional<TimezoneOffset> Parser::parseTimezone() {
     }
   }
 
-  return greedyParse(3, [&](std::string_view word) { return isTimezoneToken(word); })
+  return greedyParse(4, [&](std::string_view word) { return isTimezoneToken(word); })
       .transform([](auto &&str) { return TimezoneOffset(str); });
 }
 
@@ -676,8 +676,8 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         continue;
       }
 
-      // the timezone table matches the last part of a zone name, so "gb" and
-      // "acre" shadow the units. after a conversion operator the unit is meant
+      // places shadow units: "gb" is a legacy tzdb link, "acre", "bath" and
+      // "mile" are towns. after a conversion operator the unit is meant
       if (parseUnit()
               .transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
               .value_or(true)) {

@@ -90,10 +90,13 @@ TEST_CASE("Resolve timezone links", TAG) {
   TimezoneDB db;
 
   for (const auto &link : std::chrono::get_tzdb().links) {
+    if (std::ranges::any_of(TimezoneDB::customLinks(), [&](auto &&l) { return l.name == link.name(); }))
+      continue;
     CAPTURE(link.name());
     auto tz = db.query(link.name());
     CHECK(tz);
-    if (tz) { CHECK(tz->name() == link.target()); }
+    // bare legacy names (Greenwich) are places first
+    if (tz && link.name().contains('/')) { CHECK(tz->name() == link.target()); }
   }
 }
 
@@ -107,8 +110,63 @@ TEST_CASE("resolve custom tz link", TAG) {
   }
 
   {
-    auto tz = db.query("europe");
+    auto tz = db.query("est");
     REQUIRE(tz);
-    CHECK(tz->name() == "Europe/Paris");
+    CHECK(tz->name() == "America/New_York");
   }
+}
+
+TEST_CASE("resolve places from the geo database", TAG) {
+  TimezoneDB db;
+
+  auto expect = [&](std::string_view query, std::string_view zone) {
+    CAPTURE(query);
+    auto tz = db.query(query);
+    REQUIRE(tz);
+    CHECK(tz->name() == zone);
+  };
+
+  // cities that are not zone names
+  expect("beijing", "Asia/Shanghai");
+  expect("san francisco", "America/Los_Angeles");
+  expect("munich", "Europe/Berlin");
+  expect("München", "Europe/Berlin");
+  expect("bombay", "Asia/Kolkata");
+  expect("Washington, D.C.", "America/New_York");
+
+  expect("Москва", "Europe/Moscow");
+  expect("МОСКВА", "Europe/Moscow");
+  expect("北京", "Asia/Shanghai");
+  expect("Αθήνα", "Europe/Athens");
+  expect("Sài Gòn", "Asia/Ho_Chi_Minh");
+  expect("washington", "America/New_York");
+  expect("washington state", "America/Los_Angeles");
+
+  // states, provinces, countries
+  expect("texas", "America/Chicago");
+  expect("bavaria", "Europe/Berlin");
+  expect("japan", "Asia/Tokyo");
+  expect("usa", "America/New_York");
+  expect("uk", "Europe/London");
+  expect("brazil", "America/Sao_Paulo");
+
+  // most populous wins, unless qualified
+  expect("paris", "Europe/Paris");
+  expect("paris texas", "America/Chicago");
+  expect("paris tx", "America/Chicago");
+  expect("paris france", "Europe/Paris");
+  expect("portland", "America/Los_Angeles");
+  expect("portland maine", "America/New_York");
+  expect("london", "Europe/London");
+  expect("london ontario", "America/Toronto");
+  expect("san jose", "America/Los_Angeles");
+  expect("san jose costa rica", "America/Costa_Rica");
+  expect("la", "America/Los_Angeles");
+
+  // "to" and "of" are towns
+  CHECK(!db.query("to"));
+  CHECK(!db.query("of"));
+  CHECK(!db.query("in"));
+  CHECK(!db.query("paris in"));
+  CHECK(!db.query("nowhere at all"));
 }

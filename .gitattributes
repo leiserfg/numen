@@ -4,3 +4,4 @@
 *.cmd text eol=crlf
 
 vendor/** linguist-vendored
+src/gen/** linguist-generated

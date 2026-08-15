@@ -1,15 +1,20 @@
 #pragma once
 #include <chrono>
+#include <span>
 #include <string_view>
+
+struct CustomTzLink {
+  std::string_view name;
+  std::string_view target;
+};
 
 class TimezoneDB {
 public:
-  // search the timezone database in a relaxed way, e.g a query of "new york"
-  // should yield "America/New_York"
-  //
-  // "new york" -> America/New_York
-  // "paris" -> Europe/Paris
-  // "new_york" -> America/New_York
+  // abbreviations (pst), IANA names (Europe/Paris), then GeoNames places, optionally
+  // qualified ("paris tx"). A bare name yields the most populous place called that
   const std::chrono::time_zone *query(std::string_view query) const;
   const std::chrono::time_zone *userTz() const;
+
+  // take precedence over tzdb, so EST is New York rather than the fixed offset link
+  static std::span<const CustomTzLink> customLinks();
 };
