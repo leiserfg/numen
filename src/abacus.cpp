@@ -272,8 +272,14 @@ std::string formatDate(const DateTime &dt) {
                                   : std::chrono::zoned_time{dt.tz, instant};
 
   if (dt.offset.count() != 0) {
-    auto hours = std::chrono::floor<std::chrono::hours>(dt.offset);
-    return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+})", zt, dt.tz->name(), hours.count());
+    auto hours = dt.offset.count() / 3600;
+    auto minutes = std::abs((dt.offset.count() - hours * 3600) / 60);
+
+    if (minutes != 0) {
+      return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+}:{})", zt, dt.tz->name(), hours, minutes);
+    } else {
+      return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+})", zt, dt.tz->name(), hours);
+    }
   }
 
   return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, dt.tz->name());

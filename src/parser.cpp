@@ -444,13 +444,18 @@ std::optional<TimezoneOffset> Parser::parseTimezone() {
           int sign = str->raw == "+" ? 1 : -1;
           m_lexer.next();
 
-          // we only support hour offsets, such as UTC+1 or UTC-1
-          // In rare scenarios, people write UTC+1:30 but this is really uncommon so
-          // we don't support it.
-
           if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && isValidOffset(n->n)) {
-            tz.offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
             m_lexer.next();
+            tz.offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
+
+            if (auto tok = m_lexer.peak(); tok && tok->raw == ":") {
+              m_lexer.next();
+              if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && n->n >= 0 && n->n < 60) {
+                m_lexer.next();
+                tz.offset += std::chrono::minutes(static_cast<int>(n->n.toDouble()) * sign);
+              }
+            }
+
             return tz;
           }
         }
