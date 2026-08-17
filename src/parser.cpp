@@ -428,7 +428,21 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     m_lexer.next();
   }
 
-  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") return time;
+  const auto commitTime = [&]() {
+    if (auto tok = m_lexer.peakAs<Lexer::String>()) {
+      const bool am = equalsIgnoreCase(tok->data, std::string_view{"am"});
+      const bool pm = equalsIgnoreCase(tok->data, std::string_view{"pm"});
+      // TODO: if using 12h we need to make sure the clock component actually make sense...
+
+      if (am || pm) {
+        m_lexer.next();
+        if (pm) time.hours = time.hours.value_or(std::chrono::hours{0}) + std::chrono::hours{12};
+      }
+    }
+    return time;
+  };
+
+  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") return commitTime();
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
@@ -439,7 +453,7 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     m_lexer.next();
   }
 
-  return time;
+  return commitTime();
 }
 
 std::optional<DateString> Parser::parseRFC3339() {
