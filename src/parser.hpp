@@ -68,7 +68,17 @@ using ConversionTarget = std::variant<NamedUnit, TimezoneOffset, NamedNumberForm
 
 struct ConversionExpression {
   std::unique_ptr<Expression> lhs;
-  ConversionTarget target;
+
+  // target can be many things, what is applicable
+  // is only known when interpreting as we find out
+  // what the type of lhs is.
+  // For instance `pt` can be a unit or refer to pacific time,
+  // the latter only makes sense if lhs is of a date time type.
+  struct {
+    std::optional<NamedUnit> unit;
+    std::optional<TimezoneOffset> tz;
+    std::optional<NamedNumberFormat> fmt;
+  } target;
 };
 
 // now in new york

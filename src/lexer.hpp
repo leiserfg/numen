@@ -69,6 +69,9 @@ public:
   void advance(int n);
   std::optional<std::string_view> peakString(int n = 1);
 
+  size_t cursor() const { return m_cursor; }
+  void setCursor(size_t cursor) { m_cursor = cursor; }
+
   bool isGluedLeft(const Token &tok) const {
     return tok.start > 0 && std::isspace(static_cast<unsigned char>(m_data[tok.start - 1])) == 0;
   }

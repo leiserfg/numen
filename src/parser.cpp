@@ -754,30 +754,24 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         continue;
       }
 
-      // places shadow units: "gb" is a legacy tzdb link, "acre", "bath" and
-      // "mile" are towns. after a conversion operator the unit is meant
-      if (parseUnit()
-              .transform([&](auto name) { return m_unitDb.findUnitCandidates(name).empty(); })
-              .value_or(true)) {
-        if (auto tz = parseTimezone()) {
-          left = std::make_unique<Expression>(
-              ConversionExpression{.lhs = std::move(left), .target = tz.value()});
-          continue;
-        }
-      }
+      ConversionExpression expr{.lhs = std::move(left)};
 
-      if (auto fmt = parseNumberFormat()) {
-        left =
-            std::make_unique<Expression>(ConversionExpression{.lhs = std::move(left), .target = fmt.value()});
-        continue;
-      }
+      auto cursor = m_lexer.cursor();
+      size_t maxCursor = 0;
 
-      auto unit = parseConversionTarget();
+      const auto stampChoice = [&](auto &&fn) {
+        auto r = fn();
+        maxCursor = std::max(maxCursor, m_lexer.cursor());
+        m_lexer.setCursor(cursor);
+        return r;
+      };
 
-      if (!unit) throw std::runtime_error("expected unit after conversion operator");
+      expr.target.tz = stampChoice([&]() { return parseTimezone(); });
+      expr.target.unit = stampChoice([&]() { return parseConversionTarget(); });
+      expr.target.fmt = stampChoice([&]() { return parseNumberFormat(); });
+      m_lexer.setCursor(maxCursor);
 
-      left = std::make_unique<Expression>(
-          ConversionExpression{.lhs = std::move(left), .target = std::move(*unit)});
+      left = std::make_unique<Expression>(std::move(expr));
 
       continue;
     }

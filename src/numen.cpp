@@ -430,21 +430,17 @@ public:
         const auto &conv = value;
         auto v = computeExpr(*conv.lhs);
 
-        if (auto tzl = std::get_if<TimezoneOffset>(&conv.target)) {
-          if (!v.isDateTime())
-            throw std::runtime_error("Only datetime expressions can be "
-                                     "converted to another timezone");
-
-          auto d = *v.asDateTime();
-
-          d.tz = TimezoneDB{}.query(tzl->name);
-          d.offset = tzl->offset;
-
-          return Computed{d};
-        }
-
         if (v.isDateTime()) {
-          if (auto unit = std::get_if<NamedUnit>(&conv.target); unit && unit->isSimple()) {
+          if (auto tz = conv.target.tz) {
+            auto d = *v.asDateTime();
+
+            d.tz = TimezoneDB{}.query(tz->name);
+            d.offset = tz->offset;
+
+            return Computed{d};
+          }
+
+          if (auto unit = conv.target.unit; unit && unit->isSimple()) {
             if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"},
                                       unit->simpleName())) {
               auto epoch = v.asDateTime()->time.time_since_epoch();
@@ -457,7 +453,7 @@ public:
         }
 
         if (auto d = v.asDuration()) {
-          if (auto unit = std::get_if<NamedUnit>(&conv.target); unit && unit->isSimple()) {
+          if (auto unit = conv.target.unit; unit && unit->isSimple()) {
             return convertToUnit(d->total().count(), "second", unit->simpleName());
           }
         }
@@ -465,7 +461,7 @@ public:
         if (auto n = v.asNumber()) {
           auto value = *n;
 
-          if (auto fmt = std::get_if<NamedNumberFormat>(&conv.target)) {
+          if (auto fmt = conv.target.fmt) {
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
               value.format = NumberOutputFormat::Hexadecimal;
               return Computed{value};
@@ -482,8 +478,7 @@ public:
             }
           }
 
-          if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
-
+          if (auto unit = conv.target.unit) {
             if (!n->unit) return Computed{.value = value};
 
             // a single token can still name a composition, so ask what it
@@ -501,7 +496,7 @@ public:
             return convertCompound(*n, std::move(target));
           }
         }
-        if (auto unit = std::get_if<NamedUnit>(&conv.target)) {
+        if (auto unit = conv.target.unit) {
           throw std::runtime_error(
               std::format("Cannot convert a {} to {}", v.valueTypeName(),
                           unit->isSimple() ? std::string{unit->simpleName()} : buildTarget(*unit).render()));
@@ -1216,8 +1211,10 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
             }
           };
 
-          os << ident() << "Convert " << rang::fg::green << std::visit(visitor, value.target)
-             << rang::fg::reset << " {\n";
+          /*
+  os << ident() << "Convert " << rang::fg::green << std::visit(visitor, value.target)
+     << rang::fg::reset << " {\n";
+                 */
 
           printASTNode(os, *value.lhs, depth + 1);
           os << ident() << "}\n";
