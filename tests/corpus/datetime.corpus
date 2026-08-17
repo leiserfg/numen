@@ -26,6 +26,14 @@ Jan 2025                    => 2025-01-01 00:00:00 (Etc/UTC)
 Jan 18                      => 2026-01-18 00:00:00 (Etc/UTC)
 January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 
+# 12 hr support
+Jan 2025 18 7:32 am         => 2025-01-18 07:32:00 (Etc/UTC)
+Jan 2025 18 7:32 pm         => 2025-01-18 19:32:00 (Etc/UTC)
+Jan 2025 18 7 pm            => 2025-01-18 19:00:00 (Etc/UTC)
+
+# optional "at" token between date and time 
+Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
+
 # RFC 3339 UTC
 2026-01-18T14:30:00Z        => 2026-01-18 14:30:00 (Etc/UTC)
 

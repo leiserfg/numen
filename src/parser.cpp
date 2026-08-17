@@ -340,8 +340,6 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
 
 std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto d = parseYYYYMMDD()) {
-    if (auto tok = m_lexer.peakAs<Lexer::String>(); tok && tok->data == "T") m_lexer.next();
-
     d->time = parseTime(true);
     return d;
   }
@@ -385,9 +383,13 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
 }
 
 std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
+  if (auto tok = m_lexer.peakAs<Lexer::String>(); tok && tok->data == "at") { m_lexer.next(); }
+
   std::chrono::hours hrs{};
 
   auto head = m_lexer.peakIf(Lexer::TokenType::Number);
+
+  if (!head) return std::nullopt;
 
   if (head) {
     auto value = clockComponent(toNumber(head->raw), 23);
@@ -395,38 +397,9 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     hrs = std::chrono::hours{*value};
   }
 
-  using IV = std::initializer_list<std::string_view>;
-
-  auto sep = m_lexer.peak(1);
-  if (!sep || !std::ranges::contains(IV{":", "h"}, sep->raw)) return std::nullopt;
-
-  // "h" also names the hour unit, so it only separates a clock when glued
-  if (sep->raw == "h") {
-    if (!head || !head->isAdjacent(*sep)) return std::nullopt;
-
-    // on its own "12h" is twelve hours far more often than noon, so it needs
-    // its minutes. after a date there is nothing else it could mean
-    if (!afterDate) {
-      auto mins = m_lexer.peak(2);
-      if (!mins || mins->type != Lexer::TokenType::Number || !sep->isAdjacent(*mins)) return std::nullopt;
-    }
-  }
-
-  m_lexer.next();
-
   ParsedTime time;
 
   time.hours = hrs;
-
-  m_lexer.next();
-
-  if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    auto value = clockComponent(toNumber(tok->raw), 59);
-    if (!value) return std::nullopt;
-
-    time.minutes = std::chrono::minutes{*value};
-    m_lexer.next();
-  }
 
   const auto commitTime = [&]() {
     if (auto tok = m_lexer.peakAs<Lexer::String>()) {
@@ -441,6 +414,40 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     }
     return time;
   };
+
+  using IV = std::initializer_list<std::string_view>;
+
+  auto sep = m_lexer.peak(1);
+  if (!sep || !std::ranges::contains(IV{":", "h"}, sep->raw)) {
+    if (afterDate) {
+      m_lexer.next();
+      return commitTime();
+    }
+    return std::nullopt;
+  }
+
+  // "h" also names the hour unit, so it only separates a clock when glued
+  if (sep->raw == "h") {
+    if (!head || !head->isAdjacent(*sep)) return std::nullopt;
+
+    // on its own "12h" is twelve hours far more often than noon, so it needs
+    // its minutes. after a date there is nothing else it could mean
+    if (!afterDate) {
+      auto mins = m_lexer.peak(2);
+      if (!mins || mins->type != Lexer::TokenType::Number || !sep->isAdjacent(*mins)) return std::nullopt;
+    }
+  }
+
+  m_lexer.next();
+  m_lexer.next();
+
+  if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
+    auto value = clockComponent(toNumber(tok->raw), 59);
+    if (!value) return std::nullopt;
+
+    time.minutes = std::chrono::minutes{*value};
+    m_lexer.next();
+  }
 
   if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") return commitTime();
   m_lexer.next();
