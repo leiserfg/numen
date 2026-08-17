@@ -31,7 +31,7 @@ fs::path persistPath() {
   auto cacheHome = genv("XDG_CACHE_HOME")
                        .transform([](auto &&s) { return fs::path{s}; })
                        .value_or(fs::path{*genv("HOME")} / ".cache");
-  return cacheHome / "libabacus" / "vicinae-rates.json";
+  return cacheHome / "libnumen" / "vicinae-rates.json";
 }
 
 std::string normalizeCurrencyId(std::string_view id) {

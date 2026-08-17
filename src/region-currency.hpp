@@ -2,7 +2,7 @@
 #include <optional>
 #include <string_view>
 
-namespace abacus {
+namespace numen {
 
 std::optional<std::string_view> currencyForRegion(std::string_view region);
 
@@ -19,4 +19,4 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale);
  */
 int currencyDigits(std::string_view currency);
 
-}; // namespace abacus
+}; // namespace numen

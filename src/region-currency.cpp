@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cctype>
 
-namespace abacus {
+namespace numen {
 
 namespace {
 
@@ -74,4 +74,4 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale) {
   return std::nullopt;
 }
 
-}; // namespace abacus
+}; // namespace numen

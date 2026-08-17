@@ -2,7 +2,7 @@
 #include <chrono>
 #include <mutex>
 #include <unordered_map>
-#include "abacus/abstract-currency-provider.hpp"
+#include "numen/abstract-currency-provider.hpp"
 
 class VicinaeCurrencyProvider : public AbstractCurrencyProvider {
 public:

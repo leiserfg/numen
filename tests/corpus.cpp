@@ -46,7 +46,7 @@ void runCorpusFile(const fs::path &path) {
   REQUIRE(file.is_open());
 
   const std::string src(std::istreambuf_iterator<char>(file), {});
-  abacus::Abacus calc;
+  numen::Numen calc;
   int lineno = 0;
 
   for (auto raw : src | std::views::split('\n')) {

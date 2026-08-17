@@ -13,7 +13,7 @@
 class Lexer {
 public:
   struct Number {
-    abacus::Value n;
+    numen::Value n;
     unsigned fromBase = 10;
   };
 

@@ -1,15 +1,15 @@
 #pragma once
 
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include "value.hpp"
 #include <compare>
 #include <optional>
 #include <type_traits>
 #include <variant>
 
-namespace abacus::detail {
+namespace numen::detail {
 
-// The interpreter's number. abacus::Number is derived from it at the compute()
+// The interpreter's number. numen::Number is derived from it at the compute()
 // boundary, where it picks up its rendered text.
 struct Num {
   Value n;
@@ -56,4 +56,4 @@ struct Computed {
   }
 };
 
-} // namespace abacus::detail
+} // namespace numen::detail

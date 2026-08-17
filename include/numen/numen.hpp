@@ -1,5 +1,5 @@
 #pragma once
-#include "abacus/unit.hpp"
+#include "numen/unit.hpp"
 #include <bits/chrono.h>
 #include <chrono>
 #include <compare>
@@ -11,7 +11,7 @@
 #include <variant>
 #include "abstract-currency-provider.hpp"
 
-namespace abacus {
+namespace numen {
 
 using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
@@ -203,9 +203,9 @@ struct EvalConfig {
   std::optional<std::string> locale;
 };
 
-class Abacus {
+class Numen {
 public:
-  Abacus();
+  Numen();
 
   std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
   std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
@@ -222,4 +222,4 @@ private:
   UnitDatabase m_unitDb;
 };
 
-}; // namespace abacus
+}; // namespace numen

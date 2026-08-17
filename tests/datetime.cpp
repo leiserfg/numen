@@ -4,8 +4,8 @@ using namespace std::chrono;
 
 namespace {
 
-abacus::EvalConfig configAt(year_month_day now) {
-  return abacus::EvalConfig{
+numen::EvalConfig configAt(year_month_day now) {
+  return numen::EvalConfig{
       .now = sys_days(now),
       .timezone = locate_zone("UTC"),
   };

@@ -1,5 +1,5 @@
 #include "parser.hpp"
-#include "abacus/unit.hpp"
+#include "numen/unit.hpp"
 #include "timezone.hpp"
 #include "utils.hpp"
 #include <algorithm>
@@ -79,7 +79,7 @@ std::optional<double> parseConstant(std::string_view tok) {
   return it->n;
 }
 
-std::unique_ptr<Expression> makeNumberExpr(abacus::Value n) {
+std::unique_ptr<Expression> makeNumberExpr(numen::Value n) {
   return std::make_unique<Expression>(NumberString{n});
 }
 
@@ -490,7 +490,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     if (auto constant = parseConstant(tok->raw)) {
       m_lexer.next();
 
-      auto lhs = makeNumberExpr(abacus::Value{*constant});
+      auto lhs = makeNumberExpr(numen::Value{*constant});
 
       // pi2 = pi * 2
       if (auto n = m_lexer.peak(); n && !isOperatorToken(n->raw) && n->raw != ")") {
@@ -625,7 +625,7 @@ std::optional<Scanned<Duration>> Parser::scanDuration() {
       if (auto unit = m_unitDb.findUnit(std::string{u.data});
           unit && unit->dimension == dimensions::DURATION) {
 
-        auto part = abacus::durationFrom(n.n.toDouble(), *unit);
+        auto part = numen::durationFrom(n.n.toDouble(), *unit);
         if (!part) break;
 
         d.tokenCount += 2;

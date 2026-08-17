@@ -15,7 +15,7 @@ constexpr double toSeconds(auto d) { return std::chrono::duration<double>(d).cou
 // Factors are relative to a per-dimension base unit.
 // Sources: NIST SP 811 (exact defined conversions), ISO 4217 (currency codes).
 
-// must stay function-local: at namespace scope a consumer's own static Abacus
+// must stay function-local: at namespace scope a consumer's own static Numen
 // can be constructed before this table is, and read it empty
 std::span<const UnitDef> units::builtins() {
 // clang-format off

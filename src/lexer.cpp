@@ -48,7 +48,7 @@ std::optional<Lexer::Token> Lexer::next() {
     case State::NumberBase: {
       int scale = expSign * static_cast<int>(expValue) - (nfrac ? static_cast<int>(nfrac) - 1 : 0);
 
-      return makeToken(TokenType::Number, Number{.n = abacus::Value::scaled(n, scale), .fromBase = base});
+      return makeToken(TokenType::Number, Number{.n = numen::Value::scaled(n, scale), .fromBase = base});
     }
     case State::String:
       return makeToken(TokenType::String, String{.data = getSelection()});

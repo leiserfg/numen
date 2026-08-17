@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-set(PROJECT_NAME abacus)
+set(PROJECT_NAME numen)
 project(${PROJECT_NAME})
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,7 +50,7 @@ endif()
 
 set(LINK_LIBS)
 set(SRCS 
-	src/abacus.cpp
+	src/numen.cpp
 	src/builtin-units.cpp
 	src/lexer.cpp
 	src/parser.cpp
@@ -113,7 +113,7 @@ if (BUILD_TESTS)
 		list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 	endif()
 
-	set(TEST_TARGET abacus-tests)
+	set(TEST_TARGET numen-tests)
 	add_executable(${TEST_TARGET} tests/main.cpp tests/datetime.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp tests/value.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
@@ -126,7 +126,7 @@ if (BUILD_TESTS)
 endif()
 
 if (BUILD_FUZZER)
-	set(FUZZ_TARGET abacus-fuzz)
+	set(FUZZ_TARGET numen-fuzz)
 	add_executable(${FUZZ_TARGET} tests/fuzz.cpp)
 	target_link_libraries(${FUZZ_TARGET} PRIVATE ${PROJECT_NAME})
 	target_include_directories(${FUZZ_TARGET} PRIVATE ./include)

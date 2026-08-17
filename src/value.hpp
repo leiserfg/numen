@@ -1,12 +1,12 @@
 #pragma once
 
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include <cmath>
 #include <compare>
 #include <optional>
 #include <string>
 
-namespace abacus {
+namespace numen {
 
 // Every number is a double, which is the trade numbat makes too: a utility
 // calculator wants boring, predictable arithmetic, and the places a double falls
@@ -58,4 +58,4 @@ private:
   double m_n = 0;
 };
 
-} // namespace abacus
+} // namespace numen

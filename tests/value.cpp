@@ -1,7 +1,7 @@
 #include "value.hpp"
 #include <catch2/catch_test_macros.hpp>
 
-using abacus::Value;
+using numen::Value;
 
 TEST_CASE("scaled applies the exponent in one step", "[value]") {
   CHECK(Value::scaled(15, 2) == Value{1500});
@@ -54,11 +54,11 @@ TEST_CASE("rendering", "[value]") {
   CHECK(Value{1.0 / 3}.render() == "0.333333");
   CHECK(Value{1234567.5}.render() == "1234567.5");
   CHECK(Value{1e-7}.render() == "1e-07");
-  CHECK(Value{255}.render(abacus::NumberOutputFormat::Hexadecimal) == "0xff");
-  CHECK(Value{511}.render(abacus::NumberOutputFormat::Octal) == "0o777");
-  CHECK(Value{256}.render(abacus::NumberOutputFormat::Binary) == "0b100000000");
+  CHECK(Value{255}.render(numen::NumberOutputFormat::Hexadecimal) == "0xff");
+  CHECK(Value{511}.render(numen::NumberOutputFormat::Octal) == "0o777");
+  CHECK(Value{256}.render(numen::NumberOutputFormat::Binary) == "0b100000000");
 
   // a unit that dictates its own precision caps the fraction
-  CHECK(Value{0.223923}.render(abacus::NumberOutputFormat::Decimal, 2) == "0.22");
-  CHECK(Value{1234.7}.render(abacus::NumberOutputFormat::Decimal, 0) == "1235");
+  CHECK(Value{0.223923}.render(numen::NumberOutputFormat::Decimal, 2) == "0.22");
+  CHECK(Value{1234.7}.render(numen::NumberOutputFormat::Decimal, 0) == "1235");
 }

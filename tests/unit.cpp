@@ -1,5 +1,5 @@
-#include "abacus/abacus.hpp"
-#include "abacus/unit.hpp"
+#include "numen/numen.hpp"
+#include "numen/unit.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
@@ -56,7 +56,7 @@ TEST_CASE("an alias expands to the composition it names", "[unit][compound]") {
 // the units that are not products of anything we have stay atomic, so nothing
 // enforces their factor except this
 TEST_CASE("an atomic unit still agrees with its composed equivalent", "[unit][compound]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   CHECK(calc.evaluate("1 hectare to m*m") == "10000m²");
   CHECK(calc.evaluate("1 acre to m*m") == "4046.856422m²");
@@ -87,7 +87,7 @@ TEST_CASE("a compound renders the way it was typed", "[unit][compound]") {
 }
 
 TEST_CASE("unit should tag any expression", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
   {
     auto res = calc.compute("5 * 2 + 10 usd");
     REQUIRE(res.has_value());
@@ -98,7 +98,7 @@ TEST_CASE("unit should tag any expression", "[unit]") {
 }
 
 TEST_CASE("unit can be converted using the 'to' operator", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1 km to m");
@@ -110,7 +110,7 @@ TEST_CASE("unit can be converted using the 'to' operator", "[unit]") {
 }
 
 TEST_CASE("unit can be converted using the 'in' operator", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1 km in m");
@@ -122,7 +122,7 @@ TEST_CASE("unit can be converted using the 'in' operator", "[unit]") {
 }
 
 TEST_CASE("unit can be converted many times in a row", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1 km in m to km");
@@ -134,7 +134,7 @@ TEST_CASE("unit can be converted many times in a row", "[unit]") {
 }
 
 TEST_CASE("artithmetic can be used on a converted unit", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
   {
     auto res = calc.compute("1km to m to km * 10 + 5");
     REQUIRE(res);
@@ -145,7 +145,7 @@ TEST_CASE("artithmetic can be used on a converted unit", "[unit]") {
 }
 
 TEST_CASE("unit name should be inferred from context", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1m to s");
@@ -157,7 +157,7 @@ TEST_CASE("unit name should be inferred from context", "[unit]") {
 }
 
 TEST_CASE("inconvertible units should return an error", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1meter to s");
@@ -166,7 +166,7 @@ TEST_CASE("inconvertible units should return an error", "[unit]") {
 }
 
 TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("km to m");
@@ -176,7 +176,7 @@ TEST_CASE("unit without number should assume a quantity of 1", "[unit]") {
 }
 
 TEST_CASE("unit should always apply to everything to the left of it", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("2^8 km to m");
@@ -186,7 +186,7 @@ TEST_CASE("unit should always apply to everything to the left of it", "[unit]") 
 }
 
 TEST_CASE("should convert between systems, with non base unit", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("km to in");
@@ -202,7 +202,7 @@ TEST_CASE("should convert between systems, with non base unit", "[unit]") {
 }
 
 TEST_CASE("no unit after conversion operator should error", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1m to 150");
@@ -213,7 +213,7 @@ TEST_CASE("no unit after conversion operator should error", "[unit]") {
 TEST_CASE("in should work as a conversion operator in the right context, and a "
           "unit name in others",
           "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
   auto res = calc.compute("1m in in"); // 1 meter to inches, here the middle
                                        // in is an alias for the 'go' operator
   REQUIRE(res);
@@ -223,7 +223,7 @@ TEST_CASE("in should work as a conversion operator in the right context, and a "
 }
 
 TEST_CASE("Unit should convert implicitly when in a binary expression", "[unit]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   {
     auto res = calc.compute("1km + 100m");

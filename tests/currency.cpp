@@ -1,11 +1,11 @@
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include "region-currency.hpp"
 #include "mock-currency-provider.hpp"
 
 TEST_CASE("Locale to currency mapping") {
-  using abacus::currencyForLocale;
-  using abacus::currencyForRegion;
+  using numen::currencyForLocale;
+  using numen::currencyForRegion;
 
   REQUIRE(currencyForRegion("FR") == "EUR");
   REQUIRE(currencyForRegion("fr") == "EUR");
@@ -66,7 +66,7 @@ TEST_CASE("a currency amount lands on its minor units even without a conversion"
   CHECK(calc.evaluate("1 usd / 3") == "0.33usd");
 
   // jpy has no minor units at all
-  abacus::EvalConfig jp{.locale = "ja_JP"};
+  numen::EvalConfig jp{.locale = "ja_JP"};
   CHECK(calc.evaluate("1 jpy / 3", jp) == "0jpy");
   CHECK(calc.evaluate("1234.7 jpy", jp) == "1235jpy");
 
@@ -75,7 +75,7 @@ TEST_CASE("a currency amount lands on its minor units even without a conversion"
 }
 
 TEST_CASE("minor unit digits come from CLDR", "[currency]") {
-  using abacus::currencyDigits;
+  using numen::currencyDigits;
 
   CHECK(currencyDigits("JPY") == 0);
   CHECK(currencyDigits("KRW") == 0);
@@ -92,7 +92,7 @@ TEST_CASE("minor unit digits come from CLDR", "[currency]") {
 }
 
 TEST_CASE("the provider supplies the rates a conversion uses", "[currency]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
   auto provider = std::make_unique<test::MockCurrencyProvider>();
   auto *handle = provider.get();
 
@@ -123,7 +123,7 @@ TEST_CASE("a rate applies inside a composed unit too", "[currency][compound]") {
   // the same currency cancels before any rate is consulted, which is why this
   // works even on a calculator with no provider at all
   CHECK(calc.evaluate("100 usd / 2 hr to usd/hr") == "50usd/hr");
-  CHECK(abacus::Abacus{}.evaluate("100 usd / 2 hr to usd/hr") == "50usd/hr");
+  CHECK(numen::Numen{}.evaluate("100 usd / 2 hr to usd/hr") == "50usd/hr");
 
   CHECK_FALSE(calc.evaluate("100 usd / 2 hr to zzz/hr"));
 }

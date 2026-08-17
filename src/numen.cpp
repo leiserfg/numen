@@ -1,5 +1,5 @@
-#include "abacus/abacus.hpp"
-#include "abacus/unit.hpp"
+#include "numen/numen.hpp"
+#include "numen/unit.hpp"
 #include "dummy-currency-provider.hpp"
 #include "computed.hpp"
 #include "parser.hpp"
@@ -30,8 +30,8 @@
 #include <variant>
 #include <vector>
 
-namespace abacus {
-using namespace abacus::detail;
+namespace numen {
+using namespace numen::detail;
 bool isWholeNumber(double x) { return std::isfinite(x) && x == std::trunc(x); };
 
 namespace {
@@ -548,7 +548,7 @@ public:
     if (auto n = result.asNumber(); n && n->unit && n->unit->def() &&
                                     n->unit->def()->dimension == dimensions::CURRENCY &&
                                     !n->explicitlyConverted) {
-      auto target = abacus::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
+      auto target = numen::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
       if (target && !equalsIgnoreCase(*target, n->unit->def()->id)) {
         result = convertToUnit(result.asNumber()->n.toDouble(), n->unit->def()->id, *target);
       }
@@ -1129,7 +1129,7 @@ static ComputedValue toPublic(const detail::Computed &c) {
   return ComputedValue{.value = std::get<Boolean>(c.value)};
 }
 
-std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr, const EvalConfig &opts) {
+std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
@@ -1139,7 +1139,7 @@ std::expected<ComputedValue, std::string> Abacus::compute(std::string_view expr,
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
-std::expected<std::string, std::string> Abacus::evaluate(const std::string_view expr,
+std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr,
                                                          const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
@@ -1251,13 +1251,13 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
       expr.data);
 }
 
-void Abacus::printAST(const std::string &expr) const {
+void Numen::printAST(const std::string &expr) const {
   Parser parser{expr, m_unitDb};
   auto ast = parser.parse();
 
   printASTNode(std::cout, *ast.root, 0);
 }
 
-Abacus::Abacus() { setCurrencyProvider(std::make_unique<DummyCurrencyProvider>()); }
+Numen::Numen() { setCurrencyProvider(std::make_unique<DummyCurrencyProvider>()); }
 
-}; // namespace abacus
+}; // namespace numen

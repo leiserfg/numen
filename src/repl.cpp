@@ -1,4 +1,4 @@
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include "rang/rang.hpp"
 #include <iostream>
 #include <string>
@@ -6,7 +6,7 @@
 #include "vicinae-currency-provider.hpp"
 #endif
 
-void process(abacus::Abacus &calc, const std::string &s) {
+void process(numen::Numen &calc, const std::string &s) {
   std::string_view line{s};
 
   bool ast = false;
@@ -29,7 +29,7 @@ void process(abacus::Abacus &calc, const std::string &s) {
 }
 
 int main(int ac, char **av) {
-  abacus::Abacus calc{};
+  numen::Numen calc{};
 
 #ifdef BUILD_CURRENCY_PROVIDER
   auto provider = std::make_unique<VicinaeCurrencyProvider>();

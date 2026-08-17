@@ -1,6 +1,6 @@
 #pragma once
 
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -21,10 +21,10 @@ template <typename T, typename E> struct StringMaker<std::expected<T, E>> {
 namespace test {
 
 // "now" is frozen so that tests depending on the current date stay valid
-inline const abacus::EvalConfig &frozenConfig() {
-  static const abacus::EvalConfig config = [] {
+inline const numen::EvalConfig &frozenConfig() {
+  static const numen::EvalConfig config = [] {
     std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{1}, std::chrono::day{18}};
-    return abacus::EvalConfig{
+    return numen::EvalConfig{
         .now = std::chrono::sys_days(now),
         .timezone = std::chrono::locate_zone("UTC"),
         // without this the ambient locale decides whether currencies auto-convert
@@ -35,9 +35,9 @@ inline const abacus::EvalConfig &frozenConfig() {
 }
 
 inline void assertExpr(std::string_view expr, std::string_view expected,
-                       const abacus::EvalConfig &opts = {}) {
+                       const numen::EvalConfig &opts = {}) {
   CAPTURE(expr);
-  abacus::Abacus calc;
+  numen::Numen calc;
   auto res = calc.evaluate(expr, opts);
   if (!res) {
     FAIL_CHECK("evaluation failed: " << res.error());
@@ -47,9 +47,9 @@ inline void assertExpr(std::string_view expr, std::string_view expected,
 }
 
 inline void assertNumber(std::string_view expr, double expected, double margin = 1e-9,
-                         const abacus::EvalConfig &opts = {}) {
+                         const numen::EvalConfig &opts = {}) {
   CAPTURE(expr);
-  abacus::Abacus calc;
+  numen::Numen calc;
   auto res = calc.compute(expr, opts);
   if (!res) {
     FAIL_CHECK("evaluation failed: " << res.error());

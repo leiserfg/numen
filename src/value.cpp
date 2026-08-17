@@ -4,7 +4,7 @@
 #include <ranges>
 #include <stdexcept>
 
-namespace abacus {
+namespace numen {
 
 namespace {
 
@@ -120,4 +120,4 @@ std::string Value::render(NumberOutputFormat format, std::optional<int> fixedDec
   return out;
 }
 
-} // namespace abacus
+} // namespace numen

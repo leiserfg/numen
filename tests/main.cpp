@@ -1,4 +1,4 @@
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include "helpers.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -61,7 +61,7 @@ TEST_CASE("planned NLP operator phrasings", "[.][future]") {
 }
 
 TEST_CASE("deeply nested and very long input does not overflow the stack", "[robustness]") {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   SECTION("nested parentheses") {
     std::string expr = std::string(200, '(') + "1" + std::string(200, ')');

@@ -1,6 +1,6 @@
 #pragma once
-#include "abacus/unit.hpp"
-#include "abacus/abacus.hpp"
+#include "numen/unit.hpp"
+#include "numen/numen.hpp"
 #include "concepts.hpp"
 #include "lexer.hpp"
 #include <bits/chrono.h>
@@ -14,11 +14,11 @@
 #include <type_traits>
 #include <variant>
 
-using namespace abacus;
+using namespace numen;
 
 struct Expression;
 
-using NumberString = abacus::Value;
+using NumberString = numen::Value;
 
 namespace {
 double toNumber(std::string_view s) {
@@ -205,7 +205,7 @@ public:
 
 protected:
   bool isPostfixPercent(const Lexer::Token &pct);
-  std::optional<Scanned<abacus::Duration>> scanDuration();
+  std::optional<Scanned<numen::Duration>> scanDuration();
   std::unique_ptr<Expression> parseTerm();
   std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);

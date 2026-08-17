@@ -5,7 +5,7 @@ all:
 	cmake --build --preset default
 
 test: all
-	./build/abacus-tests
+	./build/numen-tests
 
 debug:
 	cmake --preset debug

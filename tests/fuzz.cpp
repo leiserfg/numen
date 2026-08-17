@@ -1,10 +1,10 @@
-#include "abacus/abacus.hpp"
+#include "numen/numen.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t *data, std::size_t size) {
-  abacus::Abacus calc;
+  numen::Numen calc;
 
   auto res = calc.evaluate(std::string_view{reinterpret_cast<const char *>(data), size});
 

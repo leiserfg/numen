@@ -1,7 +1,7 @@
 #pragma once
 
-#include "abacus/abacus.hpp"
-#include "abacus/abstract-currency-provider.hpp"
+#include "numen/numen.hpp"
+#include "numen/abstract-currency-provider.hpp"
 #include <map>
 #include <memory>
 #include <optional>
@@ -33,8 +33,8 @@ private:
   int m_updates = 0;
 };
 
-inline abacus::Abacus mockCalc() {
-  abacus::Abacus calc;
+inline numen::Numen mockCalc() {
+  numen::Numen calc;
   calc.setCurrencyProvider(std::make_unique<MockCurrencyProvider>());
   return calc;
 }
