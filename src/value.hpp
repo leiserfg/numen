@@ -21,6 +21,8 @@ public:
 
   double toDouble() const { return m_n; }
 
+  template <typename T> T to() const { return static_cast<T>(m_n); }
+
   bool isZero() const { return m_n == 0; }
   bool isNaN() const { return std::isnan(m_n); }
   bool isInteger() const { return std::isfinite(m_n) && m_n == std::trunc(m_n); }

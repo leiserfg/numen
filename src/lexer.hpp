@@ -25,7 +25,7 @@ public:
     std::string_view data;
   };
   struct Operator {
-    char c;
+    std::string_view op;
   };
 
   using TokenData = std::variant<Number, String, Operator>;

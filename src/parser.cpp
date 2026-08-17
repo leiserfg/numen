@@ -234,11 +234,11 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
 // to the numbers (no spaces) in order to be considered a date literal
 std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
   auto ns1 = m_lexer.peak(0);
-  constexpr auto dateDelim = "/";
+  constexpr auto isDateDelim = [](auto c) { return c == "/" || c == "-"; };
 
   if (!ns1 || ns1->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  if (auto tok = m_lexer.peak(1); !tok || !ns1->isAdjacent(*tok) || tok->raw != dateDelim) {
+  if (auto tok = m_lexer.peak(1); !tok || !ns1->isAdjacent(*tok) || !isDateDelim(tok->raw)) {
     return std::nullopt;
   }
 
@@ -246,7 +246,7 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   if (!ns2 || ns2->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  if (auto tok = m_lexer.peak(3); !tok || !ns2->isAdjacent(*tok) || tok->raw != dateDelim) {
+  if (auto tok = m_lexer.peak(3); !tok || !ns2->isAdjacent(*tok) || !isDateDelim(tok->raw)) {
     return std::nullopt;
   }
 
@@ -340,6 +340,8 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
 
 std::optional<DateTimeLiteral> Parser::parseDate() {
   if (auto d = parseYYYYMMDD()) {
+    if (auto tok = m_lexer.peakAs<Lexer::String>(); tok && tok->data == "T") m_lexer.next();
+
     d->time = parseTime(true);
     return d;
   }
@@ -440,40 +442,79 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   return time;
 }
 
+std::optional<DateString> Parser::parseRFC3339() {
+  // 2026-08-17T14:30:00Z
+  using L = Lexer;
+  auto parsed = m_lexer.peakForward<L::Number, L::Operator, L::Number, L::Operator, L::Number, L::String,
+                                    L::Number, L::Operator, L::Number, L::Operator, L::Number>();
+
+  if (!parsed) return std::nullopt;
+
+  auto &[year, s1, month, s2, day, tsep, hour, s3, min, s4, s] = *parsed;
+
+  if (!(s1.op == "-" && s2.op == "-" && s3.op == ":" && s4.op == ":")) return std::nullopt;
+
+  DateString ds;
+
+  ds.value = DateTimeLiteral{.day = std::chrono::day{static_cast<unsigned>(day.n.toDouble())},
+                             .month = std::chrono::month{static_cast<unsigned>(month.n.toDouble())},
+                             .year = std::chrono::year{static_cast<int>(year.n.toDouble())},
+                             .time = ParsedTime{
+                                 .hours = std::chrono::hours{hour.n.to<int>()},
+                                 .minutes = std::chrono::minutes{min.n.to<int>()},
+                                 .seconds = std::chrono::seconds{s.n.to<int>()},
+                             }};
+
+  m_lexer.advance(std::tuple_size_v<decltype(parsed)::value_type>);
+
+  if (auto s = m_lexer.peakAs<Lexer::String>(); s && s->data == "Z") {
+    m_lexer.next();
+    ds.timezone = TimezoneOffset{.name = "UTC"};
+    return ds;
+  } else if (auto offset = parseTimezoneOffset()) {
+    ds.timezone = TimezoneOffset{.name = "UTC", .offset = *offset};
+    return ds;
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
+  constexpr auto isValidOffset = [](auto offset) { return offset >= 0 && offset <= 23; };
+  std::chrono::seconds offset;
+
+  if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
+    if (str->raw == "+" || str->raw == "-") {
+      int sign = str->raw == "+" ? 1 : -1;
+      m_lexer.next();
+
+      if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && isValidOffset(n->n)) {
+        m_lexer.next();
+        offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
+
+        if (auto tok = m_lexer.peak(); tok && tok->raw == ":") {
+          m_lexer.next();
+          if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && n->n >= 0 && n->n < 60) {
+            m_lexer.next();
+            offset += std::chrono::minutes(static_cast<int>(n->n.toDouble()) * sign);
+          }
+        }
+      }
+    }
+    return offset;
+  };
+  return std::nullopt;
+}
+
 std::optional<TimezoneOffset> Parser::parseTimezone() {
   if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
     auto isOffsettableTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
                                                [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
-    constexpr auto isValidOffset = [](auto offset) { return offset >= 0 && offset <= 23; };
 
     if (isOffsettableTz) {
-      TimezoneOffset tz{.name = str->raw};
-
       m_lexer.next();
-
-      if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
-        if (str->raw == "+" || str->raw == "-") {
-          int sign = str->raw == "+" ? 1 : -1;
-          m_lexer.next();
-
-          if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && isValidOffset(n->n)) {
-            m_lexer.next();
-            tz.offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
-
-            if (auto tok = m_lexer.peak(); tok && tok->raw == ":") {
-              m_lexer.next();
-              if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && n->n >= 0 && n->n < 60) {
-                m_lexer.next();
-                tz.offset += std::chrono::minutes(static_cast<int>(n->n.toDouble()) * sign);
-              }
-            }
-
-            return tz;
-          }
-        }
-      }
-
-      return tz;
+      return TimezoneOffset{.name = str->raw,
+                            .offset = parseTimezoneOffset().value_or(std::chrono::seconds{0})};
     }
   }
 
@@ -512,9 +553,13 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       return std::move(lhs);
     }
 
+    if (auto date = parseRFC3339()) { return std::make_unique<Expression>(*date); }
+
     if (auto date = parseDate()) {
       DateString ds{.value = *date};
+
       if (auto result = parseTimezone()) { ds.timezone = result.value(); }
+
       return std::make_unique<Expression>(ds);
     }
 

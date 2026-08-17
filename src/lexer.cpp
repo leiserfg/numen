@@ -53,7 +53,7 @@ std::optional<Lexer::Token> Lexer::next() {
     case State::String:
       return makeToken(TokenType::String, String{.data = getSelection()});
     case State::Operator:
-      return makeToken(TokenType::Operator, Operator{});
+      return makeToken(TokenType::Operator, Operator{getSelection()});
     default:
       return std::nullopt;
     }

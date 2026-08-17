@@ -187,6 +187,9 @@ public:
   std::optional<TimezoneOffset> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
   std::optional<RelativeDateTimeLiteral> parseRelativeDateTimeLiteral();
+  std::optional<DateString> parseRFC3339();
+
+  std::optional<std::chrono::seconds> parseTimezoneOffset();
 
   template <typename F> std::optional<std::string_view> greedyParse(int n, F fn) {
     assert(n >= 0);

@@ -1,0 +1,2 @@
+- [ ] disambiguation of conversion between timezone and unit. e.g "now in pt" should be interpreted as pacific time
+- [ ] handle most frequent date formats

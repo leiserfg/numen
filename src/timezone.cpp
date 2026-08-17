@@ -85,6 +85,7 @@ const std::chrono::time_zone *locateZone(std::string_view name) {
 // clang-format off
 constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
     {.name = "nyc", .target = "America/New_York"},
+    {.name = "ny", .target = "America/New_York"},
     {.name = "dc", .target = "America/New_York"},
     // the state outweighs the district in the geo database
     {.name = "washington", .target = "America/New_York"},
