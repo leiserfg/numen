@@ -146,6 +146,19 @@ struct Boolean {
 
 using ValueType = std::variant<Number, DateTime, Boolean, Duration>;
 
+template <class T> std::string_view valueName() {
+  if constexpr (std::is_same_v<T, Duration>) {
+    return "Duration";
+  } else if constexpr (std::is_same_v<T, Number>) {
+    return "Number";
+  } else if constexpr (std::is_same_v<T, DateTime>) {
+    return "DateTime";
+  } else {
+    static_assert(std::is_same_v<T, Boolean>);
+    return "Boolean";
+  }
+}
+
 struct ComputedValue {
   ValueType value;
 
@@ -161,21 +174,7 @@ struct ComputedValue {
   const Duration *asDuration() const { return std::get_if<Duration>(&value); }
 
   std::string_view valueTypeName() const {
-    return std::visit(
-        [](const auto &v) {
-          using T = std::remove_cvref_t<decltype(v)>;
-          if constexpr (std::is_same_v<T, Duration>) {
-            return "Duration";
-          } else if constexpr (std::is_same_v<T, Number>) {
-            return "Number";
-          } else if constexpr (std::is_same_v<T, DateTime>) {
-            return "DateTime";
-          } else {
-            static_assert(std::is_same_v<T, Boolean>);
-            return "Boolean";
-          }
-        },
-        value);
+    return std::visit([](const auto &v) { return valueName<std::remove_cvref_t<decltype(v)>>(); }, value);
   }
 };
 
@@ -209,6 +208,28 @@ public:
 
   std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
   std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
+
+  template <typename T>
+  std::expected<T, std::string> parse(std::string_view expr, const EvalConfig &opts = {}) {
+    if constexpr (std::is_same_v<T, bool>) {
+      return parse<Boolean>(expr, opts).transform([](const auto &value) { return value.value; });
+    } else if constexpr (std::is_arithmetic_v<T>) {
+      return parse<Number>(expr, opts).transform([](const auto &value) { return static_cast<T>(value.n); });
+    } else if constexpr (std::is_same_v<T, std::chrono::system_clock::time_point>) {
+      return parse<DateTime>(expr, opts).transform([](const auto &value) {
+        return static_cast<T>(value.time);
+      });
+    } else {
+      auto res = compute(expr, opts);
+
+      if (!res) return std::unexpected(res.error());
+
+      if (auto v = std::get_if<T>(&res.value().value)) return *v;
+
+      return std::unexpected(std::format("Could not parse expression as {}, got {} instead", valueName<T>(),
+                                         res->valueTypeName()));
+    }
+  }
 
   void printAST(const std::string &expr) const;
 

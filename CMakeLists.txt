@@ -114,7 +114,15 @@ if (BUILD_TESTS)
 	endif()
 
 	set(TEST_TARGET numen-tests)
-	add_executable(${TEST_TARGET} tests/main.cpp tests/datetime.cpp tests/timezone.cpp tests/unit.cpp tests/corpus.cpp tests/currency.cpp tests/value.cpp)
+	add_executable(${TEST_TARGET} 
+		tests/main.cpp 
+		tests/datetime.cpp 
+		tests/timezone.cpp 
+		tests/parse.cpp
+		tests/unit.cpp 
+		tests/corpus.cpp 
+		tests/currency.cpp 
+		tests/value.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
