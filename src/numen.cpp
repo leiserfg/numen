@@ -242,9 +242,15 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
             using A = std::remove_cvref_t<decltype(anchor)>;
             int sign = value.direction == RelativeDateTimeLiteral::Direction::Past ? -1 : 1;
             if constexpr (std::is_same_v<A, std::chrono::weekday>) {
+              // TODO: implement weekday delta
               return now;
             } else {
               static_assert(std::is_same_v<A, Duration>);
+              if (value.precision == DateTimePrecision::Date) {
+                std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
+                now = tz->to_sys(std::chrono::local_seconds{std::chrono::local_days{date}});
+              }
+
               if (auto &y = anchor.years) now = shift<std::chrono::years>(now, sign * *y);
               if (auto &m = anchor.months) now = shift<std::chrono::months>(now, sign * *m);
               if (auto &s = anchor.seconds) now = now + sign * *s;
@@ -1139,8 +1145,7 @@ std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, 
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
-std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr,
-                                                         const EvalConfig &opts) {
+std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr, const EvalConfig &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();

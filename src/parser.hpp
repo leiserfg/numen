@@ -101,6 +101,7 @@ template <typename T> struct Scanned {
 struct RelativeDateTimeLiteral {
   std::variant<Duration, std::chrono::weekday> delta;
   enum class Direction : std::uint8_t { Past, Future } direction;
+  DateTimePrecision precision = DateTimePrecision::DateTime;
 };
 
 struct DateString {

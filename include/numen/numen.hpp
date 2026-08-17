@@ -15,14 +15,14 @@ namespace numen {
 
 using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
-enum class DateTimeOutputFormat { DateTime, Time, Date };
+enum class DateTimePrecision { DateTime, Time, Date, Month, Year };
 
 struct DateTime {
   TimePoint time;
   const std::chrono::time_zone *tz = nullptr;
   std::chrono::seconds offset = std::chrono::seconds(0);
 
-  DateTimeOutputFormat format = DateTimeOutputFormat::DateTime;
+  DateTimePrecision format = DateTimePrecision::DateTime;
 
   auto operator<=>(const DateTime &rhs) const { return time <=> rhs.time; }
   bool operator==(const DateTime &rhs) const { return time == rhs.time; }

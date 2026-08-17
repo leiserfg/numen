@@ -57,9 +57,9 @@ public:
   std::optional<Token> peakIf(TokenType type);
   std::optional<Token> peak(int n = 0);
 
-  template <typename T> const T *peakAs() {
-    if (auto tok = peak(); tok && std::holds_alternative<T>(tok->data)) { return &std::get<T>(tok->data); }
-    return nullptr;
+  template <typename T> std::optional<T> peakAs() {
+    if (auto tok = peak(); tok && std::holds_alternative<T>(tok->data)) { return std::get<T>(tok->data); }
+    return std::nullopt;
   }
 
   Token peakOrThrow(std::string_view message, int n = 0) {
