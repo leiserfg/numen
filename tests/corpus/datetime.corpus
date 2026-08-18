@@ -150,6 +150,10 @@ tomorrow - yesterday to days => 2days
 14h to min                   => 840min
 1 h * 3                      => 3 hr
 
+# the 'min' at the end should make it a duration and not a time of the day (date time)
+1h30min						=> 1 hr 30 min
+1h30min50s                  => 1 hr 30 min 50 sec
+
 # after a date there is nothing else it could be, so the minutes are optional
 18 Jan 2026 12h              => 2026-01-18 12:00:00 (Etc/UTC)
 18 Jan 2026 12h40            => 2026-01-18 12:40:00 (Etc/UTC)

@@ -576,17 +576,25 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
     if (auto date = parseRFC3339()) { return std::make_unique<Expression>(*date); }
 
+    if (auto date = parseRelativeDateTimeLiteral()) {
+      DateString ds{.value = *date};
+      if (auto result = parseTimezone()) { ds.timezone = result.value(); }
+      return std::make_unique<Expression>(ds);
+    }
+
+    // less than 2 tokens means likely unit
+    if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
+      for (int i = 0; i != duration->tokenCount; ++i) {
+        m_lexer.next();
+      }
+      return std::make_unique<Expression>(duration->data);
+    }
+
     if (auto date = parseDate()) {
       DateString ds{.value = *date};
 
       if (auto result = parseTimezone()) { ds.timezone = result.value(); }
 
-      return std::make_unique<Expression>(ds);
-    }
-
-    if (auto date = parseRelativeDateTimeLiteral()) {
-      DateString ds{.value = *date};
-      if (auto result = parseTimezone()) { ds.timezone = result.value(); }
       return std::make_unique<Expression>(ds);
     }
 
@@ -600,14 +608,6 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
       return std::make_unique<Expression>(ds);
     }
-  }
-
-  // less than 2 tokens means likely unit
-  if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
-    for (int i = 0; i != duration->tokenCount; ++i) {
-      m_lexer.next();
-    }
-    return std::make_unique<Expression>(duration->data);
   }
 
   if (auto tok = m_lexer.peak()) {
