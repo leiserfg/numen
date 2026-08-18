@@ -40,6 +40,12 @@ std::optional<Lexer::Token> Lexer::next() {
 
   constexpr auto isValidChar = [](std::uint8_t c) { return std::isalpha(c) || c & 0x80; };
 
+  const auto isCalled = [&](std::size_t pos) {
+    while (pos < m_data.size() && (isValidChar(m_data[pos]) || std::isdigit(m_data[pos]))) ++pos;
+    while (pos < m_data.size() && std::isspace(m_data[pos])) ++pos;
+    return pos < m_data.size() && m_data[pos] == '(';
+  };
+
   auto tryCommit = [&]() -> std::optional<Token> {
     switch (state) {
     case State::NumberExponentSign:
@@ -173,8 +179,10 @@ std::optional<Lexer::Token> Lexer::next() {
       break;
     }
     case State::String: {
-      if (!isValidChar(c)) { return tryCommit(); }
-      break;
+      if (isValidChar(c)) break;
+      // digits end a word ("2m10s") unless the word is being called ("log10(x)")
+      if (std::isdigit(c) && isCalled(m_cursor)) break;
+      return tryCommit();
     }
     }
 

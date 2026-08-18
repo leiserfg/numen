@@ -9,12 +9,28 @@
 
 - Dependency-free. You only need a C++23 compiler. Compiles with GCC/clang/MSVC.
 - Evaluate algebraic expressions as you would expect.
-- Built-in math functions.
+- Built-in math functions (see below).
 - Support for computer science operators like bitwise operators and modulo.
 - Full support for units.
 - Date-time arithmetic and timezone conversion based on timezone name, city/region/state name. Expressions like `time in 2 hours in SF` work.
 - Currency conversion support (requires implementing a currency provider; this repo contains an example of one).
 - Natural language syntactic sugar: you can write expressions like `20% of 100` to calculate `0.20 * 100`.
+
+### Built-in functions
+
+Most of these are thin proxies around the `<cmath>` function of the same name, taking radians for angles.
+
+| Family | Functions |
+| --- | --- |
+| Roots and powers | `sqrt`, `cbrt`, `root(x, n)`, `pow(x, y)`, `hypot(a, b, ...)` |
+| Exponentials and logarithms | `exp`, `exp2`, `expm1`, `ln`, `log(x)` / `log(x, base)`, `log2`, `log10`, `log1p` |
+| Trigonometry | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2(y, x)`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh` |
+| Rounding | `floor`, `ceil`, `trunc`, `round(x)` / `round(x, digits)`, `abs`, `sign` |
+| Integers | `gcd(a, b, ...)`, `lcm(a, b, ...)`, `fact` |
+| Special | `gamma`, `lgamma`, `erf`, `erfc`, `fmod(x, y)` |
+| Aggregates | `min`, `max`, `sum`, `avg` |
+
+Functions that keep the shape of their argument (`abs`, rounding, aggregates) keep its unit too: `sum(1 km, 500 m)` is `1.5km`. The others expect plain numbers. Everything lives in `src/numen/fn.cpp`.
 
 ## Comparison with other calculator libraries
 

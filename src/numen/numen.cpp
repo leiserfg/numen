@@ -2,6 +2,7 @@
 #include "numen/unit.hpp"
 #include "dummy-currency-provider.hpp"
 #include "computed.hpp"
+#include "fn.hpp"
 #include "parser.hpp"
 #include "rang/rang.hpp"
 #include "region-currency.hpp"
@@ -298,77 +299,6 @@ std::optional<int> unitDecimals(const detail::Num &v) {
   }
   return std::nullopt;
 }
-
-struct FunctionCtx {
-  template <typename... Ts> std::tuple<Ts...> unpack() {
-    if (args.size() != sizeof...(Ts))
-      throw std::runtime_error("expected " + std::to_string(sizeof...(Ts)) + " argument(s), got " +
-                               std::to_string(args.size()));
-    return [&]<std::size_t... I>(std::index_sequence<I...>) {
-      return std::tuple{(args[I].value)...};
-    }(std::index_sequence_for<Ts...>{});
-  }
-
-  // unwraps all argument while asserting that they are indeed of type T
-  template <typename T> std::vector<const T *> unpackAll() {
-    std::vector<const T *> unpacked;
-    for (const auto &arg : args) {
-      if (auto n = std::get_if<T>(&arg.value)) {
-        unpacked.emplace_back(n);
-      } else {
-        throw std::runtime_error("Found an argument with invalid type");
-      }
-    }
-
-    return unpacked;
-  }
-
-  FunctionCtx(std::span<const Computed> args) : args(args) {}
-  std::span<const Computed> args;
-};
-
-using FunctionHandler = std::function<Computed(FunctionCtx ctx)>;
-
-struct FunctionDefinition {
-  std::string_view name;
-  int requiredArgs = 0;
-  FunctionHandler fn;
-};
-
-class FunctionDatabase {
-public:
-  FunctionDatabase() {
-    registerFunction("min", [&](FunctionCtx ctx) {
-      if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
-      auto nn = ctx.unpackAll<Num>();
-      auto min = std::ranges::min(nn, std::less{}, [](const Num *a) { return a->n; });
-
-      return Computed{.value = *min};
-    });
-
-    registerFunction("max", [&](FunctionCtx ctx) {
-      if (ctx.args.empty()) throw std::runtime_error("min: at least 1 argument is required.");
-      auto nn = ctx.unpackAll<Num>();
-      auto max = std::ranges::max(nn, std::less{}, [](const Num *a) { return a->n; });
-
-      return Computed{.value = *max};
-    });
-  }
-
-  void registerFunction(std::string_view name, FunctionHandler handler) {
-    m_fns.emplace_back(FunctionDefinition{.name = name, .fn = std::move(handler)});
-  }
-
-  void registerFunction(FunctionDefinition def) { m_fns.emplace_back(std::move(def)); }
-
-  FunctionHandler *findFunction(std::string_view name) {
-    auto it = std::ranges::find_if(m_fns, [&](auto &&fn) { return fn.name == name; });
-    return it == m_fns.end() ? nullptr : &it->fn;
-  }
-
-private:
-  std::vector<FunctionDefinition> m_fns;
-};
 
 struct OperationHandler {};
 
@@ -1097,19 +1027,15 @@ private:
   }
 
   Computed executeFunction(const FunctionCall &fn) const {
-    FunctionDatabase db;
+    auto handler = FunctionDatabase::builtin().find(fn.name);
+    if (!handler) throw std::runtime_error(std::format("Unknown function \"{}\"", fn.name));
 
     auto computedArgs = fn.args | std::views::transform([&](auto &&expr) { return computeExpr(*expr); }) |
                         std::ranges::to<std::vector>();
 
     reconcileArguments(computedArgs);
 
-    if (auto handler = db.findFunction(fn.name)) {
-      FunctionCtx ctx{computedArgs};
-      return (*handler)(ctx);
-    } else {
-      throw std::runtime_error(std::format("Unknown function \"{}\"", fn.name));
-    }
+    return (*handler)(FunctionCtx{.name = fn.name, .args = computedArgs});
   }
 
   const UnitDatabase &m_db;

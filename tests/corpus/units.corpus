@@ -203,3 +203,33 @@ max(1 km to m, 100)         => 1000m
 1 kmh to mph                => 0.621371mi/h
 1 sqkm to hectare           => 100hectare
 1 kmh * 1 kmh               => 1km²/h²
+
+# unit-preserving functions
+abs(-3 m)                   => 3m
+abs(1 km to m)              => 1000m
+floor(2.7 km)               => 2km
+ceil(2.1 kg)                => 3kg
+round(2.567 km, 1)          => 2.6km
+trunc(-2.7 hr)              => -2 hr
+sign(-5 m)                  => -1
+sum(1 km, 500 m)            => 1.5km
+sum(1 hr, 30 min)           => 1.5hr
+avg(1 km, 3 km)             => 2km
+avg(20 c, 30 c)             => 25c
+hypot(3 m, 4 m)             => 5m
+hypot(3 km, 4000 m)         => 5km
+max(100, 1 km to m)         => 1000m
+sum(1 km, 1 hr)             => !error Incompatible units: hr to km
+
+# no roots or logarithms of dimensions
+sqrt(4 m)                   => !error sqrt: argument 1 must be a plain number, got 4 m
+sqrt(1 km to m)             => !error sqrt: argument 1 must be a plain number, got 1000 m
+ln(2 kg)                    => !error
+pow(2 m, 2)                 => !error
+
+# a unit can follow a call like any other term
+sqrt(4) km                  => 2km
+sqrt(4)m                    => 2m
+2 * sqrt(4) km              => 4km
+sqrt(4) km to m             => 2000m
+sqrt(4) km + 1              => 3km

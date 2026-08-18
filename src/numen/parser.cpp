@@ -671,7 +671,8 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         }
 
         m_lexer.next();
-        return std::make_unique<Expression>(std::move(fn));
+        // falls through to the unit check so that "sqrt(4) km" carries a unit
+        expr = std::make_unique<Expression>(std::move(fn));
       }
     }
   }

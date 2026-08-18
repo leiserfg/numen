@@ -53,6 +53,7 @@ endif()
 set(NUMEN_SRCS 
 	src/numen/numen.cpp
 	src/numen/builtin-units.cpp
+	src/numen/fn.cpp
 	src/numen/lexer.cpp
 	src/numen/parser.cpp
 	src/numen/region-currency.cpp
