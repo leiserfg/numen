@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(BUILD_REPL "Build the repl program" ON)
 option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
 
@@ -63,7 +64,14 @@ set(NUMEN_SRCS
 
 set(PUBLIC_HEADERS ./include/numen/numen.hpp ./include/numen/unit.hpp ./include/numen/abstract-currency-provider.hpp)
 
-add_library(${PROJECT_NAME} STATIC SHARED ${NUMEN_SRCS})
+if (BUILD_SHARED_LIBS)
+	add_library(${PROJECT_NAME} SHARED ${NUMEN_SRCS})
+else()
+	add_library(${PROJECT_NAME} STATIC ${NUMEN_SRCS})
+endif()
+
+install(TARGETS ${PROJECT_NAME})
+
 target_link_libraries(${PROJECT_NAME})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/numen/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include/numen)
 

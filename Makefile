@@ -1,8 +1,17 @@
 PY := /usr/bin/env python
 
-all:
+all: static
+.PHONY: all
+
+static:
 	cmake --preset default
 	cmake --build --preset default
+.PHONY: static
+
+shared:
+	cmake --preset default -DBUILD_SHARED_LIBS=ON
+	cmake --build --preset default
+.PHONY: shared
 
 test: all
 	./build/numen-tests

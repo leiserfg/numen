@@ -33,12 +33,14 @@
 
 ### Build
 
-Run `make` to build a static and shared version of the library, as well as the simple REPL. The Makefile is a thin wrapper around CMake presets; the equivalent CMake invocation is:
+You can just run `make`, or:
 
 ```sh
 cmake --preset default
 cmake --build --preset default
 ```
+
+You can pass `-DBUILD_SHARED_LIBS=ON` if you want to build as a shared library.
 
 Run `make test` to build and run the test suite (`./build/numen-tests`).
 
