@@ -34,8 +34,7 @@ inline const numen::EvalConfig &frozenConfig() {
   return config;
 }
 
-inline void assertExpr(std::string_view expr, std::string_view expected,
-                       const numen::EvalConfig &opts = {}) {
+inline void assertExpr(std::string_view expr, std::string_view expected, const numen::EvalConfig &opts = {}) {
   CAPTURE(expr);
   numen::Numen calc;
   auto res = calc.evaluate(expr, opts);

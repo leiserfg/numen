@@ -61,8 +61,11 @@ set(NUMEN_SRCS
 	src/numen/value.cpp
 )
 
-add_library(${PROJECT_NAME} ${NUMEN_SRCS})
+set(PUBLIC_HEADERS ./include/numen/numen.hpp ./include/numen/unit.hpp ./include/numen/abstract-currency-provider.hpp)
+
+add_library(${PROJECT_NAME} STATIC SHARED ${NUMEN_SRCS})
 target_link_libraries(${PROJECT_NAME})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/numen/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include/numen)
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include

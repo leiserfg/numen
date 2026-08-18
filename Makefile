@@ -28,6 +28,10 @@ format:
 	find ./tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i
 .PHONY: format
 
+install:
+	cmake --install build
+.PHONY: install
+
 re: clean all
 
 .PHONY: all test debug fuzzer clean re

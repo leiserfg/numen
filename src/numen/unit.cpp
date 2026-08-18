@@ -89,9 +89,7 @@ DimensionTraits traitsOf(std::string_view name) {
   if (name == dimensions::SPEED) return {.signature = {.length = 1, .time = -1}};
 
   if (name == dimensions::CURRENCY) {
-    return {.signature = {.currency = 1},
-            .composition = Composition::RateOnly,
-            .dynamicFactor = true};
+    return {.signature = {.currency = 1}, .composition = Composition::RateOnly, .dynamicFactor = true};
   }
 
   return {};
@@ -258,9 +256,8 @@ std::vector<CompoundUnit> UnitDatabase::findCompounds(std::string_view q) const 
     if (auto expanded = expandComposition(alias.composition)) return {*expanded};
   }
 
-  return findUnitCandidates(q) | std::views::transform([&](const UnitDef &def) {
-           return soleUnit(def, std::string{q});
-         }) |
+  return findUnitCandidates(q) |
+         std::views::transform([&](const UnitDef &def) { return soleUnit(def, std::string{q}); }) |
          std::ranges::to<std::vector>();
 }
 

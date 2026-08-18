@@ -18,7 +18,7 @@ constexpr double toSeconds(auto d) { return std::chrono::duration<double>(d).cou
 // must stay function-local: at namespace scope a consumer's own static Numen
 // can be constructed before this table is, and read it empty
 std::span<const UnitDef> units::builtins() {
-// clang-format off
+  // clang-format off
   static const auto BUILTIN_UNITS = std::to_array<UnitDef>({
     // length
     {.id = "meter",      .aliases = {"m", "metre"}, .factor = 1,        .dimension = dimensions::LENGTH, .family = families::METRIC,   .prefixable = true},
@@ -124,7 +124,7 @@ std::span<const UnitDef> units::builtins() {
     {.id = "btc", .aliases = {"bitcoin"},                   .dimension = dimensions::CURRENCY, .family = families::CURRENCY},
     {.id = "eth", .aliases = {"ether", "ethereum"},         .dimension = dimensions::CURRENCY, .family = families::CURRENCY},
   });
-// clang-format on
+  // clang-format on
 
   return BUILTIN_UNITS;
 }
