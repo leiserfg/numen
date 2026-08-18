@@ -5,8 +5,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(BUILD_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
 option(BUILD_REPL "Build the repl program" ON)
+option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
+
 option(BUILD_TESTS "Build the test suite" ON)
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
@@ -48,34 +49,20 @@ if (WIN32 AND NOT MSVC)
 	message(FATAL_ERROR "Windows builds are only supported with MSVC (got '${CMAKE_CXX_COMPILER_ID}'). Please set -DCMAKE_CXX_COMPILER=cl.")
 endif()
 
-set(LINK_LIBS)
-set(SRCS 
-	src/numen.cpp
-	src/builtin-units.cpp
-	src/lexer.cpp
-	src/parser.cpp
-	src/region-currency.cpp
-	src/timezone.cpp
-	src/unicode.cpp
-	src/unit.cpp
-	src/value.cpp
+set(NUMEN_SRCS 
+	src/numen/numen.cpp
+	src/numen/builtin-units.cpp
+	src/numen/lexer.cpp
+	src/numen/parser.cpp
+	src/numen/region-currency.cpp
+	src/numen/timezone.cpp
+	src/numen/unicode.cpp
+	src/numen/unit.cpp
+	src/numen/value.cpp
 )
 
-if (BUILD_CURRENCY_PROVIDER)
-	find_package(OpenSSL REQUIRED)
-	add_compile_definitions(CPPHTTPLIB_OPENSSL_SUPPORT=1)
-	add_compile_definitions(BUILD_CURRENCY_PROVIDER=1)
-	list(APPEND SRCS
-		src/vicinae-currency-provider.cpp
-	)
-	list(APPEND LINK_LIBS
-		OpenSSL::SSL OpenSSL::Crypto
-	)
-endif()
-
-add_library(${PROJECT_NAME} ${SRCS})
-
-target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
+add_library(${PROJECT_NAME} ${NUMEN_SRCS})
+target_link_libraries(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -89,13 +76,28 @@ endif()
 
 if (BUILD_REPL)
 	set(REPL_TARGET repl)
-	add_executable(${REPL_TARGET} src/repl.cpp)
+	set(SRCS src/repl/main.cpp)
+	set(LINK_LIBS)
+
+	if (BUILD_REPL_CURRENCY_PROVIDER)
+		find_package(OpenSSL REQUIRED)
+		add_compile_definitions(CPPHTTPLIB_OPENSSL_SUPPORT=1)
+		add_compile_definitions(BUILD_CURRENCY_PROVIDER=1)
+		list(APPEND SRCS
+			src/repl/vicinae-currency-provider.cpp
+		)
+		list(APPEND LINK_LIBS
+			OpenSSL::SSL OpenSSL::Crypto
+		)
+	endif()
+
+	add_executable(${REPL_TARGET} ${SRCS})
 	target_include_directories(${REPL_TARGET} PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/include
 		${VENDOR_DIR}
 	)
-	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME})
-	target_include_directories(${REPL_TARGET} PRIVATE ./include)
+	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME} ${LINK_LIBS})
+	target_include_directories(${REPL_TARGET} PRIVATE ./include ./repl)
 endif()
 
 if (BUILD_TESTS)
@@ -126,7 +128,7 @@ if (BUILD_TESTS)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
-	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src)
+	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src/numen)
 
 	include(CTest)
 	include(Catch)
