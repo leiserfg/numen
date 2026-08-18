@@ -1,5 +1,6 @@
 #include "numen/numen.hpp"
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 
 TEST_CASE("Should parse value type using parse method") {
   numen::Numen calc{};
@@ -31,6 +32,31 @@ TEST_CASE("Should parse value type using parse method") {
     auto result = calc.parse<int>("1mb to bytes");
     REQUIRE(result);
     REQUIRE(result.value() == 1000000);
+  }
+
+  {
+    auto result = calc.parse<std::chrono::days>("tomorrow - yesterday");
+    REQUIRE(result);
+    REQUIRE(result.value().count() == 2);
+  }
+
+  {
+    auto result = calc.parse<std::chrono::hours>("tomorrow - yesterday + 5h + 30min");
+    REQUIRE(result);
+    REQUIRE(result.value().count() == 53);
+  }
+
+  {
+    auto result = calc.parse<unsigned>("18 Jan 2001 to unix", {.timezone = std::chrono::locate_zone("UTC")});
+    REQUIRE(result);
+    REQUIRE(result.value() == 979776000);
+  }
+
+  {
+    using namespace std::chrono;
+    auto result = calc.parse<system_clock::time_point>("18 Jan 2001", {.timezone = locate_zone("UTC")});
+    REQUIRE(result);
+    REQUIRE(duration_cast<seconds>(result.value().time_since_epoch()).count() == 979776000);
   }
 };
 

@@ -1,6 +1,5 @@
 #pragma once
 #include "numen/unit.hpp"
-#include <bits/chrono.h>
 #include <chrono>
 #include <compare>
 #include <expected>
@@ -202,7 +201,15 @@ struct EvalConfig {
   std::optional<std::string> locale;
 };
 
+template <typename T> struct is_duration : std::false_type {};
+
+template <typename Rep, typename Period>
+struct is_duration<std::chrono::duration<Rep, Period>> : std::true_type {};
+
+template <typename T> inline constexpr bool is_duration_v = is_duration<T>::value;
+
 class Numen {
+
 public:
   Numen();
 
@@ -211,7 +218,23 @@ public:
 
   template <typename T>
   std::expected<T, std::string> parse(std::string_view expr, const EvalConfig &opts = {}) {
-    if constexpr (std::is_same_v<T, bool>) {
+    if constexpr (is_duration_v<T>) {
+      return parse<Duration>(expr, opts)
+          .transform([](const Duration &value) {
+            constexpr auto into = [](auto &&d) { return std::chrono::duration_cast<T>(d); };
+            T d{0};
+            if (auto y = value.years) d += into(*y);
+            if (auto m = value.months) d += into(*m);
+            if (auto s = value.seconds) d += into(*s);
+            if (auto ns = value.subsecond) d += into(*ns);
+            return d;
+          })
+          .or_else([&](auto &&f) {
+            return parse<Number>(expr, opts).transform([](const Number &n) {
+              return T{static_cast<long long>(n.n)};
+            });
+          });
+    } else if constexpr (std::is_same_v<T, bool>) {
       return parse<Boolean>(expr, opts).transform([](const auto &value) { return value.value; });
     } else if constexpr (std::is_arithmetic_v<T>) {
       return parse<Number>(expr, opts).transform([](const auto &value) { return static_cast<T>(value.n); });

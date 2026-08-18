@@ -443,9 +443,10 @@ public:
           if (auto unit = conv.target.unit; unit && unit->isSimple()) {
             if (std::ranges::contains(std::initializer_list<std::string_view>{"unix", "epoch"},
                                       unit->simpleName())) {
-              auto epoch = v.asDateTime()->time.time_since_epoch();
-              auto seconds = std::chrono::duration_cast<std::chrono::seconds>(epoch).count();
-              return Computed{Num{.n = Value{static_cast<double>(seconds)},
+              auto dt = v.asDateTime();
+              auto seconds_epoch = duration_cast<seconds>(dt->time.time_since_epoch()).count();
+
+              return Computed{Num{.n = Value{static_cast<double>(seconds_epoch)},
                                   .unit = Number::Unit{.raw = "second"},
                                   .explicitlyConverted = true}};
             }
