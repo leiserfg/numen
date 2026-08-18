@@ -52,8 +52,12 @@ endif()
 
 set(NUMEN_SRCS 
 	src/numen/numen.cpp
+	src/numen/ast-printer.cpp
 	src/numen/builtin-units.cpp
+	src/numen/datetime.cpp
+	src/numen/duration.cpp
 	src/numen/fn.cpp
+	src/numen/interpreter.cpp
 	src/numen/lexer.cpp
 	src/numen/parser.cpp
 	src/numen/region-currency.cpp

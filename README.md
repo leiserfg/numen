@@ -79,6 +79,18 @@ int main() {
 }
 ```
 
+`evaluate()` returns the default rendering. When you need the value itself, `compute()` returns a `numen::ComputedValue` (a variant of `Number`, `DateTime`, `Duration` and `Boolean`) and `parse<T>()` converts straight to a C++ type. Every value type has a `toString()` producing the same text `evaluate()` would, and a matching `std::formatter`, so you can format some kinds yourself and fall back to the default for the rest:
+
+```cpp
+auto res = calc.compute("tomorrow - today + 90min");
+
+if (auto d = res->asDuration()) {
+  std::println("{}", *d);            // 1 day 1 hr 30 min
+  std::println("{}", d->toString()); // same thing
+  std::println("{}", calc.parse<std::chrono::minutes>("tomorrow - today + 90min")->count()); // 1530
+}
+```
+
 The REPL built by `make` (`./build/repl`) can be used to quickly try things out, either interactively or by passing an expression as its single argument:
 
 ```sh

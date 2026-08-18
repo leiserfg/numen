@@ -3,6 +3,7 @@
 #include <chrono>
 #include <compare>
 #include <expected>
+#include <format>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -25,6 +26,14 @@ struct DateTime {
 
   auto operator<=>(const DateTime &rhs) const { return time <=> rhs.time; }
   bool operator==(const DateTime &rhs) const { return time == rhs.time; }
+
+  std::string toString() const;
+
+  // Whether the timezone attached to this DateTime (if any) is the same
+  // as the current timezone. Note that the concept of current timezone
+  // is not impacted by any timezone override that may have been set during
+  // calculation. It always refer to the current timezone.
+  bool isCurrentTimezone() const;
 };
 
 struct Duration {
@@ -91,6 +100,9 @@ struct Duration {
     return total() == rhs.total() && subsecond.value_or(std::chrono::nanoseconds{0}) ==
                                          rhs.subsecond.value_or(std::chrono::nanoseconds{0});
   }
+
+  // what evaluate() prints, e.g. "1 yr 2 months 3 days 4 hr"
+  std::string toString() const;
 };
 
 // the single place a value plus a duration unit becomes a Duration
@@ -114,7 +126,7 @@ struct Number {
 
   double n;
 
-  // the rendered result, which is what should be displayed
+  // the rendered magnitude without its unit, e.g. "1.5" for "1.5 km"
   std::string text;
 
   NumberOutputFormat format;
@@ -136,11 +148,16 @@ struct Number {
 
   bool operator==(const Number &rhs) const { return n == rhs.n; }
   std::partial_ordering operator<=>(const Number &rhs) const { return n <=> rhs.n; }
+
+  // what evaluate() prints: text followed by the unit, e.g. "1.5 km"
+  std::string toString() const;
 };
 
 struct Boolean {
   bool value;
   auto operator<=>(const Boolean &rhs) const = default;
+
+  std::string toString() const;
 };
 
 using ValueType = std::variant<Number, DateTime, Boolean, Duration>;
@@ -175,6 +192,9 @@ struct ComputedValue {
   std::string_view valueTypeName() const {
     return std::visit([](const auto &v) { return valueName<std::remove_cvref_t<decltype(v)>>(); }, value);
   }
+
+  // the default rendering, which is exactly what evaluate() returns
+  std::string toString() const;
 };
 
 struct EvalConfig {
@@ -266,4 +286,16 @@ private:
   UnitDatabase m_unitDb;
 };
 
-}; // namespace numen
+} // namespace numen
+
+// every value formats as its toString(), so std::format("{}", value) is
+// evaluate() for the part of the result you did not render yourself
+template <typename T>
+  requires std::is_same_v<T, numen::Number> || std::is_same_v<T, numen::DateTime> ||
+           std::is_same_v<T, numen::Duration> || std::is_same_v<T, numen::Boolean> ||
+           std::is_same_v<T, numen::ComputedValue>
+struct std::formatter<T> : std::formatter<std::string> {
+  auto format(const T &value, std::format_context &ctx) const {
+    return std::formatter<std::string>::format(value.toString(), ctx);
+  }
+};
