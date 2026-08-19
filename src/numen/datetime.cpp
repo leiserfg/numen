@@ -170,7 +170,7 @@ std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
   const auto displayTz = tz ? tz : std::chrono::current_zone();
   std::chrono::zoned_time zt{displayTz, time + offset};
   const auto localTime = zt.get_local_time();
-  const auto localNow = std::chrono::zoned_time{displayTz, now}.get_local_time();
+  const auto localNow = std::chrono::zoned_time{std::chrono::current_zone(), now}.get_local_time();
   const bool isSameLocalDay = fl(localNow) == fl(localTime);
   const bool hasTime = (localTime - fl(localTime)).count() != 0;
   const bool localized = opts.format == DateTimeFormatOptions::TimeFormat::Local;
