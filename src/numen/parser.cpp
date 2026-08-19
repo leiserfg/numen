@@ -8,7 +8,6 @@
 #include <charconv>
 #include <chrono>
 #include <initializer_list>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -545,7 +544,6 @@ std::optional<TimezoneOffset> Parser::parseTimezone() {
 }
 
 std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
-
   return greedyParse(3,
                      [&](std::string_view word) {
                        return std::ranges::contains(
@@ -555,7 +553,9 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
 }
 
 std::optional<numen::Value> Parser::parseNumber() {
+  constexpr auto CONTEXT_AWARE_THOUSAND_SEP = ",";
   std::string ns;
+  size_t count = 0;
 
   while (true) {
     auto n = m_lexer.peak();
@@ -567,14 +567,17 @@ std::optional<numen::Value> Parser::parseNumber() {
     m_lexer.next();
 
     if (std::from_chars(n->raw.data(), n->raw.data() + n->raw.size(), nn).ptr !=
-        n->raw.data() + n->raw.size()) {
+            n->raw.data() + n->raw.size() &&
+        count == 0) {
       return nb.n;
     }
 
-    if (auto tok = m_lexer.peak(); m_inFunction || !tok || tok->raw != ",") {
-      if (ns == n->raw) return nb.n; // do not bother stringifying, there is only one part so pass the number
+    if (auto tok = m_lexer.peak(); m_inFunction || !tok || tok->raw != CONTEXT_AWARE_THOUSAND_SEP) {
+      if (count == 0) return nb.n; // do not bother stringifying, there is only one part so pass the number
+      break;
     };
 
+    ++count;
     m_lexer.next();
   }
 
@@ -840,6 +843,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       auto right = pratParse(it->rightAssociative ? it->precedence : it->precedence + 1);
       left = makeBinExpr(std::move(left), std::move(right), std::string{it->id});
     } else {
+      // FIXME: ugly, hacky...
       if (!(3 < minPrec)) {
         if (auto constant = parseConstant(tok->raw)) {
           auto rhs = parseTerm();
