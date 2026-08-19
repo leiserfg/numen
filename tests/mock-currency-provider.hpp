@@ -26,8 +26,20 @@ public:
 
 private:
   std::map<std::string, double> m_rates{
-      {"usd", 1.0},       {"eur", 0.9234567}, {"gbp", 0.7891234},  {"chf", 0.8712345},
-      {"cad", 1.3698765}, {"cny", 7.2345678}, {"jpy", 157.891234}, {"krw", 1234.5678},
+      {"usd", 1.0},
+      {"eur", 0.9234567},
+      {"gbp", 0.7891234},
+      {"chf", 0.8712345},
+      {"cad", 1.3698765},
+      {"cny", 7.2345678},
+      {"jpy", 157.891234},
+      {"krw", 1234.5678},
+      // crypto: btc and eth are builtins, xmr and shib only exist through the
+      // provider. "m" checks a ticker never shadows a builtin unit
+      {"btc", 0.0000117},
+      {"xmr", 0.005},
+      {"shib", 100000},
+      {"m", 1},
   };
 
   int m_updates = 0;

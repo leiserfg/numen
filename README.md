@@ -18,7 +18,7 @@
 
 ## Comparison with other calculator libraries
 
-- [SoulverCore](https://github.com/soulverteam/SoulverCore) is the main inspiration for this library, as it supports extensive timezone conversions and advanced natural language constructs. It is, however, closed-source and requires a Swift toolchain, which is less than convenient on non-Apple systems.
+- [SoulverCore](https://github.com/soulverteam/SoulverCore) is the main inspiration for this library, as it supports extensive timezone conversions and natural language constructs. It is, however, closed-source and requires a Swift toolchain, which is less than convenient on non-Apple systems.
 - [numbat](https://github.com/sharkdp/numbat) is a statically typed programming language, and lacks natural language and date-time arithmetic capabilities.
 - [libqalculate](https://github.com/qalculate/libqalculate) is a very capable scientific calculator, supporting a lot of advanced math that `libnumen` does not plan to support. Timezone conversion and date-time arithmetic support is poor.
 
@@ -95,6 +95,6 @@ If you want a system-wide installation of the library, run `make install`.
 
 ### Data
 
-- Currency tables under `src/gen/` are generated from Unicode CLDR supplemental data (`extra/supplementalData.xml`) by `scripts/gen-currency-tables.py`.
+- The region → currency table under `src/numen/gen/` is generated from Unicode CLDR supplemental data (`extra/supplementalData.xml`) by `scripts/gen-currency-tables.py`. Currency minor units live on the unit definitions in `src/numen/builtin-units.cpp`.
 - Place name to timezone resolution (`now in paris tx`) uses data from [GeoNames](https://www.geonames.org), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). `scripts/gen-timezone-tables.py` downloads the GeoNames dumps into `.cache/geonames/` (or reads them from an existing directory with `python3 scripts/gen-timezone-tables.py --dumps <dir>`) and turns them into `src/gen/geo-tz-tables.inc` and `src/gen/geo-charmap.inc`. Delete the cached dumps to refresh them.
 - `make gen` runs both scripts.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Generate src/gen/geo-tz-tables.inc, the place name -> IANA timezone table,
-and src/gen/geo-charmap.inc, the character folding used to normalize names,
+"""Generate src/numen/gen/geo-tz-tables.inc, the place name -> IANA timezone table,
+and src/numen/gen/geo-charmap.inc, the character folding used to normalize names,
 from GeoNames data (https://www.geonames.org, CC BY 4.0).
 
 Usage: gen-timezone-tables.py [--dumps DIR]
@@ -36,8 +36,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DUMPS = "https://download.geonames.org/export/dump/"
 DUMP_FILES = ["cities15000.zip", "admin1CodesASCII.txt", "countryInfo.txt", "alternateNamesV2.zip"]
-OUT = ROOT / "src/gen/geo-tz-tables.inc"
-CHARMAP_OUT = ROOT / "src/gen/geo-charmap.inc"
+OUT = ROOT / "src/numen/gen/geo-tz-tables.inc"
+CHARMAP_OUT = ROOT / "src/numen/gen/geo-charmap.inc"
 
 CHUNK_SIZE = 16000
 MIN_NAME_LEN = 3
@@ -75,7 +75,7 @@ def char_repl(c):
 
 
 def normalize(name):
-    """Mirror of normalizeName() in src/unicode.cpp."""
+    """Mirror of normalizeName() in src/numen/unicode.cpp."""
     return " ".join("".join(char_repl(c) for c in name).split())
 
 
@@ -241,7 +241,7 @@ def generate(raw):
         used += size
 
     # every non-ASCII character of the source names, in every case, so that
-    # src/unicode.cpp normalizes queries exactly like normalize() did the names
+    # src/numen/unicode.cpp normalizes queries exactly like normalize() did the names
     char_map = {}
     for c in {c for name in raw_names for c in name if not c.isascii()}:
         for variant in {c, c.lower(), c.upper(), c.title()}:

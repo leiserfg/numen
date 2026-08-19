@@ -74,21 +74,49 @@ TEST_CASE("a currency amount lands on its minor units even without a conversion"
   CHECK(calc.evaluate("1 km / 3") == "0.333333km");
 }
 
-TEST_CASE("minor unit digits come from CLDR", "[currency]") {
-  using numen::currencyDigits;
+TEST_CASE("minor units are declared on the unit itself", "[currency]") {
+  auto calc = test::mockCalc();
 
-  CHECK(currencyDigits("JPY") == 0);
-  CHECK(currencyDigits("KRW") == 0);
-  CHECK(currencyDigits("BHD") == 3);
-  CHECK(currencyDigits("CLF") == 4);
+  // btc is a builtin with satoshi precision, so a tiny amount keeps its
+  // digits instead of rounding to the two decimals fiat gets
+  CHECK(calc.evaluate("1 eur to btc") == "0.00001267btc");
+  CHECK(calc.evaluate("1 jpy to btc") == "0.00000007btc");
+  CHECK(calc.evaluate("1 usd to btc") == "0.0000117btc");
+  CHECK(calc.evaluate("0.123456789 btc to btc") == "0.12345679btc");
+}
 
-  // not listed by CLDR, so it takes the default
-  CHECK(currencyDigits("USD") == 2);
-  CHECK(currencyDigits("EUR") == 2);
-  CHECK(currencyDigits("ZZZ") == 2);
+TEST_CASE("a ticker the provider quotes a rate for is a currency", "[currency]") {
+  auto calc = test::mockCalc();
 
-  CHECK(currencyDigits("jpy") == 0);
-  CHECK(currencyDigits("") == 2);
+  // no builtin knows "xmr" as a currency, only the provider does
+  CHECK(calc.evaluate("100 usd to xmr") == "0.5xmr");
+  CHECK(calc.evaluate("1 xmr to usd") == "200usd");
+  CHECK(calc.evaluate("1 XMR to usd") == "200usd");
+  CHECK(calc.evaluate("1 xmr to eur") == "184.69eur");
+
+  // a bare amount localizes like any other currency does
+  CHECK(calc.evaluate("2 xmr", {.locale = "en_US"}) == "400USD");
+
+  // provider currencies carry no minor units of their own, so they get a
+  // fixed high precision rather than the fiat default
+  CHECK(calc.evaluate("1 usd to shib") == "100000shib");
+  CHECK(calc.evaluate("1 shib / 3 to shib") == "0.33333333shib");
+  CHECK(calc.evaluate("1000000 shib to btc") == "0.000117btc");
+
+  // while the target's minor units still rule once it is fiat
+  CHECK(calc.evaluate("1 shib to usd") == "0usd");
+  CHECK(calc.evaluate("1000 shib to usd") == "0.01usd");
+
+  // a builtin always wins over a ticker of the same name: "m" stays a meter
+  // even though the provider quotes a rate for it
+  CHECK(calc.evaluate("1 m to cm") == "100cm");
+  CHECK_FALSE(calc.evaluate("1 m to usd"));
+
+  // without a provider quoting it, the token is not a unit at all
+  auto bare = numen::Numen{}.compute("2 xmr");
+  REQUIRE(bare);
+  CHECK_FALSE(bare->asNumber()->unit);
+  CHECK_FALSE(calc.evaluate("1 usd to zzz"));
 }
 
 TEST_CASE("the provider supplies the rates a conversion uses", "[currency]") {

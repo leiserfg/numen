@@ -69,6 +69,9 @@ struct UnitDef {
   std::string family;
   double offset = 0;
   bool prefixable = false;
+  // fixes the fraction a rendered amount may show, as money does: two for
+  // usd, none for jpy. unset means the generic number formatting applies
+  std::optional<int> decimals;
 };
 
 struct UnitTerm {
@@ -110,7 +113,8 @@ public:
   void registerUnit(UnitDef unit);
 
   // units can share a same identifier, e.g 'm' can stand for 'meter' or
-  // 'minute'.
+  // 'minute'. a token no builtin answers to is last offered to the currency
+  // provider, so any ticker it quotes a rate for resolves as a currency
   std::vector<UnitDef> findUnitCandidates(std::string_view q) const;
 
   std::optional<UnitDef> findUnit(const std::string &id) const;
@@ -132,6 +136,7 @@ private:
   std::optional<CompoundUnit> expandComposition(std::string_view spec) const;
   std::vector<UnitDef> matchExact(std::string_view q) const;
   std::vector<UnitDef> expandPrefixed(std::string_view q) const;
+  std::optional<UnitDef> providerCurrency(std::string_view q) const;
 
   std::vector<UnitDef> m_units;
   const AbstractCurrencyProvider *m_currencyProvider = nullptr;

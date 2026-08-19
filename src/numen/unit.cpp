@@ -3,6 +3,7 @@
 #include "builtin-units.hpp"
 #include "utils.hpp"
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <format>
 #include <map>
@@ -11,6 +12,10 @@
 #include <ranges>
 
 namespace {
+
+// a currency only the provider knows about states no minor units of its own,
+// and most of those are crypto, so it gets satoshi precision
+constexpr int PROVIDER_CURRENCY_DECIMALS = 8;
 
 struct Prefix {
   std::string_view symbol;
@@ -213,7 +218,28 @@ std::vector<UnitDef> UnitDatabase::findUnitCandidates(std::string_view q) const 
     if (auto units = expandPrefixed(form); !units.empty()) { return units; }
   }
 
+  if (auto unit = providerCurrency(q)) { return {*unit}; }
+
   return {};
+}
+
+// a ticker the provider quotes a rate for is a currency too, even with no
+// builtin behind it. this comes last so no ticker can ever shadow a real unit
+std::optional<UnitDef> UnitDatabase::providerCurrency(std::string_view q) const {
+  if (!m_currencyProvider || q.empty()) return std::nullopt;
+
+  std::string code{q};
+  std::ranges::transform(code, code.begin(),
+                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+  if (!m_currencyProvider->getRate(code)) return std::nullopt;
+
+  return UnitDef{
+      .id = code,
+      .dimension = dimensions::CURRENCY,
+      .family = families::CURRENCY,
+      .decimals = PROVIDER_CURRENCY_DECIMALS,
+  };
 }
 
 void UnitDatabase::registerUnit(UnitDef unit) { m_units.emplace_back(std::move(unit)); }

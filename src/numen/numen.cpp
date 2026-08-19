@@ -38,11 +38,10 @@ std::string ComputedValue::toString(const DateTimeFormatOptions &dateTimeFormat)
       value);
 }
 
-// money is only ever shown on its minor units, e.g. none for jpy and three for bhd
+// a unit may fix how much of the fraction is shown, as money does: none for
+// jpy, two for eur. only a sole unit carries that; "eur/hr" is a rate, not money
 static std::optional<int> unitDecimals(const detail::Num &v) {
-  if (v.unit && v.unit->def() && v.unit->def()->dimension == dimensions::CURRENCY) {
-    return currencyDigits(v.unit->def()->id);
-  }
+  if (v.unit && v.unit->def()) return v.unit->def()->decimals;
   return std::nullopt;
 }
 

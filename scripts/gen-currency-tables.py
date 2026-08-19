@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generate the CLDR currency tables under src/ from supplemental data.
+"""Generate the CLDR region currency table under src/numen/gen/ from
+supplemental data.
 
 Usage: gen-currency-tables.py [supplementalData.xml]
 
@@ -9,10 +10,9 @@ region-currency-table.inc
     preference. Regions with no current tender (e.g. AQ, dissolved countries)
     are omitted.
 
-currency-digits-table.inc
-    Minor unit digits per currency, e.g. JPY has none and BHD has three.
-    `cashDigits`/`cashRounding` are ignored: they describe physical coinage,
-    not the amounts a calculator deals in.
+Minor unit digits are not generated: every currency the calculator knows is
+declared in src/numen/builtin-units.cpp with its `decimals` field, and the
+ones only a currency provider knows about fall back to a fixed precision.
 """
 import sys
 import xml.etree.ElementTree as ET
@@ -43,38 +43,13 @@ def main():
             f"// ({xml_path.name}). Do not edit by hand.",
         ]
 
-    out_path = ROOT / "src/gen/region-currency-table.inc"
+    out_path = ROOT / "src/numen/gen/region-currency-table.inc"
     lines = banner() + ["constexpr RegionCurrency kRegionCurrencyTable[] = {"]
     for code in sorted(table):
         lines.append(f'    {{"{code}", "{table[code]}"}},')
     lines += ["};", ""]
     out_path.write_text("\n".join(lines))
     print(f"{len(table)} regions -> {out_path}")
-
-    digits = {}
-    default = 2
-    for info in currency_data.find("fractions").findall("info"):
-        code = info.get("iso4217")
-        if code == "DEFAULT":
-            default = int(info.get("digits"))
-            continue
-        digits[code] = int(info.get("digits"))
-
-    for code, n in digits.items():
-        assert len(code) == 3 and code.isupper(), code
-        assert 0 <= n <= 9, (code, n)
-
-    out_path = ROOT / "src/gen/currency-digits-table.inc"
-    lines = banner() + [
-        f"constexpr int kDefaultCurrencyDigits = {default};",
-        "",
-        "constexpr CurrencyDigits kCurrencyDigitsTable[] = {",
-    ]
-    for code in sorted(digits):
-        lines.append(f'    {{"{code}", {digits[code]}}},')
-    lines += ["};", ""]
-    out_path.write_text("\n".join(lines))
-    print(f"{len(digits)} currencies -> {out_path}")
 
 
 main()
