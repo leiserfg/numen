@@ -233,3 +233,7 @@ sqrt(4)m                    => 2m
 2 * sqrt(4) km              => 4km
 sqrt(4) km to m             => 2000m
 sqrt(4) km + 1              => 3km
+
+# square/cubic
+5km2                        => 5km²
+5km3                        => 5km³

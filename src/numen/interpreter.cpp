@@ -168,10 +168,7 @@ public:
 
         // unit only makes sense for a number, ignore it otherwise
         if (auto n = c.asNumber()) {
-          n->unit = Number::Unit{.raw = std::string{ue.unit}};
-          if (auto candidates = m_db.findCompounds(ue.unit); candidates.size() == 1) {
-            n->unit->resolved = std::move(candidates.front());
-          }
+          n->unit = Number::Unit{.raw = std::string{ue.unit.simpleName()}, .resolved = buildTarget(ue.unit)};
         }
 
         return c;

@@ -94,7 +94,7 @@ std::unique_ptr<Expression> makeBinExpr(std::unique_ptr<Expression> lhs, std::un
       BinaryExpression{.op = op, .lhs = std::move(lhs), .rhs = std::move(rhs)});
 }
 
-std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner, std::string_view unit) {
+std::unique_ptr<Expression> makeUnit(std::unique_ptr<Expression> inner, const NamedUnit &unit) {
   return std::make_unique<Expression>(UnitExpression{
       .unit = unit,
       .expr = std::move(inner),
@@ -136,21 +136,32 @@ bool Parser::isTimezoneToken(std::string_view name) {
   return TimezoneDB{}.query(name);
 }
 
-std::optional<OpaqueUnit> Parser::parseUnit() {
-  if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (!m_unitDb.findCompounds(tok->raw).empty()) { return tok->raw; }
+std::optional<NamedUnit> Parser::parseUnit(bool validate) {
+  auto head = m_lexer.peak();
+
+  if (!head || head->type != Lexer::TokenType::String) return std::nullopt;
+
+  if (validate && m_unitDb.findCompounds(head->raw).empty()) { return std::nullopt; }
+
+  m_lexer.next();
+  NamedUnit target{.terms = {NamedUnitTerm{.name = head->raw}}};
+
+  // shorthand squaring/cubing. We don't support other exponents are they are not typically
+  // used as shorthand.
+  if (auto num = m_lexer.peakAs<Lexer::Number>(); num && num->n >= 2 && num->n <= 3) {
+    target.terms.front().exponent = num->n.to<int>();
+    m_lexer.next();
   }
-  return std::nullopt;
+
+  return target;
 }
 
 // only a real unit token may follow the slash, so "1 km to m / 2" still divides
 // the result rather than naming metres per two
 std::optional<NamedUnit> Parser::parseConversionTarget() {
-  auto head = m_lexer.peak();
-  if (!head || head->type != Lexer::TokenType::String) return std::nullopt;
+  auto target = parseUnit(false); // FIXME: we should not need to disable validation here
 
-  m_lexer.next();
-  NamedUnit target{.terms = {NamedUnitTerm{.name = head->raw}}};
+  if (!target) return std::nullopt;
 
   while (auto op = m_lexer.peak()) {
     if (op->raw != "/" && op->raw != "*") break;
@@ -161,7 +172,7 @@ std::optional<NamedUnit> Parser::parseConversionTarget() {
 
     m_lexer.next();
     m_lexer.next();
-    target.terms.push_back(NamedUnitTerm{.name = next->raw, .exponent = op->raw == "/" ? -1 : 1});
+    target->terms.push_back(NamedUnitTerm{.name = next->raw, .exponent = op->raw == "/" ? -1 : 1});
   }
 
   return target;
@@ -702,7 +713,6 @@ std::unique_ptr<Expression> Parser::parseTerm() {
           expr = makeUnit(makeNumberExpr(1), unit.value());
         else
           expr = makeUnit(std::move(expr), unit.value());
-        m_lexer.next();
       } else {
         // implict multiplication, e.g "(150 * 2)4
         expr = makeBinExpr(std::move(expr), parseMul(), "*");
@@ -751,7 +761,6 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       expr = makeUnit(makeNumberExpr(1), unit.value());
     else
       expr = makeUnit(std::move(expr), unit.value());
-    m_lexer.next();
   }
 
   if (!expr) {

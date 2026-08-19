@@ -34,14 +34,6 @@ struct BinaryExpression {
   std::unique_ptr<Expression> rhs;
 };
 
-// we keep the target unit as a simple string
-// because unit names are not unique and may
-// be interpreted differenty depending on what
-// is being done with them.
-// for instance, "1m to s" should be "1 minute to second"
-// while "1m to in" should be "1 meter to inches"
-using OpaqueUnit = std::string_view;
-
 struct TimezoneOffset {
   std::string_view name;
   std::chrono::seconds offset = std::chrono::seconds(0);
@@ -130,7 +122,7 @@ struct FunctionCall {
 };
 
 struct UnitExpression {
-  OpaqueUnit unit;
+  NamedUnit unit;
   std::unique_ptr<Expression> expr;
 };
 
@@ -185,7 +177,7 @@ class Parser {
 public:
   Parser(std::string_view data, const UnitDatabase &unitDb);
 
-  std::optional<OpaqueUnit> parseUnit();
+  std::optional<NamedUnit> parseUnit(bool validate = true);
   std::optional<NamedUnit> parseConversionTarget();
 
   bool isTimezoneToken(std::string_view name);

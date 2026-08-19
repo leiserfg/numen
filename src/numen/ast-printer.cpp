@@ -57,7 +57,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
           printASTNode(os, *value.lhs, depth + 1);
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, UnitExpression>) {
-          os << ident() << "Unit " << rang::fg::green << value.unit << rang::fg::reset << " {\n";
+          os << ident() << "Unit " << rang::fg::green << value.unit.simpleName() << rang::fg::reset << " {\n";
           printASTNode(os, *value.expr, depth + 1);
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, DateString>) {
