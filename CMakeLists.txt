@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-option(BUILD_REPL "Build the repl program" ON)
-option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
+option(BUILD_REPL "Build the repl program" OFF)
+option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in REPL currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
 
-option(BUILD_TESTS "Build the test suite" ON)
+option(BUILD_TESTS "Build the test suite" OFF)
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
