@@ -192,7 +192,6 @@ public:
   std::optional<DateTimeLiteral> parseYYYYMMDD();
   std::optional<DateTimeLiteral> parseNaturalDateLiteral();
   std::optional<DateTimeLiteral> parseDate();
-  // [<hour>]:[minute]:[second]
   std::optional<ParsedTime> parseTime(bool afterDate = false);
   std::optional<TimezoneOffset> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
@@ -221,12 +220,15 @@ protected:
   bool isPostfixPercent(const Lexer::Token &pct);
   std::optional<Scanned<numen::Duration>> scanDuration();
   std::unique_ptr<Expression> parseTerm();
-  std::unique_ptr<Expression> parseNumber();
   std::unique_ptr<Expression> pratParse(int minPrec = 0);
   std::unique_ptr<Expression> parseMul() { return pratParse(4); }
+  std::optional<numen::Value> parseNumber();
 
 private:
   Lexer m_lexer;
   DateStringVocab m_dateStringVocab;
   const UnitDatabase &m_unitDb;
+
+  // flags
+  bool m_inFunction = false;
 };

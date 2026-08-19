@@ -5,6 +5,7 @@
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <initializer_list>
 #include <iostream>
@@ -553,6 +554,37 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
       .transform([](auto &&str) { return NamedNumberFormat(str); });
 }
 
+std::optional<numen::Value> Parser::parseNumber() {
+  std::string ns;
+
+  while (true) {
+    auto n = m_lexer.peak();
+    if (n->type != Lexer::TokenType::Number) break;
+    auto &nb = std::get<Lexer::Number>(n->data);
+    double nn;
+
+    ns += n->raw;
+    m_lexer.next();
+
+    if (std::from_chars(n->raw.data(), n->raw.data() + n->raw.size(), nn).ptr !=
+        n->raw.data() + n->raw.size()) {
+      return nb.n;
+    }
+
+    if (auto tok = m_lexer.peak(); m_inFunction || !tok || tok->raw != ",") {
+      if (ns == n->raw) return nb.n; // do not bother stringifying, there is only one part so pass the number
+    };
+
+    m_lexer.next();
+  }
+
+  if (ns.empty()) return std::nullopt;
+
+  double n;
+  std::from_chars(ns.data(), ns.data() + ns.size(), n);
+  return n;
+};
+
 std::unique_ptr<Expression> Parser::parseTerm() {
   if (!m_lexer.peak()) {
     throw std::runtime_error("Expected EOF, looks like there is nothing we can parse!");
@@ -646,9 +678,8 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   if (auto tok = m_lexer.peak()) {
-    if (auto n = tok->asNumber()) {
-      m_lexer.next();
-      expr = makeNumberExpr(n->n);
+    if (auto n = parseNumber()) {
+      expr = makeNumberExpr(*n);
     } else if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
       if (auto next = m_lexer.peak(1); next && next->raw == "(") {
         m_lexer.next();
@@ -657,6 +688,8 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         FunctionCall fn{.name = tok->raw};
 
         constexpr auto unterminated = "Expected ) to close the argument list";
+
+        m_inFunction = true;
 
         while (true) {
           if (m_lexer.peakOrThrow(unterminated).raw == ")") break;
@@ -669,6 +702,8 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
           m_lexer.next();
         }
+
+        m_inFunction = false;
 
         m_lexer.next();
         // falls through to the unit check so that "sqrt(4) km" carries a unit
