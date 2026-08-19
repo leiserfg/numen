@@ -27,7 +27,7 @@ if (BUILD_FUZZER)
 	add_link_options(-fsanitize=address,undefined)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${PROJECT_IS_TOP_LEVEL})
 	if (MSVC)
 		add_compile_options(/fsanitize=address)
 	else()
