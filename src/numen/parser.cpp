@@ -559,7 +559,7 @@ std::optional<numen::Value> Parser::parseNumber() {
 
   while (true) {
     auto n = m_lexer.peak();
-    if (n->type != Lexer::TokenType::Number) break;
+    if (!n || n->type != Lexer::TokenType::Number) break;
     auto &nb = std::get<Lexer::Number>(n->data);
     double nn;
 
