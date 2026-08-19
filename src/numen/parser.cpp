@@ -8,6 +8,7 @@
 #include <charconv>
 #include <chrono>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -295,6 +296,9 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
   return std::nullopt;
 }
 
+constexpr auto RESERVED_TIME_TOKENS =
+    std::to_array<std::string_view>({"tomorrow", "yesterday", "tomorrow", "now", "time", "date", "ago"});
+
 std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto duration = scanDuration()) {
     if (auto s = m_lexer.peak(duration->tokenCount); s && s->type == Lexer::TokenType::String) {
@@ -312,26 +316,35 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto s = m_lexer.peakAs<Lexer::String>()) {
     if (s->data == "yesterday") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
-                                     .direction = RelativeDateTimeLiteral::Direction::Past,
-                                     .precision = DateTimePrecision::Date};
+
+      return RelativeDateTimeLiteral{
+          .delta = Duration{.seconds = std::chrono::days{1}},
+          .direction = RelativeDateTimeLiteral::Direction::Past,
+          .precision = DateTimePrecision::Date,
+      };
     }
 
     if (s->data == "tomorrow") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
-                                     .direction = RelativeDateTimeLiteral::Direction::Future,
-                                     .precision = DateTimePrecision::Date};
+      return RelativeDateTimeLiteral{
+          .delta = Duration{.seconds = std::chrono::days{1}},
+          .direction = RelativeDateTimeLiteral::Direction::Future,
+          .precision = DateTimePrecision::Date,
+      };
     }
 
     if (s->data == "today" || s->data == "date") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.precision = DateTimePrecision::Date};
+      return RelativeDateTimeLiteral{
+          .precision = DateTimePrecision::Date,
+      };
     }
 
     if (s->data == "now" || s->data == "time") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.precision = DateTimePrecision::DateTime};
+      return RelativeDateTimeLiteral{
+          .precision = DateTimePrecision::DateTime,
+      };
     }
   }
 
@@ -529,6 +542,8 @@ std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
 
 std::optional<TimezoneOffset> Parser::parseTimezone() {
   if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
+    if (std::ranges::contains(RESERVED_TIME_TOKENS, str->raw)) return std::nullopt;
+
     auto isOffsettableTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
                                                [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });
 
@@ -611,10 +626,18 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
     if (auto date = parseRFC3339()) { return std::make_unique<Expression>(*date); }
 
-    if (auto date = parseRelativeDateTimeLiteral()) {
-      DateString ds{.value = *date};
-      if (auto result = parseTimezone()) { ds.timezone = result.value(); }
-      return std::make_unique<Expression>(ds);
+    {
+      auto tz = parseTimezone();
+
+      if (auto date = parseRelativeDateTimeLiteral()) {
+        DateString ds{.value = *date, .timezone = tz};
+
+        if (!tz) {
+          if (auto result = parseTimezone()) { ds.timezone = result.value(); }
+        }
+
+        return std::make_unique<Expression>(ds);
+      }
     }
 
     // less than 2 tokens means likely unit
@@ -623,6 +646,13 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         m_lexer.next();
       }
       return std::make_unique<Expression>(duration->data);
+    }
+
+    if (auto tz = parseTimezone()) {
+      if (auto date = parseDate()) {
+        DateString ds{.value = *date, .timezone = *tz};
+        return std::make_unique<Expression>(ds);
+      }
     }
 
     if (auto date = parseDate()) {

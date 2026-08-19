@@ -127,6 +127,11 @@ tomorrow                     => 2026-01-19 00:00:00 (Etc/UTC)
 tomorrow - yesterday to days => 2days
 150 years ago                => 1876-01-18 00:00:00 (Etc/UTC)
 
+# <tz><relative> || <relative><tz>
+time washington               => 2026-01-17 19:00:00 (America/New_York)
+washington time               => 2026-01-17 19:00:00 (America/New_York)
+washington time to washington => 2026-01-17 19:00:00 (America/New_York)
+
 # "h" names the hour unit as well as separating a clock time. on its own it
 # only reads as a clock when glued to its minutes, so "12h" is twelve hours.
 # this used to split at 24 instead: "23 h" was 11pm and "24 h" a day
