@@ -526,7 +526,7 @@ std::optional<DateString> Parser::parseRFC3339() {
 
 std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
   constexpr auto isValidOffset = [](auto offset) { return offset >= 0 && offset <= 23; };
-  std::chrono::seconds offset;
+  std::chrono::seconds offset{0};
 
   if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
     if (str->raw == "+" || str->raw == "-") {

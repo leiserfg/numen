@@ -52,7 +52,7 @@ TEST_CASE("bitwise operands are truncated toward zero", "[value]") {
 TEST_CASE("rendering", "[value]") {
   CHECK(Value{0.1}.render() == "0.1");
   CHECK(Value{1.0 / 3}.render() == "0.333333");
-  CHECK(Value{1234567.5}.render() == "1234567.5");
+  CHECK(Value{1234567.5}.render() == "1,234,567.5");
   CHECK(Value{1e-7}.render() == "1e-07");
   CHECK(Value{255}.render(numen::NumberOutputFormat::Hexadecimal) == "0xff");
   CHECK(Value{511}.render(numen::NumberOutputFormat::Octal) == "0o777");
@@ -60,5 +60,5 @@ TEST_CASE("rendering", "[value]") {
 
   // a unit that dictates its own precision caps the fraction
   CHECK(Value{0.223923}.render(numen::NumberOutputFormat::Decimal, 2) == "0.22");
-  CHECK(Value{1234.7}.render(numen::NumberOutputFormat::Decimal, 0) == "1235");
+  CHECK(Value{1234.7}.render(numen::NumberOutputFormat::Decimal, 0) == "1,235");
 }

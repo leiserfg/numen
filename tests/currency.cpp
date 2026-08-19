@@ -30,8 +30,8 @@ TEST_CASE("currency results snap to the minor units of the target", "[currency]"
 
   // eur takes two decimals, jpy and krw none
   CHECK(calc.evaluate("100 usd to eur") == "92.35eur");
-  CHECK(calc.evaluate("100 usd to jpy") == "15789jpy");
-  CHECK(calc.evaluate("100 usd to krw") == "123457krw");
+  CHECK(calc.evaluate("100 usd to jpy") == "15,789jpy");
+  CHECK(calc.evaluate("100 usd to krw") == "123,457krw");
 }
 
 TEST_CASE("rounding money is a formatting concern, not a value one", "[currency]") {
@@ -44,7 +44,7 @@ TEST_CASE("rounding money is a formatting concern, not a value one", "[currency]
   CHECK(res->asNumber()->text == "92.35");
 
   // and the full precision survives into further arithmetic
-  CHECK(calc.evaluate("(100 usd to eur) * 100") == "9234.57eur");
+  CHECK(calc.evaluate("(100 usd to eur) * 100") == "9,234.57eur");
 }
 
 TEST_CASE("a currency is not padded out to its minor units", "[currency]") {
@@ -68,7 +68,7 @@ TEST_CASE("a currency amount lands on its minor units even without a conversion"
   // jpy has no minor units at all
   numen::EvalConfig jp{.locale = "ja_JP"};
   CHECK(calc.evaluate("1 jpy / 3", jp) == "0jpy");
-  CHECK(calc.evaluate("1234.7 jpy", jp) == "1235jpy");
+  CHECK(calc.evaluate("1234.7 jpy", jp) == "1,235jpy");
 
   // a plain unit is untouched by any of this
   CHECK(calc.evaluate("1 km / 3") == "0.333333km");
@@ -99,7 +99,7 @@ TEST_CASE("a ticker the provider quotes a rate for is a currency", "[currency]")
 
   // provider currencies carry no minor units of their own, so they get a
   // fixed high precision rather than the fiat default
-  CHECK(calc.evaluate("1 usd to shib") == "100000shib");
+  CHECK(calc.evaluate("1 usd to shib") == "100,000shib");
   CHECK(calc.evaluate("1 shib / 3 to shib") == "0.33333333shib");
   CHECK(calc.evaluate("1000000 shib to btc") == "0.000117btc");
 

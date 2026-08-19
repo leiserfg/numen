@@ -1,6 +1,7 @@
 #include "value.hpp"
 #include <algorithm>
 #include <format>
+#include <locale>
 #include <ranges>
 #include <stdexcept>
 
@@ -9,10 +10,24 @@ namespace numen {
 namespace {
 
 constexpr int MAX_DECIMALS = 6;
-constexpr std::size_t MAX_RENDERED_DIGITS = 40;
 
 // past this a long long cannot hold the value, so it is printed as a plain decimal
 constexpr double LLONG_RANGE = 9223372036854775808.0;
+
+constexpr double SCIENTIFIC_THRESHOLD = 1e40;
+
+// numbers are always rendered with US-style digit grouping (1,234,567.89)
+// this is because the parser only handles `,` and `_` as thousand separators
+// so we don't want to render something that can't be evaluated back.
+struct GroupedNumpunct : std::numpunct<char> {
+  char do_thousands_sep() const override { return ','; }
+  std::string do_grouping() const override { return "\3"; }
+};
+
+const std::locale &groupedLocale() {
+  static const std::locale loc(std::locale::classic(), new GroupedNumpunct);
+  return loc;
+}
 
 void stripTrailingZeroes(std::string &s) {
   auto last = s.find_last_not_of('0');
@@ -91,22 +106,21 @@ std::string Value::renderBase(NumberOutputFormat format) const {
 std::string Value::renderDecimal() const {
   if (std::isinf(m_n)) return m_n < 0 ? "-inf" : "inf";
 
-  std::string out;
+  if (std::abs(m_n) >= SCIENTIFIC_THRESHOLD) return std::format("{:.{}e}", m_n, MAX_DECIMALS);
+
+  const auto &loc = groupedLocale();
 
   if (isInteger()) {
-    out = std::abs(m_n) < LLONG_RANGE ? std::format("{}", static_cast<long long>(m_n))
-                                      : std::format("{:.0f}", m_n);
-  } else {
-    out = std::format("{:.{}f}", m_n, MAX_DECIMALS);
-
-    // a non zero value rounding to all zeroes would read as an exact 0
-    if (out.find_first_of("123456789") == std::string::npos) return std::format("{:g}", m_n);
-
-    stripTrailingZeroes(out);
+    return std::abs(m_n) < LLONG_RANGE ? std::format(loc, "{:L}", static_cast<long long>(m_n))
+                                       : std::format(loc, "{:.0Lf}", m_n);
   }
 
-  if (out.size() > MAX_RENDERED_DIGITS) return std::format("{:.{}e}", m_n, MAX_DECIMALS);
+  auto out = std::format(loc, "{:.{}Lf}", m_n, MAX_DECIMALS);
 
+  // a non zero value rounding to all zeroes would read as an exact 0
+  if (out.find_first_of("123456789") == std::string::npos) return std::format("{:g}", m_n);
+
+  stripTrailingZeroes(out);
   return out;
 }
 
@@ -114,7 +128,7 @@ std::string Value::render(NumberOutputFormat format, std::optional<int> fixedDec
   if (format != NumberOutputFormat::Decimal) return renderBase(format);
   if (!fixedDecimals) return renderDecimal();
 
-  auto out = std::format("{:.{}f}", m_n, *fixedDecimals);
+  auto out = std::format(groupedLocale(), "{:.{}Lf}", m_n, *fixedDecimals);
   if (*fixedDecimals > 0) stripTrailingZeroes(out);
 
   return out;

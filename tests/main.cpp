@@ -77,7 +77,7 @@ TEST_CASE("deeply nested and very long input does not overflow the stack", "[rob
     }
     auto res = calc.evaluate(expr);
     REQUIRE(res);
-    CHECK(res.value() == "2001");
+    CHECK(res.value() == "2,001");
   }
 
   SECTION("stacked unary operators") {

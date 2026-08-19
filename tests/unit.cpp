@@ -58,8 +58,8 @@ TEST_CASE("an alias expands to the composition it names", "[unit][compound]") {
 TEST_CASE("an atomic unit still agrees with its composed equivalent", "[unit][compound]") {
   numen::Numen calc;
 
-  CHECK(calc.evaluate("1 hectare to m*m") == "10000m²");
-  CHECK(calc.evaluate("1 acre to m*m") == "4046.856422m²");
+  CHECK(calc.evaluate("1 hectare to m*m") == "10,000m²");
+  CHECK(calc.evaluate("1 acre to m*m") == "4,046.856422m²");
   CHECK(calc.evaluate("1 knot to m/s") == "0.514444m/s");
 }
 

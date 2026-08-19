@@ -8,7 +8,7 @@
 # literal needs a month name, which is why the numeric forms all go through '/'
 0 9                         => 0
 0 12                        => 0
-2001 5                      => 2001
+2001 5                      => 2,001
 5 2001                      => 5
 32 5                        => 32
 100 3                       => 100
@@ -31,7 +31,7 @@ Jan 2021                    => 2021-01-01 00:00:00 (Etc/UTC)
 # mi is mile (not mebi), mb stays megabyte (not millibit)
 1 min to s                  => 60s
 1 mi to km                  => 1.609344km
-1 mb to b                   => 1000000b
+1 mb to b                   => 1,000,000b
 
 # a token that is a unit by itself is never reinterpreted as a plural:
 # ms is milliseconds, not meters; mins is minutes, not milli-inches
@@ -40,7 +40,7 @@ Jan 2021                    => 2021-01-01 00:00:00 (Etc/UTC)
 
 # prefix case matters where symbols collide: m is milli, M is mega
 1 mm to m                   => 0.001m
-1 Mm to km                  => 1000km
+1 Mm to km                  => 1,000km
 
 # 'in' is a conversion operator between units, a unit name elsewhere
 1m in in                    => 39.370079in
@@ -51,7 +51,7 @@ pi2                         => 6.283185
 
 # 'e' is an exponent marker only when digits follow it, and euler's constant
 # otherwise. this is the one place scientific notation and the constant collide
-1e3                         => 1000
+1e3                         => 1,000
 1e                          => 2.718282
 2e                          => 5.436564
 e2                          => 5.436564

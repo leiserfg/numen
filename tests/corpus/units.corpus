@@ -1,20 +1,20 @@
 # length
-1 km to m                   => 1000m
-1 km in m                   => 1000m
-km to in                    => 39370.07874in
+1 km to m                   => 1,000m
+1 km in m                   => 1,000m
+km to in                    => 39,370.07874in
 5 feet to cm                => 152.4cm
 3 miles to km               => 4.828032km
 
 # prefix and plural expansion
-1 kilometres to m           => 1000m
-10 kms to m                 => 10000m
-5KM to m                    => 5000m
+1 kilometres to m           => 1,000m
+10 kms to m                 => 10,000m
+5KM to m                    => 5,000m
 1000 micrograms to mg       => 1mg
 2 dl to ml                  => 200ml
 
 # mass
 80 kg to lbs                => 176.36981lbs
-1 tonne to kg               => 1000kg
+1 tonne to kg               => 1,000kg
 1 pound to kg               => 0.453592kg
 
 # multiplied constants usage with units
@@ -33,16 +33,16 @@ pi1 km                      => 3.141593km
 0 c to k                    => 273.15k
 
 # data
-1 gb to mb                  => 1000mb
-1 GB to MB                  => 1000MB
-1 kib to b                  => 1024b
-1 gib to mib                => 1024mib
+1 gb to mb                  => 1,000mb
+1 GB to MB                  => 1,000MB
+1 kib to b                  => 1,024b
+1 gib to mib                => 1,024mib
 
 # volume
 2 cups to ml                => 473.176473ml
 
 # area
-1 acre to sqm               => 4046.856422m²
+1 acre to sqm               => 4,046.856422m²
 
 # speed
 100 mph to kmh              => 160.9344km/h
@@ -56,7 +56,7 @@ pi1 km                      => 3.141593km
 100 usd + 20 usd            => 120usd
 
 # units flowing through functions
-max(1 km to m, 100)         => 1000m
+max(1 km to m, 100)         => 1,000m
 
 # like over like cancels, leaving a plain number
 1 km / 100 m                => 10
@@ -107,11 +107,11 @@ max(1 km to m, 100)         => 1000m
 1 km/hr to m/s              => 0.277778m/s
 1 km * 1 km to sqkm         => 1km²
 1 sqkm to km*km             => 1km²
-1 acre to m*m               => 4046.856422m²
+1 acre to m*m               => 4,046.856422m²
 
 # only a real unit may follow the operator, so these still apply to the result
 1 km to m / 2               => 500m
-1 km to m * 2               => 2000m
+1 km to m * 2               => 2,000m
 
 # the dimensions still have to match
 1 km to km/hr               => !error Incompatible units: km to km/hr
@@ -151,7 +151,7 @@ max(1 km to m, 100)         => 1000m
 
 # places shadow units: "gb" (Great Britain) is a legacy tzdb link, "acre" and
 # "mile" are towns. after a conversion operator the unit is meant
-1 tb to gb                  => 1000gb
+1 tb to gb                  => 1,000gb
 500 mb to gb                => 0.5gb
 1 sqm to acre               => 0.000247acre
 1 ha to acre                => 2.471054acre
@@ -169,7 +169,7 @@ min(20 c, 50 f)             => 10c
 min(1 km, 1 hr)             => !error Incompatible units: hr to km
 
 # a plain number among the arguments means they are not all comparable
-max(1 km to m, 100)         => 1000m
+max(1 km to m, 100)         => 1,000m
 
 # a named compound is its composition, so it behaves identically however it was
 # spelled. "60 kmh * 2 hr" used to give 120kmh·hr because kmh was atomic and
@@ -184,8 +184,8 @@ max(1 km to m, 100)         => 1000m
 2 mps * 3 s                 => 6m
 
 # so does the promotion of a bare target against a composed source
-150 kmh to in               => 5905511.811024in/h
-150 km/h to in              => 5905511.811024in/h
+150 kmh to in               => 5,905,511.811024in/h
+150 km/h to in              => 5,905,511.811024in/h
 
 # the composition is what gets displayed, aliases are only spellings
 1 kmh                       => 1km/h
@@ -195,7 +195,7 @@ max(1 km to m, 100)         => 1000m
 
 # units that are not products of anything we have stay atomic, and still
 # convert against the composed form
-1 hectare to m*m            => 10000m²
+1 hectare to m*m            => 10,000m²
 1 knot to m/s               => 0.514444m/s
 1 acre                      => 1acre
 
@@ -206,7 +206,7 @@ max(1 km to m, 100)         => 1000m
 
 # unit-preserving functions
 abs(-3 m)                   => 3m
-abs(1 km to m)              => 1000m
+abs(1 km to m)              => 1,000m
 floor(2.7 km)               => 2km
 ceil(2.1 kg)                => 3kg
 round(2.567 km, 1)          => 2.6km
@@ -218,12 +218,12 @@ avg(1 km, 3 km)             => 2km
 avg(20 c, 30 c)             => 25c
 hypot(3 m, 4 m)             => 5m
 hypot(3 km, 4000 m)         => 5km
-max(100, 1 km to m)         => 1000m
+max(100, 1 km to m)         => 1,000m
 sum(1 km, 1 hr)             => !error Incompatible units: hr to km
 
 # no roots or logarithms of dimensions
 sqrt(4 m)                   => !error sqrt: argument 1 must be a plain number, got 4 m
-sqrt(1 km to m)             => !error sqrt: argument 1 must be a plain number, got 1000 m
+sqrt(1 km to m)             => !error sqrt: argument 1 must be a plain number, got 1,000 m
 ln(2 kg)                    => !error
 pow(2 m, 2)                 => !error
 
@@ -231,7 +231,7 @@ pow(2 m, 2)                 => !error
 sqrt(4) km                  => 2km
 sqrt(4)m                    => 2m
 2 * sqrt(4) km              => 4km
-sqrt(4) km to m             => 2000m
+sqrt(4) km to m             => 2,000m
 sqrt(4) km + 1              => 3km
 
 # square/cubic

@@ -30,7 +30,7 @@
 - No support for niche units, only the most popular ones.
 - Parsing may be too permissive (in a bad way) at times, we will tighten this as we go
 - Natural language syntax sugar targets English only, although number and dates are localized
-- `.` is always used as a decimal separator, and `,` as a thousand separator, no matter the user's locale. Date time values are otherwise properly localized.
+- `.` is always used as a decimal separator, and `,` as a thousand separator, no matter the user's locale. Numbers are rendered with US-style grouping (`1,234,567.89`) for the same reason, so any output can be fed back in as input. Date time values are otherwise properly localized.
 - Code is still ugly in some places :)
 
 ## Getting started
