@@ -26,8 +26,16 @@ std::string Number::toString() const {
 
 std::string Boolean::toString() const { return value ? "true" : "false"; }
 
-std::string ComputedValue::toString() const {
-  return std::visit([](const auto &v) { return v.toString(); }, value);
+std::string ComputedValue::toString(const DateTimeFormatOptions &dateTimeFormat) const {
+  return std::visit(
+      [&](const auto &v) {
+        if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, DateTime>) {
+          return v.toString(dateTimeFormat);
+        } else {
+          return v.toString();
+        }
+      },
+      value);
 }
 
 // money is only ever shown on its minor units, e.g. none for jpy and three for bhd
@@ -61,7 +69,9 @@ std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, 
 }
 
 std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr, const EvalConfig &opts) {
-  return compute(expr, opts).transform([](const ComputedValue &v) { return v.toString(); });
+  return compute(expr, opts).transform([&](const ComputedValue &v) {
+    return v.toString(opts.effectiveDateTimeFormat());
+  });
 }
 
 void Numen::printAST(const std::string &expr) const {

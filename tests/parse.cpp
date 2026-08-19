@@ -86,7 +86,7 @@ TEST_CASE("toString on a computed value matches evaluate") {
     auto evaluated = calc.evaluate(expr, opts);
     REQUIRE(computed);
     REQUIRE(evaluated);
-    REQUIRE(computed->toString() == *evaluated);
+    REQUIRE(computed->toString(opts.effectiveDateTimeFormat()) == *evaluated);
   }
 
   auto duration = calc.parse<numen::Duration>("1 yr 2 months 3 days 4h", opts);

@@ -21,15 +21,21 @@ struct DateTimeFormatOptions {
   // If relative is set to true, only "meaningful" part of the date time
   // are rendered: if there is no time, only the date part is shown, if date is the
   // same as the current local date, only the time is shown, etc...
-  bool relative = false;
+  bool relative = true;
 
   // Whether to render the timezone
   // The timezone string can be obtained separately using `toTimezoneString`.
   bool withTz = true;
 
+  // Neutral is the canonical, locale-independent form (ISO-like), Local follows
+  // the locale's date and time conventions.
   enum class TimeFormat { Neutral, Local };
 
-  TimeFormat format = TimeFormat::Neutral;
+  TimeFormat format = TimeFormat::Local;
+
+  // Locale used when format is Local. If not specified, the environment's
+  // locale is used.
+  std::optional<std::string> locale;
 };
 
 struct DateTime {
@@ -212,8 +218,9 @@ struct ComputedValue {
     return std::visit([](const auto &v) { return valueName<std::remove_cvref_t<decltype(v)>>(); }, value);
   }
 
-  // the default rendering, which is exactly what evaluate() returns
-  std::string toString() const;
+  // the default rendering; pass EvalConfig::effectiveDateTimeFormat() to get
+  // exactly what evaluate() returns for date time values
+  std::string toString(const DateTimeFormatOptions &dateTimeFormat = {}) const;
 };
 
 struct EvalConfig {
@@ -238,6 +245,21 @@ struct EvalConfig {
    * is used.
    */
   std::optional<std::string> locale;
+
+  /**
+   * How evaluate() renders date time values. Localized by default; set
+   * `format` to Neutral for the canonical, locale-independent form.
+   * If `locale` is left unset here, the config-level `locale` above is used.
+   */
+  DateTimeFormatOptions dateTimeFormat;
+
+  // `dateTimeFormat` with its locale defaulted from the config-level `locale`:
+  // the options evaluate() actually renders date time values with
+  DateTimeFormatOptions effectiveDateTimeFormat() const {
+    auto fmt = dateTimeFormat;
+    if (!fmt.locale) fmt.locale = locale;
+    return fmt;
+  }
 };
 
 template <typename T> struct is_duration : std::false_type {};

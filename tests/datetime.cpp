@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <locale>
+#include <stdexcept>
 #include "helpers.hpp"
 #include "numen/numen.hpp"
 
@@ -11,6 +13,7 @@ numen::EvalConfig configAt(year_month_day now) {
   return numen::EvalConfig{
       .now = sys_days(now),
       .timezone = locate_zone("UTC"),
+      .dateTimeFormat = {.relative = false, .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},
   };
 }
 
@@ -31,11 +34,58 @@ TEST_CASE("Month/year shifts clamp to the end of the month") {
 TEST_CASE("time anchors should parse as dates or instants") {
   numen::Numen calc{};
   auto now = sys_days{year_month_day{2026y, January, 18d}} + 2h + 30min; // 2026-01-18 02:30:00
-  auto config = numen::EvalConfig{.now = now, .timezone = locate_zone("UTC")};
+  auto config = configAt({2026y, January, 18d});
+  config.now = now;
 
   test::assertExpr("now", "2026-01-18 02:30:00 (Etc/UTC)", config);
   test::assertExpr("time", "2026-01-18 02:30:00 (Etc/UTC)", config);
   test::assertExpr("date", "2026-01-18 00:00:00 (Etc/UTC)", config);
   test::assertExpr("tomorrow", "2026-01-19 00:00:00 (Etc/UTC)", config);
   test::assertExpr("yesterday", "2026-01-17 00:00:00 (Etc/UTC)", config);
+}
+
+TEST_CASE("relative formatting drops the midnight time") {
+  auto config = configAt({2026y, January, 18d});
+  config.dateTimeFormat.relative = true;
+
+  test::assertExpr("18 Jan 2001", "2001-01-18 (Etc/UTC)", config);
+  test::assertExpr("18 Jan 2001 13:30", "2001-01-18 13:30:00 (Etc/UTC)", config);
+}
+
+TEST_CASE("localized date time formatting follows the configured locale") {
+  auto localizedConfig = [](const char *locale) {
+    auto config = configAt({2026y, January, 18d});
+    config.dateTimeFormat = {.relative = false,
+                             .withTz = false,
+                             .format = numen::DateTimeFormatOptions::TimeFormat::Local,
+                             .locale = locale};
+    return config;
+  };
+  auto available = [](const char *name) {
+    try {
+      std::locale l{name};
+      return true;
+    } catch (const std::runtime_error &) { return false; }
+  };
+
+  // assertions stay loose on purpose: the exact strings depend on the host's locale data
+  numen::Numen calc;
+
+  if (available("en_US.UTF-8")) {
+    auto res = calc.evaluate("18 Jan 2001 13:30:15", localizedConfig("en_US.UTF-8"));
+    REQUIRE(res);
+    CHECK(res->starts_with("01/18")); // month first
+    CHECK((res->contains("PM") || res->contains("pm")));
+  } else {
+    WARN("en_US.UTF-8 locale not available, skipping");
+  }
+
+  if (available("fr_FR.UTF-8")) {
+    auto res = calc.evaluate("18 Jan 2001 13:30:15", localizedConfig("fr_FR.UTF-8"));
+    REQUIRE(res);
+    CHECK(res->starts_with("18/01")); // day first
+    CHECK(res->contains("13:30:15")); // 24-hour clock
+  } else {
+    WARN("fr_FR.UTF-8 locale not available, skipping");
+  }
 }

@@ -1,6 +1,9 @@
 #include <chrono>
 #include <cmath>
 #include <format>
+#include <locale>
+#include <optional>
+#include <stdexcept>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -142,21 +145,42 @@ std::string DateTime::toTimezoneString() const {
   return out;
 }
 
+// a locale name from config may not exist on the host: fall back rather than throw
+static std::locale resolveLocale(const std::optional<std::string> &name) {
+  if (name) {
+    for (const auto &candidate : {*name, *name + ".UTF-8"}) {
+      try {
+        return std::locale{candidate};
+      } catch (const std::runtime_error &) {}
+    }
+  }
+  try {
+    return std::locale{""};
+  } catch (const std::runtime_error &) { return std::locale::classic(); }
+}
+
+// TODO: if we want really idomatic display for dates, we probably
+// want to integrate https://cldr.unicode.org/translation/date-time/date-time-patterns
+// For now we don't, we just use the basic localized form
 std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
   constexpr auto fl = [](auto &&time) { return std::chrono::floor<std::chrono::days>(time); };
   auto now = std::chrono::system_clock::now();
-  const auto userTz = std::chrono::current_zone();
-  std::chrono::zoned_time zt{tz, time + offset};
-  const auto localTime = userTz->to_local(time);
-  const auto localNow = userTz->to_local(now);
+  // relative elision is decided in the displayed frame, so what is dropped is
+  // exactly what would have rendered as redundant (midnight, today's date)
+  const auto displayTz = tz ? tz : std::chrono::current_zone();
+  std::chrono::zoned_time zt{displayTz, time + offset};
+  const auto localTime = zt.get_local_time();
+  const auto localNow = std::chrono::zoned_time{displayTz, now}.get_local_time();
   const bool isSameLocalDay = fl(localNow) == fl(localTime);
   const bool hasTime = (localTime - fl(localTime)).count() != 0;
+  const bool localized = opts.format == DateTimeFormatOptions::TimeFormat::Local;
+  const auto loc = localized ? resolveLocale(opts.locale) : std::locale::classic();
   std::string out{};
 
   // we still want to show the date for today if there is no time
   if (!opts.relative || !isSameLocalDay || !hasTime) {
-    if (opts.format == DateTimeFormatOptions::TimeFormat::Local) {
-      out += std::format("{:%x}", zt);
+    if (localized) {
+      out += std::format(loc, "{:L%x}", zt);
     } else {
       out += std::format("{:%F}", zt);
     }
@@ -164,8 +188,8 @@ std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
 
   if (!opts.relative || hasTime) {
     if (!out.empty()) out += " ";
-    if (opts.format == DateTimeFormatOptions::TimeFormat::Local) {
-      out += std::format("{:%r}", zt);
+    if (localized) {
+      out += std::format(loc, "{:L%X}", zt);
     } else {
       out += std::format("{:%H:%M:%OS}", zt);
     }

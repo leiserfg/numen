@@ -29,6 +29,10 @@ inline const numen::EvalConfig &frozenConfig() {
         .timezone = std::chrono::locate_zone("UTC"),
         // without this the ambient locale decides whether currencies auto-convert
         .locale = "en_US",
+        // tests assert the full canonical form on purpose: localized output
+        // depends on the host's locale data, relative output on the wall clock
+        .dateTimeFormat = {.relative = false,
+                           .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},
     };
   }();
   return config;
