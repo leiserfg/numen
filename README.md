@@ -16,22 +16,6 @@
 - Currency conversion support (requires implementing a currency provider; this repo contains an example of one).
 - Natural language syntactic sugar: you can write expressions like `20% of 100` to calculate `0.20 * 100`.
 
-### Built-in functions
-
-Most of these are thin proxies around the `<cmath>` function of the same name, taking radians for angles.
-
-| Family | Functions |
-| --- | --- |
-| Roots and powers | `sqrt`, `cbrt`, `root(x, n)`, `pow(x, y)`, `hypot(a, b, ...)` |
-| Exponentials and logarithms | `exp`, `exp2`, `expm1`, `ln`, `log(x)` / `log(x, base)`, `log2`, `log10`, `log1p` |
-| Trigonometry | `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2(y, x)`, `sinh`, `cosh`, `tanh`, `asinh`, `acosh`, `atanh` |
-| Rounding | `floor`, `ceil`, `trunc`, `round(x)` / `round(x, digits)`, `abs`, `sign` |
-| Integers | `gcd(a, b, ...)`, `lcm(a, b, ...)`, `fact` |
-| Special | `gamma`, `lgamma`, `erf`, `erfc`, `fmod(x, y)` |
-| Aggregates | `min`, `max`, `sum`, `avg` |
-
-Functions that keep the shape of their argument (`abs`, rounding, aggregates) keep its unit too: `sum(1 km, 500 m)` is `1.5km`. The others expect plain numbers. Everything lives in `src/numen/fn.cpp`.
-
 ## Comparison with other calculator libraries
 
 - [SoulverCore](https://github.com/soulverteam/SoulverCore) is the main inspiration for this library, as it supports extensive timezone conversions and advanced natural language constructs. It is, however, closed-source and requires a Swift toolchain, which is less than convenient on non-Apple systems.
@@ -44,6 +28,8 @@ Functions that keep the shape of their argument (`abs`, rounding, aggregates) ke
 - Does not implement an equation solver
 - No support for niche units, only the most popular ones.
 - Parsing may be too permissive (in a bad way) at times, we will tighten this as we go
+- Natural language syntax sugar targets English only, although number and dates are localized
+- Code is still ugly in some places :)
 
 ## Getting started
 

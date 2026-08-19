@@ -17,6 +17,21 @@ using TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 
 enum class DateTimePrecision { DateTime, Time, Date, Month, Year };
 
+struct DateTimeFormatOptions {
+  // If relative is set to true, only "meaningful" part of the date time
+  // are rendered: if there is no time, only the date part is shown, if date is the
+  // same as the current local date, only the time is shown, etc...
+  bool relative = false;
+
+  // Whether to render the timezone
+  // The timezone string can be obtained separately using `toTimezoneString`.
+  bool withTz = true;
+
+  enum class TimeFormat { Neutral, Local };
+
+  TimeFormat format = TimeFormat::Neutral;
+};
+
 struct DateTime {
   TimePoint time;
   const std::chrono::time_zone *tz = nullptr;
@@ -27,7 +42,11 @@ struct DateTime {
   auto operator<=>(const DateTime &rhs) const { return time <=> rhs.time; }
   bool operator==(const DateTime &rhs) const { return time == rhs.time; }
 
-  std::string toString() const;
+  std::string toString(const DateTimeFormatOptions &opts = {}) const;
+
+  // Human readable representation of the timezone + optional additonal offset
+  // attached to this DateTime object.
+  std::string toTimezoneString() const;
 
   // Whether the timezone attached to this DateTime (if any) is the same
   // as the current timezone. Note that the concept of current timezone

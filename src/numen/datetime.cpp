@@ -1,6 +1,3 @@
-#include "datetime.hpp"
-#include "numen/numen.hpp"
-#include "timezone.hpp"
 #include <chrono>
 #include <cmath>
 #include <format>
@@ -8,6 +5,9 @@
 #include <string>
 #include <type_traits>
 #include <variant>
+#include "datetime.hpp"
+#include "numen/numen.hpp"
+#include "timezone.hpp"
 
 namespace numen {
 
@@ -123,26 +123,60 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
 
 bool DateTime::isCurrentTimezone() const { return tz == std::chrono::get_tzdb().current_zone(); }
 
-std::string DateTime::toString() const {
-  if (!tz) { return std::format("{:%Y-%m-%d %H:%M:%S} (UTC)", time); }
+std::string DateTime::toTimezoneString() const {
+  std::string out{};
 
-  const auto instant = time + offset;
-  const auto userTz = std::chrono::current_zone();
-  const auto zt = userTz == tz ? std::chrono::zoned_time{tz, userTz->to_local(instant)}
-                               : std::chrono::zoned_time{tz, instant};
+  out += tz->name();
 
   if (offset.count() != 0) {
     auto hours = offset.count() / 3600;
     auto minutes = std::abs((offset.count() - hours * 3600) / 60);
 
     if (minutes != 0) {
-      return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+}:{})", zt, tz->name(), hours, minutes);
+      out += std::format("{:+}:{}", hours, minutes);
     } else {
-      return std::format("{:%Y-%m-%d %H:%M:%OS} ({}{:+})", zt, tz->name(), hours);
+      out += std::format("{:+}", hours);
     }
   }
 
-  return std::format("{:%Y-%m-%d %H:%M:%OS} ({})", zt, tz->name());
+  return out;
+}
+
+std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
+  constexpr auto fl = [](auto &&time) { return std::chrono::floor<std::chrono::days>(time); };
+  auto now = std::chrono::system_clock::now();
+  const auto userTz = std::chrono::current_zone();
+  std::chrono::zoned_time zt{tz, time + offset};
+  const auto localTime = userTz->to_local(time);
+  const auto localNow = userTz->to_local(now);
+  const bool isSameLocalDay = fl(localNow) == fl(localTime);
+  const bool hasTime = (localTime - fl(localTime)).count() != 0;
+  std::string out{};
+
+  // we still want to show the date for today if there is no time
+  if (!opts.relative || !isSameLocalDay || !hasTime) {
+    if (opts.format == DateTimeFormatOptions::TimeFormat::Local) {
+      out += std::format("{:%x}", zt);
+    } else {
+      out += std::format("{:%F}", zt);
+    }
+  }
+
+  if (!opts.relative || hasTime) {
+    if (!out.empty()) out += " ";
+    if (opts.format == DateTimeFormatOptions::TimeFormat::Local) {
+      out += std::format("{:%r}", zt);
+    } else {
+      out += std::format("{:%H:%M:%OS}", zt);
+    }
+  }
+
+  if (tz && opts.withTz) {
+    if (!out.empty()) out += " ";
+    out += std::format("({})", toTimezoneString());
+  }
+
+  return out;
 }
 
 } // namespace numen
