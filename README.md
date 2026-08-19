@@ -26,6 +26,7 @@
 
 - `libnumen` stores every number and computation result in `double` data types, meaning the range and precision of representable values are inherently limited. We could solve this by using one of the various arbitrary-precision libraries. We probably will, eventually.
 - Does not implement an equation solver
+- Implicit unit conversion is only implemented for currencies at this time
 - No support for niche units, only the most popular ones.
 - Parsing may be too permissive (in a bad way) at times, we will tighten this as we go
 - Natural language syntax sugar targets English only, although number and dates are localized
