@@ -10,10 +10,10 @@ km to in                    => 39,370.07874in
 10 kms to m                 => 10,000m
 5KM to m                    => 5,000m
 1000 micrograms to mg       => 1mg
-2 dl to ml                  => 200ml
+2 dl to ml                  => 200mL
 
 # mass
-80 kg to lbs                => 176.36981lbs
+80 kg to lbs                => 176.36981lb
 1 tonne to kg               => 1,000kg
 1 pound to kg               => 0.453592kg
 
@@ -23,23 +23,23 @@ pi1 km                      => 3.141593km
 
 # duration
 1m to s                     => 60s
-2 weeks to days             => 14days
+2 weeks to days             => 14d
 5 ms to s                   => 0.005s
 3 microseconds to ms        => 0.003ms
 
 # temperature
-100 f to c                  => 37.777778c
-20 c to f                   => 68f
-0 c to k                    => 273.15k
+100 f to c                  => 37.777778°C
+20 c to f                   => 68°F
+0 c to k                    => 273.15K
 
 # data
-1 gb to mb                  => 1,000mb
+1 gb to mb                  => 1,000MB
 1 GB to MB                  => 1,000MB
-1 kib to b                  => 1,024b
-1 gib to mib                => 1,024mib
+1 kib to b                  => 1,024B
+1 gib to mib                => 1,024MiB
 
 # volume
-2 cups to ml                => 473.176473ml
+2 cups to ml                => 473.176473mL
 
 # area
 1 acre to sqm               => 4,046.856422m²
@@ -52,8 +52,8 @@ pi1 km                      => 3.141593km
 30min + 1hour               => 1 hr 30 min
 
 # currency: identity and same-currency arithmetic work without rates
-100 dollars                 => 100dollars
-100 usd + 20 usd            => 120usd
+100 dollars                 => $100
+100 usd + 20 usd            => $120
 
 # units flowing through functions
 max(1 km to m, 100)         => 1,000m
@@ -81,11 +81,11 @@ max(1 km to m, 100)         => 1,000m
 1 km * 1 km                 => 1km²
 1 km * 100 m                => 0.1km²
 100 m * 1 km                => 0.1km²
-100 km / 2 hr               => 50km/hr
+100 km / 2 hr               => 50km/h
 2 / 1 km                    => 2/km
 1 / 1 s                     => 1/s
 10 m * 2 s                  => 20m·s
-100 usd / 4 hr              => 25usd/hr
+100 usd / 4 hr              => $25/h
 
 # exponents add, so a unit over itself cancels back to a plain number
 1 km * 1 km / 1 km          => 1km
@@ -101,9 +101,9 @@ max(1 km to m, 100)         => 1,000m
 2 m ^ 0.5                   => !error Cannot raise a unit to that power
 
 # a conversion target may be composed too, and agrees with the named unit
-100 mph to km/hr            => 160.9344km/hr
+100 mph to km/hr            => 160.9344km/h
 100 km / 2 hr to mph        => 31.06856mi/h
-50 m / 1 s to km/hr         => 180km/hr
+50 m / 1 s to km/hr         => 180km/h
 1 km/hr to m/s              => 0.277778m/s
 1 km * 1 km to sqkm         => 1km²
 1 sqkm to km*km             => 1km²
@@ -114,18 +114,18 @@ max(1 km to m, 100)         => 1,000m
 1 km to m * 2               => 2,000m
 
 # the dimensions still have to match
-1 km to km/hr               => !error Incompatible units: km to km/hr
+1 km to km/hr               => !error Incompatible units: km to km/h
 
 # a rate is just another factor, but the same currency on both sides cancels
 # before any rate is needed. these run without a provider, hence the error
-100 usd / 2 hr to usd/hr    => 50usd/hr
+100 usd / 2 hr to usd/hr    => $50/h
 100 usd / 2 hr to eur/hr    => !error No conversion rate available for eur.
 
 # money divides into other things to give a rate, and that is all it does
-100 usd / 2 hr              => 50usd/hr
-2 / 1 usd                   => 2/usd
+100 usd / 2 hr              => $50/h
+2 / 1 usd                   => 2/$
 100 usd / 2 usd             => 50
-50 usd / 1 hr * 8 hr        => 400usd
+50 usd / 1 hr * 8 hr        => $400
 
 1 usd * 1 usd               => !error usd can only be combined with other units as a rate
 2 usd ^ 2                   => !error usd can only be combined with other units as a rate
@@ -142,7 +142,7 @@ max(1 km to m, 100)         => 1,000m
 150km/h - 50km/h            => 100km/h
 150km/h > 100km/h           => true
 1 m*m + 1 m*m               => 2m²
-1 usd/hr + 1 usd/hr         => 2usd/hr
+1 usd/hr + 1 usd/hr         => $2/h
 
 # the larger unit still wins, and the dimensions still have to match
 150km/h + 10m/s             => 51.666667m/s
@@ -151,22 +151,22 @@ max(1 km to m, 100)         => 1,000m
 
 # places shadow units: "gb" (Great Britain) is a legacy tzdb link, "acre" and
 # "mile" are towns. after a conversion operator the unit is meant
-1 tb to gb                  => 1,000gb
-500 mb to gb                => 0.5gb
-1 sqm to acre               => 0.000247acre
-1 ha to acre                => 2.471054acre
-1 acre to m*m to acre       => 1acre
-5 km to mile                => 3.106856mile
+1 tb to gb                  => 1,000GB
+500 mb to gb                => 0.5GB
+1 sqm to acre               => 0.000247ac
+1 ha to acre                => 2.471054ac
+1 acre to m*m to acre       => 1ac
+5 km to mile                => 3.106856mi
 
 # function arguments are computed independently, so min/max used to compare the
 # bare numbers and answer that 1 km was smaller than 999 m
 min(1 km, 999 m)            => 0.999km
 max(1 km, 999 m)            => 1km
-min(1 hr, 30 min)           => 0.5hr
+min(1 hr, 30 min)           => 0.5h
 max(2 kg, 500 g)            => 2kg
 min(5 m/s, 10 km/h)         => 2.777778m/s
-min(20 c, 50 f)             => 10c
-min(1 km, 1 hr)             => !error Incompatible units: hr to km
+min(20 c, 50 f)             => 10°C
+min(1 km, 1 hr)             => !error Incompatible units: h to km
 
 # a plain number among the arguments means they are not all comparable
 max(1 km to m, 100)         => 1,000m
@@ -197,11 +197,11 @@ max(1 km to m, 100)         => 1,000m
 # convert against the composed form
 1 hectare to m*m            => 10,000m²
 1 knot to m/s               => 0.514444m/s
-1 acre                      => 1acre
+1 acre                      => 1ac
 
 # dimensions are unchanged by the rewrite
 1 kmh to mph                => 0.621371mi/h
-1 sqkm to hectare           => 100hectare
+1 sqkm to hectare           => 100ha
 1 kmh * 1 kmh               => 1km²/h²
 
 # unit-preserving functions
@@ -213,13 +213,13 @@ round(2.567 km, 1)          => 2.6km
 trunc(-2.7 hr)              => -2 hr
 sign(-5 m)                  => -1
 sum(1 km, 500 m)            => 1.5km
-sum(1 hr, 30 min)           => 1.5hr
+sum(1 hr, 30 min)           => 1.5h
 avg(1 km, 3 km)             => 2km
-avg(20 c, 30 c)             => 25c
+avg(20 c, 30 c)             => 25°C
 hypot(3 m, 4 m)             => 5m
 hypot(3 km, 4000 m)         => 5km
 max(100, 1 km to m)         => 1,000m
-sum(1 km, 1 hr)             => !error Incompatible units: hr to km
+sum(1 km, 1 hr)             => !error Incompatible units: h to km
 
 # no roots or logarithms of dimensions
 sqrt(4 m)                   => !error sqrt: argument 1 must be a plain number, got 4 m

@@ -18,48 +18,51 @@ namespace {
 constexpr int PROVIDER_CURRENCY_DECIMALS = 8;
 
 struct Prefix {
+  // a prefixed unit takes its name from the long spelling, its symbol from
+  // the short one
+  std::string_view name;
   std::string_view symbol;
   double multiplier;
+  // the micro sign also has an ascii stand-in and a greek look-alike
+  std::array<std::string_view, 2> alt = {};
   // 'm'/'M' (milli/mega) and 'p'/'P' (pico/peta) only differ by case
   bool caseSensitive = false;
   // binary prefixes only make sense for data units
   bool dataOnly = false;
+
+  std::optional<std::string_view> leading(std::string_view q) const {
+    auto head = [&](std::string_view spelling) { return q.substr(0, spelling.size()); };
+    if (equalsIgnoreCase(head(name), name)) return name;
+    if (caseSensitive ? head(symbol) == symbol : equalsIgnoreCase(head(symbol), symbol)) return symbol;
+    for (auto spelling : alt) {
+      if (!spelling.empty() && head(spelling) == spelling) return spelling;
+    }
+    return std::nullopt;
+  }
 };
 
 // declaration order is irrelevant: expansion collects candidates from
 // every matching prefix, first-match-wins semantics must not be assumed
 constexpr auto PREFIXES = std::to_array<Prefix>({
-    {.symbol = "micro", .multiplier = 1e-6},
-    {.symbol = "milli", .multiplier = 1e-3},
-    {.symbol = "centi", .multiplier = 1e-2},
-    {.symbol = "nano", .multiplier = 1e-9},
-    {.symbol = "pico", .multiplier = 1e-12},
-    {.symbol = "deci", .multiplier = 1e-1},
-    {.symbol = "kilo", .multiplier = 1e3},
-    {.symbol = "mega", .multiplier = 1e6},
-    {.symbol = "giga", .multiplier = 1e9},
-    {.symbol = "tera", .multiplier = 1e12},
-    {.symbol = "peta", .multiplier = 1e15},
-    {.symbol = "kibi", .multiplier = 1024.0, .dataOnly = true},
-    {.symbol = "mebi", .multiplier = 1048576.0, .dataOnly = true},
-    {.symbol = "gibi", .multiplier = 1073741824.0, .dataOnly = true},
-    {.symbol = "tebi", .multiplier = 1099511627776.0, .dataOnly = true},
-    {.symbol = "ki", .multiplier = 1024.0, .dataOnly = true},
-    {.symbol = "mi", .multiplier = 1048576.0, .dataOnly = true},
-    {.symbol = "gi", .multiplier = 1073741824.0, .dataOnly = true},
-    {.symbol = "ti", .multiplier = 1099511627776.0, .dataOnly = true},
-    {.symbol = "n", .multiplier = 1e-9},
-    {.symbol = "u", .multiplier = 1e-6},
-    {.symbol = "m", .multiplier = 1e-3, .caseSensitive = true},
-    {.symbol = "M", .multiplier = 1e6, .caseSensitive = true},
-    {.symbol = "c", .multiplier = 1e-2},
-    {.symbol = "d", .multiplier = 1e-1},
-    {.symbol = "k", .multiplier = 1e3},
-    {.symbol = "G", .multiplier = 1e9},
-    {.symbol = "T", .multiplier = 1e12},
-    {.symbol = "p", .multiplier = 1e-12, .caseSensitive = true},
-    {.symbol = "P", .multiplier = 1e15, .caseSensitive = true},
+    {.name = "nano", .symbol = "n", .multiplier = 1e-9},
+    {.name = "micro", .symbol = "µ", .multiplier = 1e-6, .alt = {"u", "μ"}},
+    {.name = "milli", .symbol = "m", .multiplier = 1e-3, .caseSensitive = true},
+    {.name = "centi", .symbol = "c", .multiplier = 1e-2},
+    {.name = "deci", .symbol = "d", .multiplier = 1e-1},
+    {.name = "kilo", .symbol = "k", .multiplier = 1e3},
+    {.name = "mega", .symbol = "M", .multiplier = 1e6, .caseSensitive = true},
+    {.name = "giga", .symbol = "G", .multiplier = 1e9},
+    {.name = "tera", .symbol = "T", .multiplier = 1e12},
+    {.name = "pico", .symbol = "p", .multiplier = 1e-12, .caseSensitive = true},
+    {.name = "peta", .symbol = "P", .multiplier = 1e15, .caseSensitive = true},
+    {.name = "kibi", .symbol = "Ki", .multiplier = 1024.0, .dataOnly = true},
+    {.name = "mebi", .symbol = "Mi", .multiplier = 1048576.0, .dataOnly = true},
+    {.name = "gibi", .symbol = "Gi", .multiplier = 1073741824.0, .dataOnly = true},
+    {.name = "tebi", .symbol = "Ti", .multiplier = 1099511627776.0, .dataOnly = true},
 });
+
+std::string symbolOf(const UnitDef &def) { return def.symbol.empty() ? def.id : def.symbol; }
+std::string nameOf(const UnitDef &def) { return def.name.empty() ? def.id : def.name; }
 
 // "meters" -> "meter", "inches" -> "inch". Only ever consulted for tokens
 // with no direct reading: a token that is a unit name by itself ("ms",
@@ -130,12 +133,13 @@ bool CompoundUnit::hasStableFactor() const {
 }
 
 std::string CompoundUnit::render() const {
-  auto name = [](const UnitTerm &term) {
+  auto name = [&](const UnitTerm &term) {
+    auto base = symbolOf(term.def);
     auto exponent = std::abs(term.exponent);
-    if (exponent == 1) return term.display;
-    if (exponent == 2) return term.display + "²";
-    if (exponent == 3) return term.display + "³";
-    return std::format("{}^{}", term.display, exponent);
+    if (exponent == 1) return base;
+    if (exponent == 2) return base + "²";
+    if (exponent == 3) return base + "³";
+    return std::format("{}^{}", base, exponent);
   };
 
   std::vector<std::string> over, under;
@@ -161,18 +165,54 @@ std::string CompoundUnit::render() const {
   return std::format("{}/{}", join(over), under.front());
 }
 
+std::string CompoundUnit::name() const {
+  auto name = [](const UnitTerm &term) {
+    auto base = nameOf(term.def);
+    auto exponent = std::abs(term.exponent);
+    if (exponent == 1) return base;
+    if (exponent == 2) return "square " + base;
+    if (exponent == 3) return "cubic " + base;
+    return std::format("{}^{}", base, exponent);
+  };
+
+  std::string out;
+  for (const auto &term : terms) {
+    if (term.exponent < 0) continue;
+    if (!out.empty()) out += " ";
+    out += name(term);
+  }
+  for (const auto &term : terms) {
+    if (term.exponent > 0) continue;
+    if (!out.empty()) out += " ";
+    out += "per " + name(term);
+  }
+  return out;
+}
+
+const UnitDef *CompoundUnit::leadingCurrency() const {
+  const UnitDef *currency = nullptr;
+
+  for (const auto &term : terms) {
+    if (term.exponent < 0) continue;
+    // a second numerator, or a power, is no longer an amount of money
+    if (currency || term.exponent != 1) return nullptr;
+    if (!term.def.symbolPrefix || term.def.symbol.empty()) return nullptr;
+    currency = &term.def;
+  }
+
+  return currency;
+}
+
 const UnitDef *CompoundUnit::sole() const {
   if (terms.size() != 1 || terms.front().exponent != 1) return nullptr;
   return &terms.front().def;
 }
 
-CompoundUnit soleUnit(UnitDef def, std::string display) {
-  return CompoundUnit{{UnitTerm{.def = std::move(def), .display = std::move(display)}}};
-}
+CompoundUnit soleUnit(UnitDef def) { return CompoundUnit{{UnitTerm{.def = std::move(def)}}}; }
 
 std::vector<UnitDef> UnitDatabase::matchExact(std::string_view q) const {
   return m_units | std::views::filter([&](const UnitDef &unit) {
-           return equalsIgnoreCase(unit.id, q) ||
+           return equalsIgnoreCase(unit.id, q) || unit.symbol == q ||
                   std::ranges::any_of(unit.aliases, [&](auto &&str) { return equalsIgnoreCase(str, q); });
          }) |
          std::ranges::to<std::vector>();
@@ -182,15 +222,12 @@ std::vector<UnitDef> UnitDatabase::expandPrefixed(std::string_view q) const {
   std::vector<UnitDef> out;
 
   for (const auto &prefix : PREFIXES) {
-    if (q.size() <= prefix.symbol.size()) { continue; }
-
-    auto head = q.substr(0, prefix.symbol.size());
-    bool matches = prefix.caseSensitive ? head == prefix.symbol : equalsIgnoreCase(head, prefix.symbol);
-    if (!matches) { continue; }
+    auto spelling = prefix.leading(q);
+    if (!spelling || q.size() <= spelling->size()) { continue; }
 
     // exact-only: a plural remainder ("mins" as milli + "ins" -> inch) must
     // lose to the plural pass on the whole token
-    auto rest = q.substr(prefix.symbol.size());
+    auto rest = q.substr(spelling->size());
     auto bases = matchExact(rest);
 
     for (const auto &base : bases) {
@@ -199,6 +236,8 @@ std::vector<UnitDef> UnitDatabase::expandPrefixed(std::string_view q) const {
 
       out.push_back(UnitDef{
           .id = std::string{q},
+          .symbol = std::string{prefix.symbol} + symbolOf(base),
+          .name = std::string{prefix.name} + nameOf(base),
           .factor = prefix.multiplier * base.factor,
           .dimension = base.dimension,
           .family = base.family,
@@ -234,8 +273,14 @@ std::optional<UnitDef> UnitDatabase::providerCurrency(std::string_view q) const 
 
   if (!m_currencyProvider->getRate(code)) return std::nullopt;
 
+  std::string ticker = code;
+  std::ranges::transform(ticker, ticker.begin(),
+                         [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+
   return UnitDef{
       .id = code,
+      .symbol = ticker,
+      .name = ticker,
       .dimension = dimensions::CURRENCY,
       .family = families::CURRENCY,
       .decimals = PROVIDER_CURRENCY_DECIMALS,
@@ -264,9 +309,8 @@ std::optional<CompoundUnit> UnitDatabase::expandComposition(std::string_view spe
     auto candidates = findUnitCandidates(token);
     if (candidates.empty()) return std::nullopt;
 
-    out.terms.push_back(UnitTerm{.def = candidates.front(),
-                                 .display = std::string{token},
-                                 .exponent = static_cast<std::int8_t>(exponent * sign)});
+    out.terms.push_back(
+        UnitTerm{.def = candidates.front(), .exponent = static_cast<std::int8_t>(exponent * sign)});
 
     if (end == std::string_view::npos) break;
     sign = spec[end] == '/' ? -1 : 1;
@@ -277,13 +321,25 @@ std::optional<CompoundUnit> UnitDatabase::expandComposition(std::string_view spe
 }
 
 std::vector<CompoundUnit> UnitDatabase::findCompounds(std::string_view q) const {
+  // the spelling render() produces: "m²" is m^2
+  for (auto [suffix, exponent] : {std::pair{std::string_view{"²"}, 2}, {std::string_view{"³"}, 3}}) {
+    if (!q.ends_with(suffix)) continue;
+
+    auto compounds = findCompounds(q.substr(0, q.size() - suffix.size()));
+    for (auto &compound : compounds) {
+      for (auto &term : compound.terms) {
+        term.exponent = static_cast<std::int8_t>(term.exponent * exponent);
+      }
+    }
+    return compounds;
+  }
+
   for (const auto &alias : units::compoundAliases()) {
     if (!equalsIgnoreCase(alias.name, q)) continue;
     if (auto expanded = expandComposition(alias.composition)) return {*expanded};
   }
 
-  return findUnitCandidates(q) |
-         std::views::transform([&](const UnitDef &def) { return soleUnit(def, std::string{q}); }) |
+  return findUnitCandidates(q) | std::views::transform([&](const UnitDef &def) { return soleUnit(def); }) |
          std::ranges::to<std::vector>();
 }
 

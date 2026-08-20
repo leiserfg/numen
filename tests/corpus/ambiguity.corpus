@@ -31,7 +31,7 @@ Jan 2021                    => 2021-01-01 00:00:00 (Etc/UTC)
 # mi is mile (not mebi), mb stays megabyte (not millibit)
 1 min to s                  => 60s
 1 mi to km                  => 1.609344km
-1 mb to b                   => 1,000,000b
+1 mb to b                   => 1,000,000B
 
 # a token that is a unit by itself is never reinterpreted as a plural:
 # ms is milliseconds, not meters; mins is minutes, not milli-inches

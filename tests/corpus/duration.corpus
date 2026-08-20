@@ -46,8 +46,8 @@
 1.4 years + 1 month         => 1 yr 5 months 3 weeks 3 days 8 hr 23 min 17 sec
 
 # naming a unit still gets you that unit, undivided
-1.4 years to months         => 16.8months
-1.4 years to days           => 511.3395days
+1.4 years to months         => 16.8mo
+1.4 years to days           => 511.3395d
 
 # a week sits between days and months
 7 days                      => 1 week

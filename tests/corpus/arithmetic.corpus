@@ -328,8 +328,8 @@ min()                       => !error
 0b12                        => 1
 0b13                        => 1
 0o7                         => 7
-0xG                         => 0G
-0x1G                        => 1G
+0xG                         => 0g
+0x1G                        => 1g
 0xFF.5                      => 255
 
 # shifts by and of edge values
@@ -402,7 +402,7 @@ min(0.1 + 0.2, 0.3)         => 0.3
 200% of 1km                 => 2km
 1km + 10%                   => 1.1km
 1km - 10%                   => 0.9km
-1 usd + 10%                 => 1.1usd
+1 usd + 10%                 => $1.1
 50% of 1 hour               => 30 min
 1 km + 10% == 1.1 km        => true
 
@@ -444,4 +444,4 @@ min(0.1 + 0.2, 0.3)         => 0.3
 1,2,3,4                     => 1,234
 1,2,3,4.12345               => 1,234.12345
 1,200*2                     => 2,400
-5,000min / 2 to minutes     => 2,500minutes
+5,000min / 2 to minutes     => 2,500min

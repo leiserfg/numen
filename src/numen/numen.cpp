@@ -19,9 +19,25 @@ namespace numen {
 using namespace numen::detail;
 
 std::string Number::toString() const {
-  auto unitName =
-      unit.transform([](const Unit &u) { return u.resolved ? u.resolved->render() : u.raw; }).value_or("");
-  return text + unitName;
+  if (!unit) return text;
+  if (!unit->resolved) return text + unit->raw;
+
+  const auto &resolved = *unit->resolved;
+
+  // "-$5", "$25/h": the symbol leads the amount, the minus leads the symbol
+  if (auto currency = resolved.leadingCurrency()) {
+    auto rate = resolved;
+    std::erase_if(rate.terms, [](const UnitTerm &term) { return term.exponent > 0; });
+
+    std::string_view amount{text};
+    bool negative = amount.starts_with('-');
+    if (negative) amount.remove_prefix(1);
+
+    return std::format("{}{}{}{}", negative ? "-" : "", currency->symbol, amount,
+                       rate.terms.empty() ? std::string{} : rate.render());
+  }
+
+  return text + resolved.render();
 }
 
 std::string Boolean::toString() const { return value ? "true" : "false"; }

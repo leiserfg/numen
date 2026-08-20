@@ -200,7 +200,7 @@ public:
   Computed computeExprBase(const Expression &expr) const {
     auto result = computeExpr(expr);
 
-    if (auto n = result.asNumber(); n && n->unit && n->unit->def() &&
+    if (auto n = result.asNumber(); m_opts.implicitCurrencyConversion && n && n->unit && n->unit->def() &&
                                     n->unit->def()->dimension == dimensions::CURRENCY &&
                                     !n->explicitlyConverted) {
       auto target = numen::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
@@ -285,7 +285,7 @@ private:
 
     return {
         .value = Num{.n = Value{res.value()},
-                     .unit = Number::Unit{.raw = display, .resolved = soleUnit(to, display)},
+                     .unit = Number::Unit{.raw = display, .resolved = soleUnit(to)},
                      .explicitlyConverted = true},
     };
   }
@@ -305,7 +305,7 @@ private:
         auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == part.def.id; });
 
         if (known == terms.end()) {
-          terms.push_back(UnitTerm{.def = part.def, .display = part.display, .exponent = exponent});
+          terms.push_back(UnitTerm{.def = part.def, .exponent = exponent});
         } else {
           known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
         }
@@ -439,10 +439,10 @@ private:
     // the kept side holds the settled reading, so "1m + 30s" still knows its
     // "m" is a minute once the other side is gone
     if (keepLhs) {
-      n1->unit->resolved = soleUnit(a, n1->unit->raw);
+      n1->unit->resolved = soleUnit(a);
       rhs = convertResolved(n2->n.toDouble(), b, a, n1->unit->raw);
     } else {
-      n2->unit->resolved = soleUnit(b, n2->unit->raw);
+      n2->unit->resolved = soleUnit(b);
       lhs = convertResolved(n1->n.toDouble(), a, b, n2->unit->raw);
     }
   }
@@ -480,7 +480,7 @@ private:
         auto known = std::ranges::find_if(terms, [&](const UnitTerm &x) { return x.def.id == term.def.id; });
 
         if (known == terms.end()) {
-          terms.push_back(UnitTerm{.def = term.def, .display = term.display, .exponent = exponent});
+          terms.push_back(UnitTerm{.def = term.def, .exponent = exponent});
         } else {
           known->exponent = static_cast<std::int8_t>(known->exponent + exponent);
         }

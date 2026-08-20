@@ -11,7 +11,7 @@
 - Evaluate algebraic expressions as you would expect.
 - Built-in math functions (see below).
 - Support for computer science operators like bitwise operators and modulo.
-- Full support for units.
+- Full support for units, rendered in conventional notation (`km/h`, `m²`, `$25/h`) and able to name themselves ("US Dollar per hour").
 - Date-time arithmetic and timezone conversion based on timezone name, city/region/state name. Expressions like `time in 2 hours in SF` work.
 - Currency conversion support (requires implementing a currency provider; this repo contains an example of one).
 - Natural language syntactic sugar: you can write expressions like `20% of 100` to calculate `0.20 * 100`.
@@ -66,6 +66,17 @@ int main() {
   std::cout << res.value() << "\n"; // 20
 }
 ```
+
+A unit always comes back in its conventional notation, whatever spelling the expression used: `5 KM/H` renders as `5km/h`, `2 m * 3 m` as `6m²`, and a currency leads with its symbol (`$14.5`, `$25/h`). Only a unit that never resolved falls back to the token it was typed as. The resolved unit also names itself, which is what a subtitle or a tooltip wants:
+
+```cpp
+auto res = calc.compute("12.5 usd + 2 usd");
+
+res->toString();                         // $14.5
+res->asNumber()->unit->resolved->name(); // US Dollar
+```
+
+Symbols work as input too: `5 € to usd`, `3 µs`, `100 °F in celsius` and `20 km² to sqft` all evaluate as expected. `$` is the one exception — it is not yet accepted as an input token.
 
 `evaluate()` returns the default rendering. When you need the value itself, `compute()` returns a `numen::ComputedValue` (a variant of `Number`, `DateTime`, `Duration` and `Boolean`) and `parse<T>()` converts straight to a C++ type. Every value type has a `toString()` producing the same text `evaluate()` would, and a matching `std::formatter`, so you can format some kinds yourself and fall back to the default for the rest:
 

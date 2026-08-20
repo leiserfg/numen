@@ -62,6 +62,12 @@ inline constexpr const char *CURRENCY = "currency";
 struct UnitDef {
   std::string id;
   std::vector<std::string> aliases;
+  // "km", "$". resolvable like any alias; empty leaves the id to stand for it
+  std::string symbol;
+  // only currencies state one, as CLDR spells it: "US Dollar"
+  std::string name;
+  // "$12.50", not "12.50 $"
+  bool symbolPrefix = false;
   // meaningless for currency: exchange rates are resolved at runtime, keyed
   // by the currency dimension
   double factor = 1;
@@ -76,8 +82,6 @@ struct UnitDef {
 
 struct UnitTerm {
   UnitDef def;
-  // the token as the user typed it, so "5KM/h" does not come back as "km/h"
-  std::string display;
   std::int8_t exponent = 1;
 };
 
@@ -90,17 +94,23 @@ struct CompoundUnit {
   double factor() const;
   bool hasStableFactor() const;
 
+  // conventional notation, however the unit was typed: "km²", "$/h"
   std::string render() const;
+
+  // "square kilometer", "US Dollar per hour"
+  std::string name() const;
+
+  // the currency whose symbol leads the amount instead of trailing it: "$25/h"
+  const UnitDef *leadingCurrency() const;
 
   // null once composition made this something no table entry names
   const UnitDef *sole() const;
 };
 
-CompoundUnit soleUnit(UnitDef def, std::string display);
+CompoundUnit soleUnit(UnitDef def);
 
 // a spelling that stands for a composition rather than a unit of its own, so it
-// states no factor: that follows from the parts. the composition is also what
-// gets displayed, so it is spelled short
+// states no factor: that follows from the parts, as does what it renders as
 struct CompoundAlias {
   std::string_view name;
   std::string_view composition;

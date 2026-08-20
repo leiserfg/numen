@@ -56,7 +56,7 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 
 # subtracting two dates produces a duratio
 01/18/2001 1:00:00 - 01/18/2001 00:00:00          => 1 hr
-01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours => 1hours
+01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours => 1h
 
 # timezones
 2001/01/18 New York         => 2001-01-18 00:00:00 (America/New_York)
@@ -124,7 +124,7 @@ time now == now              => true
 
 yesterday                    => 2026-01-17 00:00:00 (Etc/UTC)
 tomorrow                     => 2026-01-19 00:00:00 (Etc/UTC)
-tomorrow - yesterday to days => 2days
+tomorrow - yesterday to days => 2d
 150 years ago                => 1876-01-18 00:00:00 (Etc/UTC)
 
 # <tz><relative> || <relative><tz>

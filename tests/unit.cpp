@@ -1,3 +1,4 @@
+#include "builtin-units.hpp"
 #include "numen/numen.hpp"
 #include "numen/unit.hpp"
 #include <catch2/catch_test_macros.hpp>
@@ -9,7 +10,7 @@ namespace {
 UnitTerm term(const UnitDatabase &db, const std::string &id, std::int8_t exponent = 1) {
   auto def = db.findUnit(id);
   REQUIRE(def);
-  return UnitTerm{.def = *def, .display = id, .exponent = exponent};
+  return UnitTerm{.def = *def, .exponent = exponent};
 }
 
 } // namespace
@@ -63,7 +64,7 @@ TEST_CASE("an atomic unit still agrees with its composed equivalent", "[unit][co
   CHECK(calc.evaluate("1 knot to m/s") == "0.514444m/s");
 }
 
-TEST_CASE("a compound renders the way it was typed", "[unit][compound]") {
+TEST_CASE("a compound renders in conventional notation", "[unit][compound]") {
   UnitDatabase db;
 
   auto render = [](CompoundUnit u) { return u.render(); };
@@ -80,10 +81,117 @@ TEST_CASE("a compound renders the way it was typed", "[unit][compound]") {
   CHECK(render({{term(db, "km", -1)}}) == "/km");
 
   // several denominators need grouping, "usd/kg·m" would read as (usd/kg)·m
-  CHECK(render({{term(db, "usd"), term(db, "kg", -1), term(db, "m", -1)}}) == "usd/(kg·m)");
+  CHECK(render({{term(db, "usd"), term(db, "kg", -1), term(db, "m", -1)}}) == "$/(kg·m)");
 
-  // the casing of the original token survives
-  CHECK(render({{term(db, "KM"), term(db, "hr", -1)}}) == "KM/hr");
+  // however the unit was spelled, it comes back the same way
+  CHECK(render({{term(db, "KM"), term(db, "hr", -1)}}) == "km/h");
+  CHECK(render({{term(db, "meters", 2)}}) == "m²");
+  CHECK(render({{term(db, "celsius")}}) == "°C");
+
+  CHECK(render({{term(db, "microseconds")}}) == "µs");
+  CHECK(render({{term(db, "Mm")}}) == "Mm");
+  CHECK(render({{term(db, "kib")}}) == "KiB");
+}
+
+TEST_CASE("a compound names itself", "[unit][compound]") {
+  UnitDatabase db;
+
+  auto name = [](CompoundUnit u) { return u.name(); };
+
+  CHECK(name({{term(db, "km")}}) == "kilometer");
+  CHECK(name({{term(db, "usd")}}) == "US Dollar");
+  CHECK(name({{term(db, "sek")}}) == "Swedish Krona");
+  CHECK(name({{term(db, "km", 2)}}) == "square kilometer");
+  CHECK(name({{term(db, "m", 3)}}) == "cubic meter");
+  CHECK(name({{term(db, "km"), term(db, "h", -1)}}) == "kilometer per hour");
+  CHECK(name({{term(db, "usd"), term(db, "kg", -1), term(db, "m", -1)}}) ==
+        "US Dollar per kilogram per meter");
+  CHECK(name({{term(db, "microseconds")}}) == "microsecond");
+  CHECK(name({{term(db, "kib")}}) == "kibibyte");
+}
+
+TEST_CASE("a unit resolves from its symbol", "[unit]") {
+  UnitDatabase db;
+
+  auto sole = [&](std::string_view q) {
+    auto found = db.findUnit(std::string{q});
+    REQUIRE(found);
+    return found->id;
+  };
+
+  CHECK(sole("$") == "usd");
+  CHECK(sole("€") == "eur");
+  CHECK(sole("£") == "gbp");
+  CHECK(sole("¥") == "jpy");
+  CHECK(sole("₿") == "btc");
+  CHECK(sole("°C") == "celsius");
+  CHECK(sole("°F") == "fahrenheit");
+
+  // µ resolves as a prefix, micro sign and greek mu alike
+  CHECK(db.findUnit("µs")->dimension == dimensions::DURATION);
+  CHECK(db.findUnit("μs")->dimension == dimensions::DURATION);
+
+  CHECK_FALSE(db.findUnit("€ "));
+}
+
+TEST_CASE("a rendered unit parses back", "[unit]") {
+  UnitDatabase db;
+
+  auto roundtrip = [&](std::string_view q) {
+    auto found = db.findCompounds(q);
+    REQUIRE(!found.empty());
+    auto once = found.front().render();
+
+    auto again = db.findCompounds(once);
+    REQUIRE(!again.empty());
+    CHECK(again.front().render() == once);
+    return once;
+  };
+
+  CHECK(roundtrip("km") == "km");
+  CHECK(roundtrip("sqm") == "m²");
+  CHECK(roundtrip("km2") == "km²");
+  CHECK(roundtrip("m³") == "m³");
+  CHECK(roundtrip("usd") == "$");
+  CHECK(roundtrip("celsius") == "°C");
+  CHECK(roundtrip("microsecond") == "µs");
+}
+
+TEST_CASE("every builtin renders under a spelling that resolves", "[unit]") {
+  UnitDatabase db;
+
+  for (const auto &def : units::builtins()) {
+    CAPTURE(def.id);
+
+    auto notation = soleUnit(def).render();
+    CHECK_FALSE(notation.empty());
+
+    // an ambiguous spelling may settle on another reading ("m" is a meter
+    // before it is a minute), but must still render the same
+    auto reread = db.findCompounds(notation);
+    REQUIRE_FALSE(reread.empty());
+    CHECK(reread.front().render() == notation);
+
+    CHECK_FALSE(soleUnit(def).name().empty());
+  }
+}
+
+TEST_CASE("a number renders its unit in conventional notation", "[unit]") {
+  numen::Numen calc;
+
+  auto render = [&](std::string_view expr) {
+    auto res = calc.compute(expr, {.implicitCurrencyConversion = false});
+    REQUIRE(res);
+    return res->toString();
+  };
+
+  CHECK(render("1.5 KM") == "1.5km");
+  CHECK(render("2 meters * 3 meters") == "6m²");
+
+  CHECK(render("12.5 usd") == "$12.5");
+  CHECK(render("0 - 5 euro") == "-€5");
+  // a currency with no symbol of its own keeps its code
+  CHECK(render("100 sek") == "100sek");
 }
 
 TEST_CASE("unit should tag any expression", "[unit]") {

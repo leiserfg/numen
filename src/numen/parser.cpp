@@ -139,9 +139,11 @@ bool Parser::isTimezoneToken(std::string_view name) {
 std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   auto head = m_lexer.peak();
 
-  if (!head || head->type != Lexer::TokenType::String) return std::nullopt;
+  if (!head) return std::nullopt;
 
-  if (validate && m_unitDb.findCompounds(head->raw).empty()) { return std::nullopt; }
+  if ((validate || head->type != Lexer::TokenType::String) && m_unitDb.findCompounds(head->raw).empty()) {
+    return std::nullopt;
+  }
 
   m_lexer.next();
   NamedUnit target{.terms = {NamedUnitTerm{.name = head->raw}}};

@@ -8,6 +8,7 @@ constexpr std::string_view BASE_CHARS = "0123456789abcdef";
 // we hardcode these, in order to avoid ambiguity. Only result strings are localized.
 constexpr char THOUSAND_DELIM = '_';
 constexpr char FRACTION_DELIM = '.';
+
 }; // namespace
 
 void Lexer::advance(int n) {
@@ -41,8 +42,10 @@ std::optional<Lexer::Token> Lexer::next() {
   constexpr auto isValidChar = [](std::uint8_t c) { return std::isalpha(c) || c & 0x80; };
 
   const auto isCalled = [&](std::size_t pos) {
-    while (pos < m_data.size() && (isValidChar(m_data[pos]) || std::isdigit(m_data[pos]))) ++pos;
-    while (pos < m_data.size() && std::isspace(m_data[pos])) ++pos;
+    while (pos < m_data.size() && (isValidChar(m_data[pos]) || std::isdigit(m_data[pos])))
+      ++pos;
+    while (pos < m_data.size() && std::isspace(m_data[pos]))
+      ++pos;
     return pos < m_data.size() && m_data[pos] == '(';
   };
 

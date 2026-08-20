@@ -174,7 +174,8 @@ struct Number {
   bool operator==(const Number &rhs) const { return n == rhs.n; }
   std::partial_ordering operator<=>(const Number &rhs) const { return n <=> rhs.n; }
 
-  // what evaluate() prints: text followed by the unit, e.g. "1.5 km"
+  // what evaluate() prints: "1.5km", "6m²", "$12.5". a unit that never
+  // resolved falls back to the way it was typed
   std::string toString() const;
 };
 
