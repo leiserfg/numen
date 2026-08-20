@@ -35,7 +35,8 @@ std::optional<Duration> durationFrom(double value, const UnitDef &unit) {
     auto whole = std::trunc(asMonths);
 
     using MonthRep = std::chrono::months::rep;
-    if (std::abs(whole) > static_cast<double>(std::numeric_limits<MonthRep>::max())) return std::nullopt;
+    // the bound rounds up on its way to double, so landing on it is already past
+    if (std::abs(whole) >= static_cast<double>(std::numeric_limits<MonthRep>::max())) return std::nullopt;
 
     d.months = std::chrono::months{static_cast<MonthRep>(whole)};
 
@@ -48,7 +49,7 @@ std::optional<Duration> durationFrom(double value, const UnitDef &unit) {
 
   auto asNanos = value * unit.factor * nanosPerSecond;
   if (asNanos != std::trunc(asNanos)) return std::nullopt;
-  if (std::abs(asNanos) > static_cast<double>(std::numeric_limits<long long>::max())) return std::nullopt;
+  if (std::abs(asNanos) >= static_cast<double>(std::numeric_limits<long long>::max())) return std::nullopt;
 
   auto nanos = static_cast<long long>(asNanos);
   d.seconds = std::chrono::seconds{nanos / nanosPerSecond};
@@ -93,9 +94,15 @@ std::string Duration::toString() const {
     if (n) parts.push_back(std::format("{} {}{}", n, unit, plural && n > 1 ? "s" : ""));
   };
 
+  // the most negative value has no positive counterpart, so it saturates
+  const auto magnitude = [](long long n) -> long long {
+    if (n == std::numeric_limits<long long>::min()) return std::numeric_limits<long long>::max();
+    return n < 0 ? -n : n;
+  };
+
   const auto group = [&](long long total, auto &&emit) {
     auto before = parts.size();
-    emit(std::abs(total));
+    emit(magnitude(total));
     if (total < 0 && parts.size() > before) parts[before].insert(0, "-");
   };
 
@@ -106,8 +113,8 @@ std::string Duration::toString() const {
 
   // the two share one sign, so they are emitted as a single group
   group(clock != 0 ? clock : fraction, [&](long long) {
-    auto s = std::abs(clock);
-    auto ns = std::abs(fraction);
+    auto s = magnitude(clock);
+    auto ns = magnitude(fraction);
 
     push(s / perWeek, "week", true);
     push(s % perWeek / perDay, "day", true);

@@ -87,7 +87,9 @@ Value Value::operator>>(const Value &rhs) const {
 std::string Value::renderBase(NumberOutputFormat format) const {
   auto i = toInt();
   bool negative = i < 0;
-  auto magnitude = static_cast<unsigned long long>(negative ? -i : i);
+  // the sign comes off in unsigned, where the most negative value cannot overflow
+  auto magnitude = static_cast<unsigned long long>(i);
+  if (negative) magnitude = 0ULL - magnitude;
 
   auto [prefix, body] = [&]() -> std::pair<const char *, std::string> {
     switch (format) {

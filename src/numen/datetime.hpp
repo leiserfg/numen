@@ -11,6 +11,10 @@ Duration subtractDates(const DateTime &lhs, const DateTime &rhs);
 
 DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now);
 
+// nanoseconds reach about 292 years either side of the epoch; past that the
+// conversion overflows. the bound keeps a day spare for a time of day
+TimePoint checkedTimePoint(std::chrono::sys_seconds t);
+
 // moves by whole calendar units, clamping to the last day of the month when
 // the day does not exist there (jan 31 + 1 month is feb 28)
 template <typename T> TimePoint shift(TimePoint t, T duration) {
@@ -23,9 +27,7 @@ template <typename T> TimePoint shift(TimePoint t, T duration) {
 
   if (!ymd.ok()) ymd = ymd.year() / ymd.month() / std::chrono::last;
 
-  auto point = std::chrono::sys_days{ymd} + tod;
-
-  return point;
+  return checkedTimePoint(std::chrono::sys_days{ymd}) + tod;
 }
 
 } // namespace numen::detail

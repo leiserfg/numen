@@ -507,15 +507,28 @@ std::optional<DateString> Parser::parseRFC3339() {
 
   if (!(s1.op == "-" && s2.op == "-" && s3.op == ":" && s4.op == ":")) return std::nullopt;
 
+  // the shape alone does not make it a timestamp: every component has to be
+  // one a clock could read, or the cast below has nothing to land on
+  auto yr = asYear(year.n.toDouble());
+  auto mon = clockComponent(month.n.toDouble(), 12);
+  auto dayOfMonth = clockComponent(day.n.toDouble(), 31);
+  auto hours = clockComponent(hour.n.toDouble(), 23);
+  auto minutes = clockComponent(min.n.toDouble(), 59);
+  // :60 is a leap second, which is a reading RFC 3339 allows
+  auto seconds = clockComponent(s.n.toDouble(), 60);
+
+  if (!yr || !mon || !dayOfMonth || !hours || !minutes || !seconds) return std::nullopt;
+  if (*mon < 1 || *dayOfMonth < 1) return std::nullopt;
+
   DateString ds;
 
-  ds.value = DateTimeLiteral{.day = std::chrono::day{static_cast<unsigned>(day.n.toDouble())},
-                             .month = std::chrono::month{static_cast<unsigned>(month.n.toDouble())},
-                             .year = std::chrono::year{static_cast<int>(year.n.toDouble())},
+  ds.value = DateTimeLiteral{.day = std::chrono::day{*dayOfMonth},
+                             .month = std::chrono::month{*mon},
+                             .year = *yr,
                              .time = ParsedTime{
-                                 .hours = std::chrono::hours{hour.n.to<int>()},
-                                 .minutes = std::chrono::minutes{min.n.to<int>()},
-                                 .seconds = std::chrono::seconds{s.n.to<int>()},
+                                 .hours = std::chrono::hours{*hours},
+                                 .minutes = std::chrono::minutes{*minutes},
+                                 .seconds = std::chrono::seconds{*seconds},
                              }};
 
   m_lexer.advance(std::tuple_size_v<decltype(parsed)::value_type>);
@@ -541,13 +554,13 @@ std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
       int sign = str->raw == "+" ? 1 : -1;
       m_lexer.next();
 
-      if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && isValidOffset(n->n)) {
+      if (auto n = m_lexer.peakAs<Lexer::Number>(); n && n->n.isInteger() && isValidOffset(n->n)) {
         m_lexer.next();
         offset += std::chrono::hours(static_cast<int>(n->n.toDouble()) * sign);
 
         if (auto tok = m_lexer.peak(); tok && tok->raw == ":") {
           m_lexer.next();
-          if (auto n = m_lexer.peakAs<Lexer::Number>(); n->n.isInteger() && n->n >= 0 && n->n < 60) {
+          if (auto n = m_lexer.peakAs<Lexer::Number>(); n && n->n.isInteger() && n->n >= 0 && n->n < 60) {
             m_lexer.next();
             offset += std::chrono::minutes(static_cast<int>(n->n.toDouble()) * sign);
           }

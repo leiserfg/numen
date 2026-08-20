@@ -3,6 +3,7 @@
 #include "numen/numen.hpp"
 #include <cmath>
 #include <compare>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -50,8 +51,18 @@ public:
                      std::optional<int> fixedDecimals = std::nullopt) const;
 
 private:
-  // digits below the radix point are dropped, as the bitwise operators always have
-  long long toInt() const { return static_cast<long long>(m_n); }
+  // digits below the radix point are dropped, as the bitwise operators always
+  // have. a magnitude past the integer range has none to land on, so it saturates
+  long long toInt() const {
+    constexpr auto lo = std::numeric_limits<long long>::min();
+    constexpr auto hi = std::numeric_limits<long long>::max();
+
+    if (std::isnan(m_n)) return 0;
+    if (m_n >= static_cast<double>(hi)) return hi;
+    if (m_n <= static_cast<double>(lo)) return lo;
+
+    return static_cast<long long>(m_n);
+  }
 
   long long shiftCount(const Value &rhs) const;
   std::string renderDecimal() const;

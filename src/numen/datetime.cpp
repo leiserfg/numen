@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <format>
 #include <locale>
 #include <optional>
@@ -48,6 +49,17 @@ Duration subtractDates(const DateTime &lhs, const DateTime &rhs) {
                   .seconds = seconds{std::abs(secs.count())}};
 }
 
+TimePoint checkedTimePoint(std::chrono::sys_seconds t) {
+  constexpr std::chrono::seconds LIMIT{std::numeric_limits<TimePoint::rep>::max() / TimePoint::period::den -
+                                       std::chrono::seconds{std::chrono::days{1}}.count()};
+
+  if (t.time_since_epoch() > LIMIT || t.time_since_epoch() < -LIMIT) {
+    throw std::runtime_error("Date is out of the representable range");
+  }
+
+  return TimePoint{t};
+}
+
 static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time_zone &tz,
                                       TimePoint now) {
   std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
@@ -60,7 +72,8 @@ static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chron
       if (auto min = time->minutes) t += *min;
       if (auto secs = time->seconds) t += *secs;
     }
-    return tz.to_sys(t);
+
+    return checkedTimePoint(tz.to_sys(t));
   };
 
   return std::visit(

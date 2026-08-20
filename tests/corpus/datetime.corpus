@@ -41,6 +41,26 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 2026-01-18T14:30:00+02:00   => 2026-01-18 16:30:00 (Etc/UTC+2)
 2026-01-18T14:30:00+6:42   => 2026-01-18 21:12:00 (Etc/UTC+6:42)
 
+# an offset still being typed: a sign, or a colon, with nothing after it
+2026-01-18T14:30:00+        => 2026-01-18 14:30:00 (Etc/UTC)
+2026-01-18T14:30:00-        => 2026-01-18 14:30:00 (Etc/UTC)
+2026-01-18T14:30:00+05      => 2026-01-18 19:30:00 (Etc/UTC+5)
+2026-01-18T14:30:00+05:     => 2026-01-18 19:30:00 (Etc/UTC+5)
+
+# a component no clock could read means it is not a timestamp
+2026-01-18T14:30:60Z        => 2026-01-18 14:31:00 (Etc/UTC)
+2026-01-18T80:30:00Z        => 2026-01-18 00:00:00 (Etc/UTC)
+
+# nanoseconds run out about 292 years either side of the epoch
+01/18/1700                  => 1700-01-18 00:00:00 (Etc/UTC)
+01/18/1600                  => !error Date is out of the representable range
+01/18/20                    => !error Date is out of the representable range
+01-18-2                     => !error Date is out of the representable range
+
+# the same limit, reached by shifting
+100 years ago               => 1926-01-18 00:00:00 (Etc/UTC)
+1150 years ago              => !error Date is out of the representable range
+
 # adding durations
 18/01/2001 13:30:15 + 1d + 5min => 2001-01-19 13:35:15 (Etc/UTC)
 
