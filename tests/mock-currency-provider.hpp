@@ -40,6 +40,7 @@ private:
       {"xmr", 0.005},
       {"shib", 100000},
       {"m", 1},
+      {"pi", 10}, // pi is a constant and will always overwrite currency in non conversion context.
   };
 
   int m_updates = 0;

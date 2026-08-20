@@ -69,6 +69,10 @@ constexpr auto CONSTANTS = std::to_array<ConstantDef>({
 
 namespace {
 
+constexpr bool isConstant(std::string_view v) {
+  return std::ranges::any_of(CONSTANTS, [&](auto &&def) { return equalsIgnoreCase(def.name, v); });
+};
+
 bool isOperatorToken(std::string_view tok) {
   return std::ranges::any_of(operators(), [&](auto &&op) { return std::ranges::contains(op.aliases, tok); });
 }
@@ -142,9 +146,10 @@ std::optional<NamedUnit> Parser::parseUnit(bool validate) {
 
   if (!head) return std::nullopt;
 
-  if ((validate || head->type != Lexer::TokenType::String) && m_unitDb.findCompounds(head->raw).empty()) {
-    return std::nullopt;
-  }
+  // constants always have priority over currency symbol
+  const bool isNotUnitLike = isConstant(head->raw) || m_unitDb.findCompounds(head->raw).empty();
+
+  if ((validate || head->type != Lexer::TokenType::String) && isNotUnitLike) { return std::nullopt; }
 
   m_lexer.next();
   NamedUnit target{.terms = {NamedUnitTerm{.name = head->raw}}};
