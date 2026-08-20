@@ -33,19 +33,19 @@ TEST_CASE("a chain keeps the first question and the last answer", "[conversion]"
   CHECK(u->to.raw == "in");
 }
 
-TEST_CASE("a format conversion records both formats", "[conversion]") {
-  auto f = compute("255 to hex").conversion->as<NumberOutputFormat>();
-  REQUIRE(f);
-  CHECK(f->from == NumberOutputFormat::Decimal);
-  CHECK(f->to == NumberOutputFormat::Hexadecimal);
-}
-
 TEST_CASE("a timezone conversion records both zones", "[conversion]") {
   auto t = compute("now to pst").conversion->as<Timezone>();
   REQUIRE(t);
   REQUIRE(t->from);
   CHECK(t->from->tz == test::frozenConfig().timezone);
   CHECK(t->to.toString() == "America/Los_Angeles");
+}
+
+TEST_CASE("formatting passes a conversion through", "[conversion]") {
+  auto u = compute("150 usd to jpy to binary").conversion->as<Number::Unit>();
+  REQUIRE(u);
+  CHECK(u->from->raw == "usd");
+  CHECK(u->to.raw == "jpy");
 }
 
 TEST_CASE("a source with nothing of the target's kind has no question side", "[conversion]") {
@@ -71,5 +71,6 @@ TEST_CASE("the locale currency conversion is flagged implicit", "[conversion]") 
 TEST_CASE("plain results carry no conversion", "[conversion]") {
   CHECK_FALSE(compute("1 + 2").conversion);
   CHECK_FALSE(compute("100 m").conversion);
+  CHECK_FALSE(compute("255 to hex").conversion);
   CHECK_FALSE(compute("(100 m to ft) + 1 m").conversion);
 }

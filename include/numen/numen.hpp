@@ -200,7 +200,7 @@ template <class T> struct ConversionOf {
 };
 
 struct Conversion {
-  std::variant<ConversionOf<Number::Unit>, ConversionOf<Timezone>, ConversionOf<NumberOutputFormat>> sides;
+  std::variant<ConversionOf<Number::Unit>, ConversionOf<Timezone>> sides;
 
   // locale currency conversion
   bool implicit = false;

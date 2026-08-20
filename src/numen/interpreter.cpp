@@ -123,17 +123,17 @@ public:
           if (auto fmt = conv.target.fmt) {
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
               value.format = NumberOutputFormat::Hexadecimal;
-              return stamp(v, Computed{value}, n->format, value.format);
+              return Computed{.value = value, .conversion = v.conversion};
             }
 
             if (fmt->name == "binary") {
               value.format = NumberOutputFormat::Binary;
-              return stamp(v, Computed{value}, n->format, value.format);
+              return Computed{.value = value, .conversion = v.conversion};
             }
 
             if (fmt->name == "octal") {
               value.format = NumberOutputFormat::Octal;
-              return stamp(v, Computed{value}, n->format, value.format);
+              return Computed{.value = value, .conversion = v.conversion};
             }
           }
 
