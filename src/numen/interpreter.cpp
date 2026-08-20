@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <format>
 #include <initializer_list>
+#include <iostream>
 #include <locale>
 #include <optional>
 #include <ranges>

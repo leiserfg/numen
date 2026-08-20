@@ -155,3 +155,11 @@ TEST_CASE("a rate applies inside a composed unit too", "[currency][compound]") {
 
   CHECK_FALSE(calc.evaluate("100 usd / 2 hr to zzz/hr"));
 }
+
+TEST_CASE("currency with $ in the name should work (crypto tickers)", "[currency]") {
+  auto calc = test::mockCalc();
+
+  // as per the mock, $ticker = 0.5usd
+  CHECK(calc.evaluate("100 $ticker to usd") == "$50");
+  CHECK(calc.evaluate("100 $TICKER to usd") == "$50");
+}
