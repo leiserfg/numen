@@ -137,11 +137,15 @@ public:
           }
 
           if (auto unit = conv.target.unit) {
-            if (!n->unit) return Computed{.value = value};
+            auto target = buildTarget(*unit);
+
+            if (!n->unit) {
+              n->unit = Number::Unit{.raw = std::string{unit->simpleName()}, .resolved = target};
+              return Computed{.value = *n};
+            }
 
             // a single token can still name a composition, so ask what it
             // resolved to rather than how it was spelled
-            auto target = buildTarget(*unit);
             bool plainTarget = unit->isSimple() && target.sole();
             bool plainSource = !n->unit->resolved || n->unit->resolved->sole();
 
@@ -225,7 +229,8 @@ private:
     if (src.conversion) {
       if (auto prior = src.conversion->as<T>()) from = prior->from;
     }
-    out.conversion = Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
+    out.conversion =
+        Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
     return out;
   }
 
