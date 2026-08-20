@@ -76,10 +76,6 @@ res->toString();                         // $14.5
 res->asNumber()->unit->resolved->name(); // US Dollar
 ```
 
-Symbols work as input too: `5 € to usd`, `3 µs`, `100 °F in celsius` and `20 km² to sqft` all evaluate as expected. `$` is the one exception — it is not yet accepted as an input token.
-
-`evaluate()` returns the default rendering. When you need the value itself, `compute()` returns a `numen::ComputedValue` (a variant of `Number`, `DateTime`, `Duration` and `Boolean`) and `parse<T>()` converts straight to a C++ type. Every value type has a `toString()` producing the same text `evaluate()` would, and a matching `std::formatter`, so you can format some kinds yourself and fall back to the default for the rest:
-
 ```cpp
 auto res = calc.compute("tomorrow - today + 90min");
 

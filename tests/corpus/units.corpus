@@ -237,3 +237,10 @@ sqrt(4) km + 1              => 3km
 # square/cubic
 5km2                        => 5km²
 5km3                        => 5km³
+
+# <unit> <quantity>
+km500                       => 500km
+km4 + 3km                   => 7km
+$150                        => $150
+€40 to €                    => €40
+km45 * km4                  => 180km²

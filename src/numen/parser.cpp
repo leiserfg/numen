@@ -138,6 +138,7 @@ bool Parser::isTimezoneToken(std::string_view name) {
 
 std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   auto head = m_lexer.peak();
+  auto start = m_lexer.cursor();
 
   if (!head) return std::nullopt;
 
@@ -153,6 +154,11 @@ std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   if (auto num = m_lexer.peakAs<Lexer::Number>(); num && num->n >= 2 && num->n <= 3) {
     target.terms.front().exponent = num->n.to<int>();
     m_lexer.next();
+  }
+
+  if (auto tok = m_lexer.peak(); tok && tok->raw == "(") {
+    m_lexer.setCursor(start);
+    return std::nullopt;
   }
 
   return target;
@@ -622,8 +628,10 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   auto expr = std::unique_ptr<Expression>();
+  auto frontUnit = parseUnit();
 
   if (auto tok = m_lexer.peak()) {
+
     if (auto constant = parseConstant(tok->raw)) {
       m_lexer.next();
 
@@ -690,7 +698,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
   if (auto tok = m_lexer.peak()) {
     bool unary = std::ranges::contains(std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
-    if (unary) {
+    if (!frontUnit && unary) {
       m_lexer.next();
       return std::make_unique<Expression>(UnaryExpression{
           .op = tok->raw,
@@ -763,6 +771,13 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       expr = makeUnit(makeNumberExpr(1), unit.value());
     else
       expr = makeUnit(std::move(expr), unit.value());
+  }
+
+  if (frontUnit) {
+    if (!expr)
+      expr = makeUnit(makeNumberExpr(1), frontUnit.value());
+    else
+      expr = makeUnit(std::move(expr), frontUnit.value());
   }
 
   if (!expr) {
