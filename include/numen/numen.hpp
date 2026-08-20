@@ -4,6 +4,7 @@
 #include <compare>
 #include <expected>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -36,6 +37,13 @@ struct DateTimeFormatOptions {
   // Locale used when format is Local. If not specified, the environment's
   // locale is used.
   std::optional<std::string> locale;
+};
+
+struct Timezone {
+  const std::chrono::time_zone *tz = nullptr;
+  std::chrono::seconds offset = std::chrono::seconds(0);
+
+  std::string toString() const;
 };
 
 struct DateTime {
@@ -166,8 +174,6 @@ struct Number {
 
   std::optional<Unit> unit;
 
-  bool explicitlyConverted = false;
-
   // n holds the fraction, so "50%" is 0.5
   bool isPercentage = false;
 
@@ -188,6 +194,20 @@ struct Boolean {
 
 using ValueType = std::variant<Number, DateTime, Boolean, Duration>;
 
+template <class T> struct ConversionOf {
+  std::optional<T> from;
+  T to;
+};
+
+struct Conversion {
+  std::variant<ConversionOf<Number::Unit>, ConversionOf<Timezone>, ConversionOf<NumberOutputFormat>> sides;
+
+  // locale currency conversion
+  bool implicit = false;
+
+  template <class T> const ConversionOf<T> *as() const { return std::get_if<ConversionOf<T>>(&sides); }
+};
+
 template <class T> std::string_view valueName() {
   if constexpr (std::is_same_v<T, Duration>) {
     return "Duration";
@@ -203,6 +223,8 @@ template <class T> std::string_view valueName() {
 
 struct ComputedValue {
   ValueType value;
+
+  std::optional<Conversion> conversion;
 
   bool isNumber() const { return std::holds_alternative<Number>(value); }
 

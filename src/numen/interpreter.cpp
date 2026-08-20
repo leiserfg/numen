@@ -92,7 +92,8 @@ public:
             d.tz = TimezoneDB{}.query(tz->name);
             d.offset = tz->offset;
 
-            return Computed{d};
+            return stamp(v, Computed{d}, Timezone{v.asDateTime()->tz, v.asDateTime()->offset},
+                         Timezone{d.tz, d.offset});
           }
 
           if (auto unit = conv.target.unit; unit && unit->isSimple()) {
@@ -102,16 +103,16 @@ public:
               auto seconds_epoch =
                   std::chrono::duration_cast<std::chrono::seconds>(dt->time.time_since_epoch()).count();
 
-              return Computed{Num{.n = Value{static_cast<double>(seconds_epoch)},
-                                  .unit = Number::Unit{.raw = "second"},
-                                  .explicitlyConverted = true}};
+              return stampUnit(v, Computed{Num{.n = Value{static_cast<double>(seconds_epoch)},
+                                               .unit = Number::Unit{.raw = "second"},
+                                               .explicitlyConverted = true}});
             }
           }
         }
 
         if (auto d = v.asDuration()) {
           if (auto unit = conv.target.unit; unit && unit->isSimple()) {
-            return convertToUnit(d->total().count(), "second", unit->simpleName());
+            return stampUnit(v, convertToUnit(d->total().count(), "second", unit->simpleName()));
           }
         }
 
@@ -121,17 +122,17 @@ public:
           if (auto fmt = conv.target.fmt) {
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
               value.format = NumberOutputFormat::Hexadecimal;
-              return Computed{value};
+              return stamp(v, Computed{value}, n->format, value.format);
             }
 
             if (fmt->name == "binary") {
               value.format = NumberOutputFormat::Binary;
-              return Computed{value};
+              return stamp(v, Computed{value}, n->format, value.format);
             }
 
             if (fmt->name == "octal") {
               value.format = NumberOutputFormat::Octal;
-              return Computed{value};
+              return stamp(v, Computed{value}, n->format, value.format);
             }
           }
 
@@ -147,10 +148,10 @@ public:
             // the plain path is the only one that knows about offsets, and the
             // only one that can settle an ambiguous token against its target
             if (plainTarget && plainSource) {
-              return convertToUnit(n->n.toDouble(), n->unit->raw, unit->simpleName());
+              return stampUnit(v, convertToUnit(n->n.toDouble(), n->unit->raw, unit->simpleName()));
             }
 
-            return convertCompound(*n, std::move(target));
+            return stampUnit(v, convertCompound(*n, std::move(target)));
           }
         }
         if (auto unit = conv.target.unit) {
@@ -205,7 +206,7 @@ public:
                                     !n->explicitlyConverted) {
       auto target = numen::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
       if (target && !equalsIgnoreCase(*target, n->unit->def()->id)) {
-        result = convertToUnit(result.asNumber()->n.toDouble(), n->unit->def()->id, *target);
+        result = stampUnit(result, convertToUnit(n->n.toDouble(), n->unit->def()->id, *target), true);
       }
     }
 
@@ -217,6 +218,24 @@ public:
   }
 
 private:
+  // chains keep the first `from`
+  template <class T>
+  static Computed stamp(const Computed &src, Computed out, std::type_identity_t<std::optional<T>> from, T to,
+                        bool implicit = false) {
+    if (src.conversion) {
+      if (auto prior = src.conversion->as<T>()) from = prior->from;
+    }
+    out.conversion = Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
+    return out;
+  }
+
+  static Computed stampUnit(const Computed &src, Computed out, bool implicit = false) {
+    auto n = out.asNumber();
+    if (!n || !n->unit) return out;
+    auto s = src.asNumber();
+    return stamp(src, out, s ? s->unit : std::nullopt, *n->unit, implicit);
+  }
+
   std::optional<Duration> foldToDuration(const Num &n) const {
     if (!n.unit) return std::nullopt;
 

@@ -6,8 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-option(BUILD_REPL "Build the repl program" OFF)
-option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in REPL currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL." ON)
+option(BUILD_REPL "Build the simple repl program" OFF)
+option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in REPL currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL to run the REPL." ON)
 
 option(BUILD_TESTS "Build the test suite" OFF)
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
@@ -140,6 +140,7 @@ if (BUILD_TESTS)
 		tests/unit.cpp 
 		tests/corpus.cpp 
 		tests/currency.cpp 
+		tests/conversion.cpp
 		tests/value.cpp)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 

@@ -26,6 +26,7 @@ using Val = std::variant<Num, DateTime, Boolean, Duration>;
 
 struct Computed {
   Val value;
+  std::optional<Conversion> conversion;
 
   bool isNumber() const { return std::holds_alternative<Num>(value); }
   bool isDateTime() const { return std::holds_alternative<DateTime>(value); }

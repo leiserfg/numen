@@ -62,17 +62,18 @@ static std::optional<int> unitDecimals(const detail::Num &v) {
 }
 
 static ComputedValue toPublic(const detail::Computed &c) {
+  auto out = [&](ValueType v) { return ComputedValue{.value = std::move(v), .conversion = c.conversion}; };
+
   if (auto n = c.asNumber()) {
-    return ComputedValue{.value = Number{.n = n->n.toDouble(),
-                                         .text = n->n.render(n->format, unitDecimals(*n)),
-                                         .format = n->format,
-                                         .unit = n->unit,
-                                         .explicitlyConverted = n->explicitlyConverted,
-                                         .isPercentage = n->isPercentage}};
+    return out(Number{.n = n->n.toDouble(),
+                      .text = n->n.render(n->format, unitDecimals(*n)),
+                      .format = n->format,
+                      .unit = n->unit,
+                      .isPercentage = n->isPercentage});
   }
-  if (auto d = c.asDateTime()) return ComputedValue{.value = *d};
-  if (auto d = c.asDuration()) return ComputedValue{.value = *d};
-  return ComputedValue{.value = std::get<Boolean>(c.value)};
+  if (auto d = c.asDateTime()) return out(*d);
+  if (auto d = c.asDuration()) return out(*d);
+  return out(std::get<Boolean>(c.value));
 }
 
 std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, const EvalConfig &opts) {

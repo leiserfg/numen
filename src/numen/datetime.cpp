@@ -139,7 +139,9 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
 
 bool DateTime::isCurrentTimezone() const { return tz == std::chrono::get_tzdb().current_zone(); }
 
-std::string DateTime::toTimezoneString() const {
+std::string DateTime::toTimezoneString() const { return Timezone{tz, offset}.toString(); }
+
+std::string Timezone::toString() const {
   std::string out{};
 
   out += tz->name();
