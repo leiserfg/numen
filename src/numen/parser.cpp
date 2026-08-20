@@ -598,8 +598,10 @@ std::optional<TimezoneOffset> Parser::parseTimezone() {
 std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
   return greedyParse(3,
                      [&](std::string_view word) {
-                       return std::ranges::contains(
-                           std::initializer_list{"hex", "octal", "binary", "hexadecimal"}, word);
+                       return std::ranges::contains(std::initializer_list{"hex", "octal", "binary",
+                                                                          "hexadecimal", "bin", "dec",
+                                                                          "decimal"},
+                                                    word);
                      })
       .transform([](auto &&str) { return NamedNumberFormat(str); });
 }

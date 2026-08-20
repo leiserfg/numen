@@ -2,6 +2,7 @@
 #include "datetime.hpp"
 #include "duration.hpp"
 #include "fn.hpp"
+#include "numen/numen.hpp"
 #include "region-currency.hpp"
 #include "timezone.hpp"
 #include "utils.hpp"
@@ -121,19 +122,20 @@ public:
           auto value = *n;
 
           if (auto fmt = conv.target.fmt) {
+            const auto toFormatted = [&](NumberOutputFormat fmt) {
+              value.format = fmt;
+              return Computed{.value = value, .conversion = v.conversion};
+            };
+
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
-              value.format = NumberOutputFormat::Hexadecimal;
-              return Computed{.value = value, .conversion = v.conversion};
+              return toFormatted(NumberOutputFormat::Hexadecimal);
             }
-
-            if (fmt->name == "binary") {
-              value.format = NumberOutputFormat::Binary;
-              return Computed{.value = value, .conversion = v.conversion};
+            if (fmt->name == "bin" | fmt->name == "binary") {
+              return toFormatted(NumberOutputFormat::Binary);
             }
-
-            if (fmt->name == "octal") {
-              value.format = NumberOutputFormat::Octal;
-              return Computed{.value = value, .conversion = v.conversion};
+            if (fmt->name == "octal") { return toFormatted(NumberOutputFormat::Octal); }
+            if (fmt->name == "dec" || fmt->name == "decimal") {
+              return toFormatted(NumberOutputFormat::Decimal);
             }
           }
 
