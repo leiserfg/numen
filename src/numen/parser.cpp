@@ -8,7 +8,6 @@
 #include <charconv>
 #include <chrono>
 #include <initializer_list>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -45,7 +44,7 @@ const auto &operators() {
      OperatorDefinition{.id = "*", .aliases = {"*", "mul"}, .precedence = 4},
      OperatorDefinition{.id = "/", .aliases = {"/", "div"}, .precedence = 4},
      OperatorDefinition{.id = "%", .aliases = {"%", "mod", "modulo"}, .precedence = 4},
-     OperatorDefinition{.id = "^", .aliases = {"^", "pow", "power"}, .precedence = EXPONENT_PRECEDENCE,
+     OperatorDefinition{.id = "^", .aliases = {"^", "**", "pow", "power"}, .precedence = EXPONENT_PRECEDENCE,
                         .rightAssociative = true}
   });
   // clang-format on

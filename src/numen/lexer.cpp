@@ -168,7 +168,6 @@ std::optional<Lexer::Token> Lexer::next() {
         case '+':
         case ',':
         case '^':
-        case '*':
         case '/':
         case '%':
           ++m_cursor;
