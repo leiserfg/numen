@@ -11,10 +11,17 @@
 - Evaluate algebraic expressions as you would expect.
 - Built-in math functions (see below).
 - Support for computer science operators like bitwise operators and modulo.
-- Full support for units, rendered in conventional notation (`km/h`, `m²`, `$25/h`) and able to name themselves ("US Dollar per hour").
-- Date-time arithmetic and timezone conversion based on timezone name, city/region/state name. Expressions like `time in 2 hours in SF` work.
+- Full support for units
+- Date-time arithmetic and timezone conversion based on timezone name, city/region/state name.
 - Currency conversion support (requires implementing a currency provider; this repo contains an example of one).
 - Natural language syntactic sugar: you can write expressions like `20% of 100` to calculate `0.20 * 100`.
+
+## Goals
+
+- Zero dependency, compiles on every platform where modern C++ is supported
+- Reasonably fast, should be able to run on every keystroke without slowing things down
+- Intuitive defaults, respects localization rules where possible
+- Doesn't throw (except internally)
 
 ## Comparison with other calculator libraries
 
@@ -28,12 +35,31 @@
 - Does not implement an equation solver
 - Implicit unit conversion is only implemented for currencies at this time
 - No support for niche units, only the most popular ones.
-- Parsing may be too permissive (in a bad way) at times, we will tighten this as we go
+- Parsing may be too permissive (in a bad way) at times
 - Natural language syntax sugar targets English only, although number and dates are localized
 - `.` is always used as a decimal separator, and `,` as a thousand separator, no matter the user's locale. Numbers are rendered with US-style grouping (`1,234,567.89`) for the same reason, so any output can be fed back in as input. Date time values are otherwise properly localized.
 - Code is still ugly in some places :)
 
+## Roadmap
+
+There is no strict roadmap properly speaking, but here are a few things I would like to implement in the future (in no particular order):
+
+- first class color type with color conversion support
+- more advanced maths stuff if I feel like it
+- implict unit conversion (outside of curency)
+- fully [localized](https://cldr.unicode.org/translation/date-time/date-time-patterns) date formatting (e.g `2010年12月5日` for Japanese)
+- support for variables, function definitions, multi statements (basically turning this into an interpreted programming language of sort)
+- better unicode support
+
 ## Getting started
+
+### Installation
+
+If you want to use `libnumen` in your project, we recommend vendoring it directly, which is easily done as it is dependency-free.
+
+The easiest way is to clone this repo and add it as a CMake subdirectory.
+
+If you want a system-wide installation of the library, run `make install`.
 
 ### Build
 
@@ -50,55 +76,13 @@ Run `make test` to build and run the test suite (`./build/numen-tests`).
 
 ### Usage
 
-```cpp
-#include "numen/numen.hpp"
-#include <iostream>
+You can look at the `include/numen/numen.hpp` header and the tests, which there are many.
 
-int main() {
-  numen::Numen calc;
-  auto res = calc.evaluate("20% of 100");
+If built manually using `make` there is also a minimal REPL that you can use to try things out, without much configuration:
 
-  if (!res) {
-    std::cerr << "Error: " << res.error() << "\n";
-    return 1;
-  }
-
-  std::cout << res.value() << "\n"; // 20
-}
+```bash
+./build/repl
 ```
-
-A unit always comes back in its conventional notation, whatever spelling the expression used: `5 KM/H` renders as `5km/h`, `2 m * 3 m` as `6m²`, and a currency leads with its symbol (`$14.5`, `$25/h`). Only a unit that never resolved falls back to the token it was typed as. The resolved unit also names itself, which is what a subtitle or a tooltip wants:
-
-```cpp
-auto res = calc.compute("12.5 usd + 2 usd");
-
-res->toString();                         // $14.5
-res->asNumber()->unit->resolved->name(); // US Dollar
-```
-
-```cpp
-auto res = calc.compute("tomorrow - today + 90min");
-
-if (auto d = res->asDuration()) {
-  std::println("{}", *d);            // 1 day 1 hr 30 min
-  std::println("{}", d->toString()); // same thing
-  std::println("{}", calc.parse<std::chrono::minutes>("tomorrow - today + 90min")->count()); // 1530
-}
-```
-
-The REPL built by `make` (`./build/repl`) can be used to quickly try things out, either interactively or by passing an expression as its single argument:
-
-```sh
-./build/repl "time in 2 hours in SF"
-```
-
-### Installation
-
-If you want to use `libnumen` in your project, we recommend vendoring it directly, which is easily done as it is dependency-free.
-
-The easiest way is to clone this repo and add it as a CMake subdirectory. You will probably want to pass `-DBUILD_REPL=OFF -DBUILD_TESTS=OFF` in that scenario.
-
-If you want a system-wide installation of the library, run `make install`.
 
 ## Development
 
