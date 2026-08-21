@@ -10,8 +10,10 @@ option(BUILD_REPL "Build the simple repl program" OFF)
 option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in REPL currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL to run the REPL." ON)
 
 option(BUILD_TESTS "Build the test suite" OFF)
-# Apple's libc++ has no std::chrono tzdb
+
+# Apple's libc++ has no std::chrono tzdb: see upstream PR https://github.com/llvm/llvm-project/pull/122010
 option(NUMEN_USE_DATE_TZ "Use the vendored HowardHinnant/date library for timezone support instead of std::chrono" ${APPLE})
+
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

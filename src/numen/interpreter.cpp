@@ -579,7 +579,7 @@ private:
       if (auto y = dur->years) { result.time = shift(result.time, *y); }
       if (auto m = dur->months) { result.time = shift(result.time, *m); }
       if (auto s = dur->seconds) { result.time += *s; }
-      if (auto ns = dur->subsecond) { result.time += *ns; }
+      if (auto ns = dur->subsecond) { result.time += std::chrono::duration_cast<TimePoint::duration>(*ns); }
 
       return Computed{result};
     }
@@ -618,7 +618,7 @@ private:
       if (auto y = dur->years) result.time = shift(result.time, -*y);
       if (auto m = dur->months) result.time = shift(result.time, -*m);
       if (auto s = dur->seconds) result.time += -*s;
-      if (auto ns = dur->subsecond) result.time += -*ns;
+      if (auto ns = dur->subsecond) result.time -= std::chrono::duration_cast<TimePoint::duration>(*ns);
 
       return Computed{result};
     }

@@ -278,7 +278,7 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   if (!ns3 || ns3->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  auto [n1, n2, n3] = std::tuple{toNumber(ns1->raw), toNumber(ns2->raw), toNumber(ns3->raw)};
+  auto [n1, n2, n3] = std::tuple{ns1->asNumber()->n.toDouble(), ns2->asNumber()->n.toDouble(), ns3->asNumber()->n.toDouble()};
 
   const auto isMonth = [](auto n) { return n >= 1 && n <= 12; };
   const auto isDay = [](auto n) { return n >= 1 && n <= 31; };
@@ -390,7 +390,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
     if (auto m = m_lexer.peak(1)) {
 
       if (auto month = m_dateStringVocab.asMonth(m->raw)) {
-        auto dayOfMonth = clockComponent(toNumber(tok->raw), 31);
+        auto dayOfMonth = clockComponent(tok->asNumber()->n.toDouble(), 31);
         if (!dayOfMonth) return std::nullopt;
 
         DateTimeLiteral d;
@@ -400,7 +400,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
         m_lexer.next();
         m_lexer.next();
         if (auto year = m_lexer.peakIf(Lexer::TokenType::Number)) {
-          auto parsed = asYear(toNumber(year->raw));
+          auto parsed = asYear(year->asNumber()->n.toDouble());
           if (!parsed) return std::nullopt;
 
           d.year = *parsed;
@@ -428,7 +428,7 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   if (!head) return std::nullopt;
 
   if (head) {
-    auto value = clockComponent(toNumber(head->raw), 23);
+    auto value = clockComponent(head->asNumber()->n.toDouble(), 23);
     if (!value) return std::nullopt;
     time.hours = std::chrono::hours{*value};
   }
@@ -481,7 +481,7 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    auto value = clockComponent(toNumber(tok->raw), 59);
+    auto value = clockComponent(tok->asNumber()->n.toDouble(), 59);
     if (!value) return std::nullopt;
 
     time.minutes = std::chrono::minutes{*value};
@@ -492,7 +492,7 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    auto value = clockComponent(toNumber(tok->raw), 59);
+    auto value = clockComponent(tok->asNumber()->n.toDouble(), 59);
     if (!value) return std::nullopt;
 
     time.seconds = std::chrono::seconds{*value};

@@ -3,7 +3,6 @@
 #include "numen/numen.hpp"
 #include "concepts.hpp"
 #include "lexer.hpp"
-#include <chrono>
 #include <cassert>
 #include "date-string.hpp"
 #include <chrono>
@@ -19,14 +18,6 @@ using namespace numen;
 struct Expression;
 
 using NumberString = numen::Value;
-
-namespace {
-double toNumber(std::string_view s) {
-  double n;
-  std::from_chars(s.data(), s.data() + s.size(), n);
-  return n;
-};
-} // namespace
 
 struct BinaryExpression {
   std::string op;
