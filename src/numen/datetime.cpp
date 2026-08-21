@@ -188,8 +188,10 @@ std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
   auto now = std::chrono::system_clock::now();
   // relative elision is decided in the displayed frame, so what is dropped is
   // exactly what would have rendered as redundant (midnight, today's date)
+  // whole seconds: %S would otherwise print the clock's fractional digits
   constexpr auto toLocal = [](const auto &zone, auto &&t) {
-    return std::chrono::local_time{zone->to_local(t).time_since_epoch()};
+    return std::chrono::floor<std::chrono::seconds>(
+        std::chrono::local_time{zone->to_local(t).time_since_epoch()});
   };
   const auto displayTz = tz ? tz : tz::current_zone();
   const auto localTime = toLocal(displayTz, time + offset);

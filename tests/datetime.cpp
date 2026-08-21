@@ -75,7 +75,8 @@ TEST_CASE("localized date time formatting follows the configured locale") {
     auto res = calc.evaluate("18 Jan 2001 13:30:15", localizedConfig("en_US.UTF-8"));
     REQUIRE(res);
     CHECK(res->starts_with("01/18")); // month first
-    CHECK((res->contains("PM") || res->contains("pm")));
+    // glibc's en_US %X is 12-hour, Apple's is 24-hour: only the hour digits are common ground
+    CHECK((res->contains("1:30:15") || res->contains("13:30:15")));
   } else {
     WARN("en_US.UTF-8 locale not available, skipping");
   }
@@ -83,7 +84,7 @@ TEST_CASE("localized date time formatting follows the configured locale") {
   if (available("fr_FR.UTF-8")) {
     auto res = calc.evaluate("18 Jan 2001 13:30:15", localizedConfig("fr_FR.UTF-8"));
     REQUIRE(res);
-    CHECK(res->starts_with("18/01")); // day first
+    CHECK(res->starts_with("18"));    // day first; glibc separates with '/', Apple with '.'
     CHECK(res->contains("13:30:15")); // 24-hour clock
   } else {
     WARN("fr_FR.UTF-8 locale not available, skipping");

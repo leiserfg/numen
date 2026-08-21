@@ -11,10 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
-#if NUMEN_USE_DATE_TZ
-#include <filesystem>
-#endif
 
 using namespace std::literals;
 
@@ -83,43 +79,16 @@ std::optional<std::string_view> queryGeoDb(std::string_view query) {
 bool sameZoneName(std::string_view query, std::string_view name);
 
 #if NUMEN_USE_DATE_TZ
-struct OsTzLink {
-  std::string name;
-  std::string target;
+struct TzLink {
+  std::string_view name;
+  std::string_view target;
 };
 
-// mirrors date's discovery, which it does not expose
-std::filesystem::path zoneinfoDir() {
-#ifdef __APPLE__
-  std::error_code ec;
-  auto localtime = std::filesystem::read_symlink("/etc/localtime", ec).string();
-  if (auto i = localtime.find("zoneinfo"); !ec && i != std::string::npos) {
-    return localtime.substr(0, localtime.find('/', i));
-  }
-#endif
-  return "/usr/share/zoneinfo";
-}
-
-// date's OS tzdb lists link files as zones; the symlinks tell them apart
-const std::vector<OsTzLink> &osLinks() {
-  static const auto links = [] {
-    namespace fs = std::filesystem;
-    std::vector<OsTzLink> out;
-    std::error_code ec;
-    const auto dir = fs::weakly_canonical(zoneinfoDir(), ec);
-    for (const auto &zone : numen::tz::get_tzdb().zones) {
-      const auto path = dir / zone.name();
-      if (!fs::is_symlink(path, ec)) continue;
-      auto target = fs::weakly_canonical(path, ec).lexically_relative(dir).generic_string();
-      if (!ec && !target.empty()) out.push_back({zone.name(), std::move(target)});
-    }
-    return out;
-  }();
-  return links;
-}
+// date's OS tzdb lists link files as zones of their own
+#include "gen/tz-links.inc"
 
 bool isLinkName(std::string_view name) {
-  return std::ranges::any_of(osLinks(), [&](auto &&l) { return l.name == name; });
+  return std::ranges::any_of(kTzLinks, [&](auto &&l) { return l.name == name; });
 }
 #else
 bool isLinkName(std::string_view) { return false; }
@@ -127,7 +96,7 @@ bool isLinkName(std::string_view) { return false; }
 
 std::optional<std::string_view> findLinkTarget(std::string_view query) {
 #if NUMEN_USE_DATE_TZ
-  for (const auto &link : osLinks()) {
+  for (const auto &link : kTzLinks) {
     if (sameZoneName(query, link.name)) return link.target;
   }
 #else
