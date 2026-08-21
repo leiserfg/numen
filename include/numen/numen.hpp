@@ -43,6 +43,13 @@ struct Timezone {
   const std::chrono::time_zone *tz = nullptr;
   std::chrono::seconds offset = std::chrono::seconds(0);
 
+  // Whether this timezone has the same local time as the
+  // user timezone.
+  bool isLocalTime() const;
+
+  // Whether the current timezone is the same as this timezone.
+  bool isUser() const;
+
   std::string toString() const;
 };
 

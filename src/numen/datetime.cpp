@@ -141,6 +141,13 @@ bool DateTime::isCurrentTimezone() const { return tz == std::chrono::get_tzdb().
 
 std::string DateTime::toTimezoneString() const { return Timezone{tz, offset}.toString(); }
 
+bool Timezone::isUser() const { return tz == std::chrono::current_zone(); }
+
+bool Timezone::isLocalTime() const {
+  auto now = std::chrono::system_clock::now();
+  return tz->get_info(now).offset + offset == std::chrono::current_zone()->get_info(now).offset;
+}
+
 std::string Timezone::toString() const {
   std::string out{};
 

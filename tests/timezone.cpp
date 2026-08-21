@@ -1,4 +1,5 @@
 #include "timezone.hpp"
+#include "numen/numen.hpp"
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
@@ -169,4 +170,15 @@ TEST_CASE("resolve places from the geo database", TAG) {
   CHECK(!db.query("in"));
   CHECK(!db.query("paris in"));
   CHECK(!db.query("nowhere at all"));
+}
+
+TEST_CASE("timezone isUser utility should work properly") {
+  // we need proper testing and mocking of the current user timezone actually...
+
+  {
+    auto lhs = numen::Timezone{.tz = std::chrono::locate_zone("Asia/Tokyo")};
+
+    REQUIRE(!lhs.isUser());
+    REQUIRE(!lhs.isLocalTime());
+  }
 }
