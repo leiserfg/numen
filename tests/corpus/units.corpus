@@ -252,3 +252,8 @@ km45 * km4                  => 180km²
 72pt to in                   => 1in
 1pc to pt                    => 12pt
 16px to pt                   => 12pt
+
+# unit + k thousand postifx
+150k usd                     => $150,000
+usd150k                      => $150,000
+150k usd == usd150k          => true

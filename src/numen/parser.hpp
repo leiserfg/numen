@@ -73,11 +73,6 @@ struct ConversionExpression {
   } target;
 };
 
-// now in new york
-// 5:03pm utc
-
-enum class Meridiem { AM, PM };
-
 // now = "time" | "date" | "now"
 // time_lit = <hour>[:<min>:<sec>][am|pm]
 // date = [now|time_lit] [in <TZ>]
@@ -116,6 +111,11 @@ struct UnaryExpression {
   std::unique_ptr<Expression> lhs;
 };
 
+struct PostfixExpression {
+  std::unique_ptr<Expression> lhs;
+  std::string_view op;
+};
+
 struct FunctionCall {
   std::string_view name;
   std::vector<std::unique_ptr<Expression>> args;
@@ -131,7 +131,7 @@ struct PercentExpression {
 };
 
 struct Expression {
-  std::variant<BinaryExpression, UnaryExpression, NumberString, DateString, UnitExpression,
+  std::variant<BinaryExpression, UnaryExpression, PostfixExpression, NumberString, DateString, UnitExpression,
                ConversionExpression, Duration, FunctionCall, PercentExpression>
       data;
 

@@ -14,6 +14,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <locale>
+#include <numbers>
 #include <optional>
 #include <ranges>
 #include <stdexcept>
@@ -173,6 +174,10 @@ public:
         throw std::runtime_error(std::format("Cannot convert a {} to that", v.valueTypeName()));
       } else if constexpr (std::is_same_v<T, NumberString>) {
         return Computed{.value = Num{value}};
+      } else if constexpr (std::is_same_v<T, PostfixExpression>) {
+        auto lhs = computeExpr(*value.lhs);
+        if (auto n = lhs.asNumber(); n && value.op == "k") { n->n = n->n.toDouble() * 1e3; }
+        return lhs;
       } else if constexpr (std::is_same_v<T, UnitExpression>) {
         const auto &ue = value;
         Computed c{.value = computeExpr(*ue.expr).value};
@@ -211,7 +216,8 @@ public:
   Computed computeExprBase(const Expression &expr) const {
     auto result = computeExpr(expr);
 
-    if (auto dt = result.asDateTime(); dt && m_opts.implicitTimezoneConversion && !result.explicitlyConverted) {
+    if (auto dt = result.asDateTime();
+        dt && m_opts.implicitTimezoneConversion && !result.explicitlyConverted) {
       DateTime out = *dt;
       out.tz = m_opts.timezone ? m_opts.timezone : std::chrono::current_zone();
       return Computed{out};

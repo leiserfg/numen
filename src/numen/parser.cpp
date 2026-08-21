@@ -740,6 +740,12 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
     m_lexer.next();
 
+    // TODO: refactorize so that there is only one entrypoint for this
+    if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k")) {
+      expr = std::make_unique<Expression>(PostfixExpression{.lhs = std::move(expr), .op = "k"});
+      m_lexer.next();
+    }
+
     if (auto tok = m_lexer.peak();
         tok && tok->type != Lexer::TokenType::Operator && tok->raw != "to" && tok->raw != "in") {
       if (auto unit = parseUnit()) {
@@ -787,6 +793,11 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         expr = std::make_unique<Expression>(std::move(fn));
       }
     }
+  }
+
+  if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k")) {
+    expr = std::make_unique<Expression>(PostfixExpression{.lhs = std::move(expr), .op = "k"});
+    m_lexer.next();
   }
 
   // unit can be found after any term.
