@@ -3,7 +3,7 @@
 #include "numen/numen.hpp"
 #include "concepts.hpp"
 #include "lexer.hpp"
-#include <bits/chrono.h>
+#include <chrono>
 #include <cassert>
 #include "date-string.hpp"
 #include <chrono>
