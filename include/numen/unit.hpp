@@ -53,6 +53,7 @@ inline Composition compositionOf(std::string_view name) { return traitsOf(name).
 namespace families {
 inline constexpr const char *METRIC = "metric";
 inline constexpr const char *IMPERIAL = "imperial";
+inline constexpr const char *TYPOGRAPHIC = "typographic";
 inline constexpr const char *DURATION = "duration";
 inline constexpr const char *DEGREE = "degree";
 inline constexpr const char *DATA = "data";

@@ -24,6 +24,10 @@ std::span<const UnitDef> units::builtins() {
     {.id = "foot",       .aliases = {"ft", "feet"}, .symbol = "ft", .factor = 0.3048,   .dimension = dimensions::LENGTH, .family = families::IMPERIAL},
     {.id = "yard",       .aliases = {"yd"},         .symbol = "yd", .factor = 0.9144,   .dimension = dimensions::LENGTH, .family = families::IMPERIAL},
     {.id = "mile",       .aliases = {"mi"},         .symbol = "mi", .factor = 1609.344, .dimension = dimensions::LENGTH, .family = families::IMPERIAL},
+    // css absolute units: 1in = 72pt = 6pc = 96 reference px, not device px
+    {.id = "point", .aliases = {"pt"}, .symbol = "pt", .factor = 0.0254 / 72, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
+    {.id = "pica",  .aliases = {"pc"}, .symbol = "pc", .factor = 0.0254 / 6,  .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
+    {.id = "pixel", .aliases = {"px"}, .symbol = "px", .factor = 0.0254 / 96, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
 
     // mass
     {.id = "gram",     .aliases = {"g", "gm", "gramme"}, .symbol = "g",  .factor = 1,            .dimension = dimensions::MASS, .family = families::METRIC, .prefixable = true},

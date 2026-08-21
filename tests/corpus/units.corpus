@@ -246,3 +246,9 @@ $150                        => $150
 km45 * km4                  => 180km²
 
 1 to kg to g                => 1,000g
+
+# css absolute units
+1in to px                    => 96px
+72pt to in                   => 1in
+1pc to pt                    => 12pt
+16px to pt                   => 12pt
