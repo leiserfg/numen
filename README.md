@@ -1,3 +1,5 @@
+![libnumen usage in the Vicinae launcher](./extra/screenshot.png)
+
 `libnumen` is a library to evaluate mathematical expressions, with an emphasis on natural language as well as unit and date-time operations.
 
 > [!WARNING]
