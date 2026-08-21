@@ -90,6 +90,9 @@ struct RelativeDateTimeLiteral {
   std::variant<Duration, std::chrono::weekday> delta;
   enum class Direction : std::uint8_t { Past, Future } direction;
   DateTimePrecision precision = DateTimePrecision::DateTime;
+
+  // additional time override that should superseded any relative time
+  std::optional<ParsedTime> time;
 };
 
 struct DateString {

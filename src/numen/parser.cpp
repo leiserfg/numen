@@ -333,10 +333,9 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
         m_lexer.advance(duration->tokenCount + 1);
-        return RelativeDateTimeLiteral{
-            .delta = duration->data,
-            .direction = RelativeDateTimeLiteral::Direction::Past,
-        };
+        return RelativeDateTimeLiteral{.delta = duration->data,
+                                       .direction = RelativeDateTimeLiteral::Direction::Past,
+                                       .time = parseTime(true)};
       }
     }
   }
@@ -345,34 +344,29 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     if (s->data == "yesterday") {
       m_lexer.next();
 
-      return RelativeDateTimeLiteral{
-          .delta = Duration{.seconds = std::chrono::days{1}},
-          .direction = RelativeDateTimeLiteral::Direction::Past,
-          .precision = DateTimePrecision::Date,
-      };
+      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
+                                     .direction = RelativeDateTimeLiteral::Direction::Past,
+                                     .precision = DateTimePrecision::Date,
+                                     .time = parseTime(true)};
     }
 
     if (s->data == "tomorrow") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{
-          .delta = Duration{.seconds = std::chrono::days{1}},
-          .direction = RelativeDateTimeLiteral::Direction::Future,
-          .precision = DateTimePrecision::Date,
-      };
+
+      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
+                                     .direction = RelativeDateTimeLiteral::Direction::Future,
+                                     .precision = DateTimePrecision::Date,
+                                     .time = parseTime(true)};
     }
 
     if (s->data == "today" || s->data == "date") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{
-          .precision = DateTimePrecision::Date,
-      };
+      return RelativeDateTimeLiteral{.precision = DateTimePrecision::Date, .time = parseTime(true)};
     }
 
     if (s->data == "now" || s->data == "time") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{
-          .precision = DateTimePrecision::DateTime,
-      };
+      return RelativeDateTimeLiteral{.precision = DateTimePrecision::DateTime, .time = parseTime(true)};
     }
   }
 

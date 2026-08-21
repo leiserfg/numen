@@ -90,3 +90,8 @@ TEST_CASE("localized date time formatting follows the configured locale") {
     WARN("fr_FR.UTF-8 locale not available, skipping");
   }
 }
+
+TEST_CASE("Trying to convert to non existent timezone fails") {
+  numen::Numen calc{};
+  REQUIRE_FALSE(calc.evaluate("now to WrongTimezone"));
+}

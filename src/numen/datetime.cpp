@@ -121,6 +121,15 @@ DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoi
               if (auto &y = anchor.years) now = shift<std::chrono::years>(now, sign * *y);
               if (auto &m = anchor.months) now = shift<std::chrono::months>(now, sign * *m);
               if (auto &s = anchor.seconds) now = now + sign * *s;
+
+              // we apply the duration first, then override the time of the current day
+              if (auto t = value.time) {
+                now = std::chrono::floor<std::chrono::days>(now);
+                if (auto h = t->hours) now += *h;
+                if (auto m = t->minutes) now += *m;
+                if (auto s = t->seconds) now += *s;
+              }
+
               return now;
             }
           },
