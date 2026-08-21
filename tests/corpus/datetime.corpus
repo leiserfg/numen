@@ -30,6 +30,10 @@ January 18                  => 2026-01-18 00:00:00 (Etc/UTC)
 Jan 2025 18 7:32 am         => 2025-01-18 07:32:00 (Etc/UTC)
 Jan 2025 18 7:32 pm         => 2025-01-18 19:32:00 (Etc/UTC)
 Jan 2025 18 7 pm            => 2025-01-18 19:00:00 (Etc/UTC)
+9 am                        => 2026-01-18 09:00:00 (Etc/UTC)
+9:30 am                     => 2026-01-18 09:30:00 (Etc/UTC)
+9 pm                        => 2026-01-18 21:00:00 (Etc/UTC)
+9:30 pm                     => 2026-01-18 21:30:00 (Etc/UTC)
 
 # optional "at" token between date and time 
 Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
@@ -81,6 +85,10 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 # timezones
 2001/01/18 New York         => 2001-01-18 05:00:00 (Etc/UTC)
 2001/01/18 nyc              => 2001-01-18 05:00:00 (Etc/UTC)
+
+# implicit timezone conversion
+10am osaka                  => 2026-01-18 01:00:00 (Etc/UTC)
+10am utc                    => 2026-01-18 10:00:00 (Etc/UTC)
 
 # GeoNames places
 now to beijing              => 2026-01-18 08:00:00 (Asia/Shanghai)

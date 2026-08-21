@@ -8,7 +8,6 @@
 #include <charconv>
 #include <chrono>
 #include <initializer_list>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -422,7 +421,7 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
 std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   if (auto tok = m_lexer.peakAs<Lexer::String>(); tok && tok->data == "at") { m_lexer.next(); }
 
-  std::chrono::hours hrs{};
+  ParsedTime time;
 
   auto head = m_lexer.peakIf(Lexer::TokenType::Number);
 
@@ -431,17 +430,13 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   if (head) {
     auto value = clockComponent(toNumber(head->raw), 23);
     if (!value) return std::nullopt;
-    hrs = std::chrono::hours{*value};
+    time.hours = std::chrono::hours{*value};
   }
-
-  ParsedTime time;
-
-  time.hours = hrs;
 
   const auto commitTime = [&]() {
     if (auto tok = m_lexer.peakAs<Lexer::String>()) {
-      const bool am = equalsIgnoreCase(tok->data, std::string_view{"am"});
-      const bool pm = equalsIgnoreCase(tok->data, std::string_view{"pm"});
+      const bool am = equalsIgnoreCase(tok->data, "am");
+      const bool pm = equalsIgnoreCase(tok->data, "pm");
       // TODO: if using 12h we need to make sure the clock component actually make sense...
 
       if (am || pm) {
@@ -455,8 +450,15 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   using IV = std::initializer_list<std::string_view>;
 
   auto sep = m_lexer.peak(1);
-  if (!sep || !std::ranges::contains(IV{":", "h"}, sep->raw)) {
+
+  if (!sep) return std::nullopt;
+
+  if (!std::ranges::contains(IV{":", "h"}, sep->raw)) {
     if (afterDate) {
+      m_lexer.next();
+      return commitTime();
+    }
+    if (equalsIgnoreCase(sep->raw, "pm") || equalsIgnoreCase(sep->raw, "am")) {
       m_lexer.next();
       return commitTime();
     }
