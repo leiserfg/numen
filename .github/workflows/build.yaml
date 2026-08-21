@@ -19,23 +19,40 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Debug builds are sanitized (ASan + UBSan, see CMakeLists.txt), which
+        # is a Linux concern: the other platforms build Release only
         include:
-          - name: Linux / GCC
+          - name: Linux / GCC / Release
             os: depot-ubuntu-24.04-4
             cc: gcc-14
             cxx: g++-14
-          - name: Linux / Clang
+            build_type: Release
+          - name: Linux / GCC / Debug
+            os: depot-ubuntu-24.04-4
+            cc: gcc-14
+            cxx: g++-14
+            build_type: Debug
+          - name: Linux / Clang / Release
             os: depot-ubuntu-24.04-4
             cc: clang-19
             cxx: clang++-19
+            build_type: Release
+          - name: Linux / Clang / Debug
+            os: depot-ubuntu-24.04-4
+            cc: clang-19
+            cxx: clang++-19
+            build_type: Debug
           - name: macOS / AppleClang
             os: depot-macos-26
             cc: clang
             cxx: clang++
+            build_type: Release
+          # builds Catch2 from source, hence the larger runner
           - name: Windows / MSVC
-            os: depot-windows-2022-4
+            os: depot-windows-2022-8
             cc: cl
             cxx: cl
+            build_type: Release
 
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +80,7 @@ jobs:
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
           -DBUILD_TESTS=ON
           -DBUILD_REPL=ON
           -DBUILD_REPL_CURRENCY_PROVIDER=OFF
