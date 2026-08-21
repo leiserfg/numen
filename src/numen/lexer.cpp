@@ -9,7 +9,13 @@ constexpr std::string_view BASE_CHARS = "0123456789abcdef";
 constexpr char THOUSAND_DELIM = '_';
 constexpr char FRACTION_DELIM = '.';
 
-constexpr bool isOperatorChar(char c) { return !std::isalnum(c) && c != '$'; }
+// <cctype> wants an unsigned char value: a raw UTF-8 byte in a signed char is UB
+bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
+bool isSpace(char c) { return std::isspace(static_cast<unsigned char>(c)); }
+bool isAlnum(char c) { return std::isalnum(static_cast<unsigned char>(c)); }
+char toLower(char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+
+bool isOperatorChar(char c) { return !isAlnum(c) && c != '$'; }
 
 }; // namespace
 
@@ -34,7 +40,7 @@ std::optional<Lexer::Token> Lexer::next() {
 
   const auto hasExponentDigits = [&](std::size_t pos) {
     if (pos < m_data.size() && (m_data[pos] == '+' || m_data[pos] == '-')) ++pos;
-    return pos < m_data.size() && std::isdigit(m_data[pos]);
+    return pos < m_data.size() && isDigit(m_data[pos]);
   };
 
   const auto makeToken = [&](TokenType type, TokenData data) {
@@ -44,9 +50,9 @@ std::optional<Lexer::Token> Lexer::next() {
   constexpr auto isValidChar = [](std::uint8_t c) { return std::isalpha(c) || c & 0x80 || c == '$'; };
 
   const auto isCalled = [&](std::size_t pos) {
-    while (pos < m_data.size() && (isValidChar(m_data[pos]) || std::isdigit(m_data[pos])))
+    while (pos < m_data.size() && (isValidChar(m_data[pos]) || isDigit(m_data[pos])))
       ++pos;
-    while (pos < m_data.size() && std::isspace(m_data[pos]))
+    while (pos < m_data.size() && isSpace(m_data[pos]))
       ++pos;
     return pos < m_data.size() && m_data[pos] == '(';
   };
@@ -75,7 +81,7 @@ std::optional<Lexer::Token> Lexer::next() {
 
     switch (state) {
     case State::Reset: {
-      if (std::isdigit(c)) {
+      if (isDigit(c)) {
         if (c == '0') {
           state = State::NumberBase;
           break;
@@ -83,7 +89,7 @@ std::optional<Lexer::Token> Lexer::next() {
         state = State::Number;
         continue;
       }
-      if (std::isspace(c)) {
+      if (isSpace(c)) {
         startPos += 1;
         break;
       }
@@ -91,11 +97,11 @@ std::optional<Lexer::Token> Lexer::next() {
         state = State::String;
         continue;
       }
-      if (c == FRACTION_DELIM && m_cursor + 1 < m_data.size() && std::isdigit(m_data[m_cursor + 1])) {
+      if (c == FRACTION_DELIM && m_cursor + 1 < m_data.size() && isDigit(m_data[m_cursor + 1])) {
         state = State::Number;
         continue;
       }
-      if (!std::isalnum(c)) {
+      if (!isAlnum(c)) {
         state = State::Operator;
         continue;
       }
@@ -106,7 +112,7 @@ std::optional<Lexer::Token> Lexer::next() {
       // we don't parse '0777' as octal because the leading zero
       // can create a lot of ambiguity.
       state = State::Number;
-      switch (std::tolower(c)) {
+      switch (toLower(c)) {
       case 'x':
         base = 16;
         break;
@@ -137,7 +143,7 @@ std::optional<Lexer::Token> Lexer::next() {
         break;
       }
 
-      const auto pos = BASE_CHARS.find(std::tolower(c));
+      const auto pos = BASE_CHARS.find(toLower(c));
 
       if (pos == std::string_view::npos || pos >= base) { return tryCommit(); }
 
@@ -156,7 +162,7 @@ std::optional<Lexer::Token> Lexer::next() {
       continue;
     }
     case State::NumberExponent: {
-      if (!std::isdigit(c)) { return tryCommit(); }
+      if (!isDigit(c)) { return tryCommit(); }
       expValue = expValue * 10 + (c - '0');
       break;
     }
@@ -179,13 +185,13 @@ std::optional<Lexer::Token> Lexer::next() {
         }
       }
 
-      if (std::isalnum(c) || std::isspace(c)) { return tryCommit(); }
+      if (isAlnum(c) || isSpace(c)) { return tryCommit(); }
       break;
     }
     case State::String: {
       if (isValidChar(c)) break;
       // digits end a word ("2m10s") unless the word is being called ("log10(x)")
-      if (std::isdigit(c) && isCalled(m_cursor)) break;
+      if (isDigit(c) && isCalled(m_cursor)) break;
       return tryCommit();
     }
     }
@@ -215,7 +221,7 @@ std::optional<std::string_view> Lexer::peakString(int n) {
   auto old = m_cursor;
   int i = 0;
 
-  while (m_cursor < m_data.size() && std::isspace(m_data[m_cursor])) {
+  while (m_cursor < m_data.size() && isSpace(m_data[m_cursor])) {
     ++m_cursor;
   }
   auto start = m_cursor;
