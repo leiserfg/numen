@@ -96,11 +96,3 @@ If built manually using `make` there is also a minimal REPL that you can use to 
 ```bash
 ./build/numen
 ```
-
-## Development
-
-### Data
-
-- The region → currency table under `src/numen/gen/` is generated from Unicode CLDR supplemental data (`extra/supplementalData.xml`) by `scripts/gen-currency-tables.py`. Currency minor units live on the unit definitions in `src/numen/builtin-units.cpp`.
-- Place name to timezone resolution (`now in paris tx`) uses data from [GeoNames](https://www.geonames.org), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). `scripts/gen-timezone-tables.py` downloads the GeoNames dumps into `.cache/geonames/` (or reads them from an existing directory with `python3 scripts/gen-timezone-tables.py --dumps <dir>`) and turns them into `src/gen/geo-tz-tables.inc` and `src/gen/geo-charmap.inc`. Delete the cached dumps to refresh them.
-- `make gen` runs both scripts.
