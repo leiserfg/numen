@@ -79,8 +79,8 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 01/18/2001 1:00:00 - 01/18/2001 00:00:00 to hours => 1h
 
 # timezones
-2001/01/18 New York         => 2001-01-18 00:00:00 (America/New_York)
-2001/01/18 nyc              => 2001-01-18 00:00:00 (America/New_York)
+2001/01/18 New York         => 2001-01-18 05:00:00 (Etc/UTC)
+2001/01/18 nyc              => 2001-01-18 05:00:00 (Etc/UTC)
 
 # GeoNames places
 now to beijing              => 2026-01-18 08:00:00 (Asia/Shanghai)

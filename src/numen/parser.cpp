@@ -671,13 +671,15 @@ std::unique_ptr<Expression> Parser::parseTerm() {
       auto tz = parseTimezone();
 
       if (auto date = parseRelativeDateTimeLiteral()) {
-        DateString ds{.value = *date, .timezone = tz};
+        if (!tz) tz = parseTimezone();
 
-        if (!tz) {
-          if (auto result = parseTimezone()) { ds.timezone = result.value(); }
-        }
+        auto ds = std::make_unique<Expression>(DateString{.value = *date});
+        // "time washington" asks for now as seen from there: a conversion, not a zoned literal
+        if (!tz) return ds;
 
-        return std::make_unique<Expression>(ds);
+        ConversionExpression conv{.lhs = std::move(ds)};
+        conv.target.tz = *tz;
+        return std::make_unique<Expression>(std::move(conv));
       }
     }
 

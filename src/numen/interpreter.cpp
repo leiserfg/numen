@@ -41,11 +41,7 @@ public:
         const auto &ue = value;
         auto c = computeExpr(*ue.lhs);
 
-        if (auto n = c.asNumber()) {
-          auto c = *n;
-          if (ue.op == "-") { c.n = -c.n; }
-          return {c};
-        }
+        if (auto n = c.asNumber(); n && ue.op == "-") n->n = -n->n;
 
         return c;
       } else if constexpr (std::is_same_v<T, BinaryExpression>) {
@@ -64,23 +60,30 @@ public:
           if (!durationSum) { reconcileUnits(lhs, rhs, be.op); }
         }
 
-        if (be.op == "+") { return add(lhs, rhs); }
-        if (be.op == "-") { return subtract(lhs, rhs); }
-        if (be.op == "*") { return multiply(lhs, rhs); }
-        if (be.op == "/") { return div(lhs, rhs); }
-        if (be.op == "%") { return modulo(lhs, rhs); }
-        if (be.op == "^") { return pow(lhs, rhs); }
-        if (be.op == "<<") { return leftshift(lhs, rhs); }
-        if (be.op == ">>") { return rightshift(lhs, rhs); }
-        if (be.op == "&") { return bitwiseAnd(lhs, rhs); }
-        if (be.op == "|") { return bitwiseor(lhs, rhs); }
+        auto r = [&]() -> std::optional<Computed> {
+          if (be.op == "+") return add(lhs, rhs);
+          if (be.op == "-") return subtract(lhs, rhs);
+          if (be.op == "*") return multiply(lhs, rhs);
+          if (be.op == "/") return div(lhs, rhs);
+          if (be.op == "%") return modulo(lhs, rhs);
+          if (be.op == "^") return pow(lhs, rhs);
+          if (be.op == "<<") return leftshift(lhs, rhs);
+          if (be.op == ">>") return rightshift(lhs, rhs);
+          if (be.op == "&") return bitwiseAnd(lhs, rhs);
+          if (be.op == "|") return bitwiseor(lhs, rhs);
+          if (be.op == "==") return Computed{.value = Boolean{lhs.value == rhs.value}};
+          if (be.op == "!=") return Computed{.value = Boolean{lhs.value != rhs.value}};
+          if (be.op == ">") return Computed{.value = Boolean{lhs.value > rhs.value}};
+          if (be.op == ">=") return Computed{.value = Boolean{lhs.value >= rhs.value}};
+          if (be.op == "<") return Computed{.value = Boolean{lhs.value < rhs.value}};
+          if (be.op == "<=") return Computed{.value = Boolean{lhs.value <= rhs.value}};
+          return std::nullopt;
+        }();
 
-        if (be.op == "==") { return Computed{.value = Boolean{lhs.value == rhs.value}}; }
-        if (be.op == "!=") { return Computed{.value = Boolean{lhs.value != rhs.value}}; }
-        if (be.op == ">") { return Computed{.value = Boolean{lhs.value > rhs.value}}; }
-        if (be.op == ">=") { return Computed{.value = Boolean{lhs.value >= rhs.value}}; }
-        if (be.op == "<") { return Computed{.value = Boolean{lhs.value < rhs.value}}; }
-        if (be.op == "<=") { return Computed{.value = Boolean{lhs.value <= rhs.value}}; }
+        if (r) {
+          r->explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted;
+          return *r;
+        }
 
         throw std::runtime_error(std::format("Unhandled operator {}", be.op));
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
@@ -106,8 +109,7 @@ public:
                   std::chrono::duration_cast<std::chrono::seconds>(dt->time.time_since_epoch()).count();
 
               return stampUnit(v, Computed{Num{.n = Value{static_cast<double>(seconds_epoch)},
-                                               .unit = Number::Unit{.raw = "second"},
-                                               .explicitlyConverted = true}});
+                                               .unit = Number::Unit{.raw = "second"}}});
             }
           }
         }
@@ -123,8 +125,9 @@ public:
 
           if (auto fmt = conv.target.fmt) {
             const auto toFormatted = [&](NumberOutputFormat fmt) {
-              value.format = fmt;
-              return Computed{.value = value, .conversion = v.conversion};
+              auto out = v;
+              out.asNumber()->format = fmt;
+              return out;
             };
 
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
@@ -208,16 +211,22 @@ public:
   Computed computeExprBase(const Expression &expr) const {
     auto result = computeExpr(expr);
 
+    if (auto dt = result.asDateTime(); dt && m_opts.implicitTimezoneConversion && !result.explicitlyConverted) {
+      DateTime out = *dt;
+      out.tz = m_opts.timezone ? m_opts.timezone : std::chrono::current_zone();
+      return Computed{out};
+    }
+
     if (auto n = result.asNumber(); m_opts.implicitCurrencyConversion && n && n->unit && n->unit->def() &&
                                     n->unit->def()->dimension == dimensions::CURRENCY &&
-                                    !n->explicitlyConverted) {
+                                    !result.explicitlyConverted) {
       auto target = numen::currencyForLocale(m_opts.locale.value_or(std::locale{""}.name()));
       if (target && !equalsIgnoreCase(*target, n->unit->def()->id)) {
         result = stampUnit(result, convertToUnit(n->n.toDouble(), n->unit->def()->id, *target), true);
       }
     }
 
-    if (auto n = result.asNumber(); n && !n->explicitlyConverted) {
+    if (auto n = result.asNumber(); n && !result.explicitlyConverted) {
       if (auto d = foldToDuration(*n)) return Computed{.value = *d};
     }
 
@@ -234,6 +243,7 @@ private:
     }
     out.conversion =
         Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
+    if (!implicit) out.explicitlyConverted = true;
     return out;
   }
 
@@ -311,9 +321,8 @@ private:
     if (!res) throw std::runtime_error(res.error());
 
     return {
-        .value = Num{.n = Value{res.value()},
-                     .unit = Number::Unit{.raw = display, .resolved = soleUnit(to)},
-                     .explicitlyConverted = true},
+        .value = Num{.n = Value{res.value()}, .unit = Number::Unit{.raw = display, .resolved = soleUnit(to)}},
+        .explicitlyConverted = true,
     };
   }
 
@@ -371,8 +380,8 @@ private:
     auto display = target.render();
 
     return Computed{.value = Num{.n = Value{n.n.toDouble() * *ratio},
-                                 .unit = Number::Unit{.raw = display, .resolved = std::move(target)},
-                                 .explicitlyConverted = true}};
+                                 .unit = Number::Unit{.raw = display, .resolved = std::move(target)}},
+                    .explicitlyConverted = true};
   }
 
   Computed convertToCompound(const Num &n, const NamedUnit &named) const {
@@ -385,9 +394,8 @@ private:
     // we are unable to infer what unit should be used, we need to
     // wait for more info...
     if (!pair) {
-      return Computed{.value = Num{.n = Value{v},
-                                   .unit = Number::Unit{.raw = std::string{toUnit}},
-                                   .explicitlyConverted = true}};
+      return Computed{.value = Num{.n = Value{v}, .unit = Number::Unit{.raw = std::string{toUnit}}},
+                      .explicitlyConverted = true};
     }
 
     return convertResolved(v, pair->first, pair->second, std::string{toUnit});
@@ -719,11 +727,7 @@ private:
   static Computed output(Value n, const Num &lhs, const Num &rhs, std::optional<Number::Unit> unit) {
     if (n.isNaN()) throw std::runtime_error("Result is undefined");
 
-    auto result = Num{.n = n,
-                      .format = lhs.format,
-                      .unit = std::move(unit),
-                      .explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted};
-    return Computed{.value = result};
+    return Computed{.value = Num{.n = n, .format = lhs.format, .unit = std::move(unit)}};
   }
 
   // arguments are computed independently, so without this "min(1 km, 999 m)"
@@ -785,7 +789,9 @@ private:
 
     reconcileArguments(computedArgs);
 
-    return (*handler)(FunctionCtx{.name = fn.name, .args = computedArgs});
+    auto r = (*handler)(FunctionCtx{.name = fn.name, .args = computedArgs});
+    r.explicitlyConverted = std::ranges::any_of(computedArgs, &Computed::explicitlyConverted);
+    return r;
   }
 
   const UnitDatabase &m_db;

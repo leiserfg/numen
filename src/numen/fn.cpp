@@ -96,7 +96,6 @@ Computed output(const FunctionCtx &ctx, double v, const Num &like, UnitPolicy po
 
   if (policy == UnitPolicy::Keep) {
     out.unit = like.unit;
-    out.explicitlyConverted = like.explicitlyConverted;
     out.isPercentage = like.isPercentage;
   }
 

@@ -270,6 +270,8 @@ struct EvalConfig {
    */
   bool implicitCurrencyConversion = true;
 
+  bool implicitTimezoneConversion = true;
+
   /**
    * Locale to use for implicit conversions. If not specified, the default locale
    * is used.

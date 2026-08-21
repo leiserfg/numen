@@ -15,7 +15,6 @@ struct Num {
   Value n;
   NumberOutputFormat format = NumberOutputFormat::Decimal;
   std::optional<Number::Unit> unit;
-  bool explicitlyConverted = false;
   bool isPercentage = false;
 
   bool operator==(const Num &rhs) const { return n == rhs.n; }
@@ -27,6 +26,8 @@ using Val = std::variant<Num, DateTime, Boolean, Duration>;
 struct Computed {
   Val value;
   std::optional<Conversion> conversion;
+  // the user pinned the unit/zone: implicit output passes must not override it
+  bool explicitlyConverted = false;
 
   bool isNumber() const { return std::holds_alternative<Num>(value); }
   bool isDateTime() const { return std::holds_alternative<DateTime>(value); }
