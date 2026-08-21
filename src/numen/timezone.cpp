@@ -87,6 +87,7 @@ constexpr auto CUSTOM_LINKS = std::to_array<CustomTzLink>({
     {.name = "nyc", .target = "America/New_York"},
     {.name = "ny", .target = "America/New_York"},
     {.name = "dc", .target = "America/New_York"},
+    {.name = "ldn", .target = "Europe/London"},
     // the state outweighs the district in the geo database
     {.name = "washington", .target = "America/New_York"},
     {.name = "sf", .target = "America/Los_Angeles"},
