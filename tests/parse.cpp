@@ -50,14 +50,14 @@ TEST_CASE("Should parse value type using parse method") {
   }
 
   {
-    auto result = calc.parse<unsigned>("18 Jan 2001 to unix", {.timezone = std::chrono::locate_zone("UTC")});
+    auto result = calc.parse<unsigned>("18 Jan 2001 to unix", {.timezone = test::zone("UTC")});
     REQUIRE(result);
     REQUIRE(result.value() == 979776000);
   }
 
   {
     using namespace std::chrono;
-    auto result = calc.parse<system_clock::time_point>("18 Jan 2001", {.timezone = locate_zone("UTC")});
+    auto result = calc.parse<system_clock::time_point>("18 Jan 2001", {.timezone = test::zone("UTC")});
     REQUIRE(result);
     REQUIRE(duration_cast<seconds>(result.value().time_since_epoch()).count() == 979776000);
   }

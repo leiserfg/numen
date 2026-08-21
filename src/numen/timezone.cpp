@@ -11,6 +11,10 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
+#if NUMEN_USE_DATE_TZ
+#include <filesystem>
+#endif
 
 using namespace std::literals;
 
@@ -76,9 +80,71 @@ std::optional<std::string_view> queryGeoDb(std::string_view query) {
   return std::nullopt;
 }
 
-const std::chrono::time_zone *locateZone(std::string_view name) {
+bool sameZoneName(std::string_view query, std::string_view name);
+
+#if NUMEN_USE_DATE_TZ
+struct OsTzLink {
+  std::string name;
+  std::string target;
+};
+
+// mirrors date's discovery, which it does not expose
+std::filesystem::path zoneinfoDir() {
+#ifdef __APPLE__
+  std::error_code ec;
+  auto localtime = std::filesystem::read_symlink("/etc/localtime", ec).string();
+  if (auto i = localtime.find("zoneinfo"); !ec && i != std::string::npos) {
+    return localtime.substr(0, localtime.find('/', i));
+  }
+#endif
+  return "/usr/share/zoneinfo";
+}
+
+// date's OS tzdb lists link files as zones; the symlinks tell them apart
+const std::vector<OsTzLink> &osLinks() {
+  static const auto links = [] {
+    namespace fs = std::filesystem;
+    std::vector<OsTzLink> out;
+    std::error_code ec;
+    const auto dir = fs::weakly_canonical(zoneinfoDir(), ec);
+    for (const auto &zone : numen::tz::get_tzdb().zones) {
+      const auto path = dir / zone.name();
+      if (!fs::is_symlink(path, ec)) continue;
+      auto target = fs::weakly_canonical(path, ec).lexically_relative(dir).generic_string();
+      if (!ec && !target.empty()) out.push_back({zone.name(), std::move(target)});
+    }
+    return out;
+  }();
+  return links;
+}
+
+bool isLinkName(std::string_view name) {
+  return std::ranges::any_of(osLinks(), [&](auto &&l) { return l.name == name; });
+}
+#else
+bool isLinkName(std::string_view) { return false; }
+#endif
+
+std::optional<std::string_view> findLinkTarget(std::string_view query) {
+#if NUMEN_USE_DATE_TZ
+  for (const auto &link : osLinks()) {
+    if (sameZoneName(query, link.name)) return link.target;
+  }
+#else
+  for (const auto &link : numen::tz::get_tzdb().links) {
+    if (sameZoneName(query, link.name())) return link.target();
+  }
+#endif
+  return std::nullopt;
+}
+
+// links resolve to their canonical zone, as std::chrono::locate_zone does
+const numen::tz::time_zone *locateZone(std::string_view name) {
   try {
-    return std::chrono::locate_zone(name);
+    if (isLinkName(name)) {
+      if (auto target = findLinkTarget(name)) name = *target;
+    }
+    return numen::tz::locate_zone(name);
   } catch (const std::runtime_error &) { return nullptr; }
 }
 
@@ -128,10 +194,10 @@ bool sameZoneName(std::string_view query, std::string_view name) {
 
 std::span<const CustomTzLink> TimezoneDB::customLinks() { return CUSTOM_LINKS; }
 
-const std::chrono::time_zone *TimezoneDB::userTz() const { return std::chrono::get_tzdb().current_zone(); }
+const numen::tz::time_zone *TimezoneDB::userTz() const { return numen::tz::get_tzdb().current_zone(); }
 
-const std::chrono::time_zone *TimezoneDB::query(std::string_view query) const {
-  const auto &db = std::chrono::get_tzdb();
+const numen::tz::time_zone *TimezoneDB::query(std::string_view query) const {
+  const auto &db = numen::tz::get_tzdb();
 
   if (auto it =
           std::ranges::find_if(CUSTOM_LINKS, [&](auto &&link) { return equalsIgnoreCase(link.name, query); });
@@ -139,7 +205,8 @@ const std::chrono::time_zone *TimezoneDB::query(std::string_view query) const {
     return locateZone(it->target);
   }
 
-  if (auto it = std::ranges::find_if(db.zones, [&](auto &&tz) { return sameZoneName(query, tz.name()); });
+  if (auto it = std::ranges::find_if(
+          db.zones, [&](auto &&tz) { return !isLinkName(tz.name()) && sameZoneName(query, tz.name()); });
       it != db.zones.end()) {
     return &*it;
   }
@@ -147,10 +214,7 @@ const std::chrono::time_zone *TimezoneDB::query(std::string_view query) const {
   if (auto name = queryGeoDb(query)) { return locateZone(*name); }
 
   // after the geo database: Greenwich and GB are places before being legacy links
-  if (auto it = std::ranges::find_if(db.links, [&](auto &&link) { return sameZoneName(query, link.name()); });
-      it != db.links.end()) {
-    return locateZone(it->target());
-  }
+  if (auto target = findLinkTarget(query)) { return locateZone(*target); }
 
   return nullptr;
 }

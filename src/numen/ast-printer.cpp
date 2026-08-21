@@ -68,7 +68,7 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
           }
           if (auto str = std::get_if<DateTimeLiteral>(&value.value)) {
             os << ident() << "\tvalue "
-               << parseDateTime({.value = *str, .timezone = value.timezone}, *std::chrono::current_zone(),
+               << parseDateTime({.value = *str, .timezone = value.timezone}, *tz::current_zone(),
                                 std::chrono::system_clock::now())
                       .toString()
                << "\n";

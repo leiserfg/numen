@@ -1,4 +1,5 @@
 #pragma once
+#include "numen/tz.hpp"
 #include <chrono>
 #include <span>
 #include <string_view>
@@ -12,8 +13,8 @@ class TimezoneDB {
 public:
   // abbreviations (pst), IANA names (Europe/Paris), then GeoNames places, optionally
   // qualified ("paris tx"). A bare name yields the most populous place called that
-  const std::chrono::time_zone *query(std::string_view query) const;
-  const std::chrono::time_zone *userTz() const;
+  const numen::tz::time_zone *query(std::string_view query) const;
+  const numen::tz::time_zone *userTz() const;
 
   // take precedence over tzdb, so EST is New York rather than the fixed offset link
   static std::span<const CustomTzLink> customLinks();

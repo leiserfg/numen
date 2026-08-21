@@ -31,6 +31,27 @@ namespace numen::detail {
 namespace {
 
 class Interpreter {
+private:
+  // chains keep the first `from`
+  template <class T>
+  static Computed stamp(const Computed &src, Computed out, std::type_identity_t<std::optional<T>> from, T to,
+                        bool implicit = false) {
+    if (src.conversion) {
+      if (auto prior = src.conversion->as<T>()) from = prior->from;
+    }
+    out.conversion =
+        Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
+    if (!implicit) out.explicitlyConverted = true;
+    return out;
+  }
+
+  static Computed stampUnit(const Computed &src, Computed out, bool implicit = false) {
+    auto n = out.asNumber();
+    if (!n || !n->unit) return out;
+    auto s = src.asNumber();
+    return stamp(src, out, s ? s->unit : std::nullopt, *n->unit, implicit);
+  }
+
 public:
   Interpreter(const UnitDatabase &db, const EvalConfig &opts)
       : m_db(db), m_opts(opts), m_now(opts.now.value_or(std::chrono::system_clock::now())) {}
@@ -204,7 +225,7 @@ public:
       } else {
         static_assert(std::is_same_v<T, DateString>);
         const auto &ds = value;
-        auto &tz = m_opts.timezone ? *m_opts.timezone : *std::chrono::current_zone();
+        auto &tz = m_opts.timezone ? *m_opts.timezone : *tz::current_zone();
         auto dt = parseDateTime(ds, tz, m_now);
         return Computed{.value = dt};
       }
@@ -219,7 +240,7 @@ public:
     if (auto dt = result.asDateTime();
         dt && m_opts.implicitTimezoneConversion && !result.explicitlyConverted) {
       DateTime out = *dt;
-      out.tz = m_opts.timezone ? m_opts.timezone : std::chrono::current_zone();
+      out.tz = m_opts.timezone ? m_opts.timezone : tz::current_zone();
       return Computed{out};
     }
 
@@ -240,26 +261,6 @@ public:
   }
 
 private:
-  // chains keep the first `from`
-  template <class T>
-  static Computed stamp(const Computed &src, Computed out, std::type_identity_t<std::optional<T>> from, T to,
-                        bool implicit = false) {
-    if (src.conversion) {
-      if (auto prior = src.conversion->as<T>()) from = prior->from;
-    }
-    out.conversion =
-        Conversion{.sides = ConversionOf<T>{std::move(from), std::move(to)}, .implicit = implicit};
-    if (!implicit) out.explicitlyConverted = true;
-    return out;
-  }
-
-  static Computed stampUnit(const Computed &src, Computed out, bool implicit = false) {
-    auto n = out.asNumber();
-    if (!n || !n->unit) return out;
-    auto s = src.asNumber();
-    return stamp(src, out, s ? s->unit : std::nullopt, *n->unit, implicit);
-  }
-
   std::optional<Duration> foldToDuration(const Num &n) const {
     if (!n.unit) return std::nullopt;
 

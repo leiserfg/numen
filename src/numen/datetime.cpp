@@ -60,12 +60,11 @@ TimePoint checkedTimePoint(std::chrono::sys_seconds t) {
   return TimePoint{t};
 }
 
-static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chrono::time_zone &tz,
-                                      TimePoint now) {
+static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const tz::time_zone &tz, TimePoint now) {
   std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(now)};
 
   auto process = [&](auto &&date) {
-    std::chrono::local_seconds t{std::chrono::local_days{date}};
+    tz::local_seconds t{std::chrono::local_days{date}.time_since_epoch()};
 
     if (auto time = d.time) {
       if (auto h = time->hours) t += *h;
@@ -91,9 +90,9 @@ static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const std::chron
       d.day.value_or(today.day()));
 }
 
-DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now) {
+DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoint now) {
   auto tz = d.timezone
-                .and_then([](auto &&t) -> std::optional<const std::chrono::time_zone *> {
+                .and_then([](auto &&t) -> std::optional<const tz::time_zone *> {
                   return TimezoneDB{}.query(t.name);
                 })
                 .value_or(&userTz);
@@ -114,7 +113,7 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
               static_assert(std::is_same_v<A, Duration>);
               if (value.precision == DateTimePrecision::Date) {
                 std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
-                now = tz->to_sys(std::chrono::local_seconds{std::chrono::local_days{date}});
+                now = tz->to_sys(tz::local_seconds{std::chrono::local_days{date}.time_since_epoch()});
               }
 
               if (auto &y = anchor.years) now = shift<std::chrono::years>(now, sign * *y);
@@ -137,15 +136,15 @@ DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz
 
 } // namespace detail
 
-bool DateTime::isCurrentTimezone() const { return tz == std::chrono::get_tzdb().current_zone(); }
+bool DateTime::isCurrentTimezone() const { return tz == tz::get_tzdb().current_zone(); }
 
 std::string DateTime::toTimezoneString() const { return Timezone{tz, offset}.toString(); }
 
-bool Timezone::isUser() const { return tz == std::chrono::current_zone(); }
+bool Timezone::isUser() const { return tz == tz::current_zone(); }
 
 bool Timezone::isLocalTime() const {
   auto now = std::chrono::system_clock::now();
-  return tz->get_info(now).offset + offset == std::chrono::current_zone()->get_info(now).offset;
+  return tz->get_info(now).offset + offset == tz::current_zone()->get_info(now).offset;
 }
 
 std::string Timezone::toString() const {
@@ -189,10 +188,12 @@ std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
   auto now = std::chrono::system_clock::now();
   // relative elision is decided in the displayed frame, so what is dropped is
   // exactly what would have rendered as redundant (midnight, today's date)
-  const auto displayTz = tz ? tz : std::chrono::current_zone();
-  std::chrono::zoned_time zt{displayTz, time + offset};
-  const auto localTime = zt.get_local_time();
-  const auto localNow = std::chrono::zoned_time{std::chrono::current_zone(), now}.get_local_time();
+  constexpr auto toLocal = [](const auto &zone, auto &&t) {
+    return std::chrono::local_time{zone->to_local(t).time_since_epoch()};
+  };
+  const auto displayTz = tz ? tz : tz::current_zone();
+  const auto localTime = toLocal(displayTz, time + offset);
+  const auto localNow = toLocal(tz::current_zone(), now);
   const bool isSameLocalDay = fl(localNow) == fl(localTime);
   const bool hasTime = (localTime - fl(localTime)).count() != 0;
   const bool localized = opts.format == DateTimeFormatOptions::TimeFormat::Local;
@@ -202,18 +203,18 @@ std::string DateTime::toString(const DateTimeFormatOptions &opts) const {
   // we still want to show the date for today if there is no time
   if (!opts.relative || !isSameLocalDay || !hasTime) {
     if (localized) {
-      out += std::format(loc, "{:L%x}", zt);
+      out += std::format(loc, "{:L%x}", localTime);
     } else {
-      out += std::format("{:%F}", zt);
+      out += std::format("{:%F}", localTime);
     }
   }
 
   if (!opts.relative || hasTime) {
     if (!out.empty()) out += " ";
     if (localized) {
-      out += std::format(loc, "{:L%X}", zt);
+      out += std::format(loc, "{:L%X}", localTime);
     } else {
-      out += std::format("{:%H:%M:%OS}", zt);
+      out += std::format("{:%H:%M:%OS}", localTime);
     }
   }
 

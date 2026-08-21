@@ -10,6 +10,8 @@ option(BUILD_REPL "Build the simple repl program" OFF)
 option(BUILD_REPL_CURRENCY_PROVIDER "Build the built-in REPL currency provider (uses api.vicinae.com). Adds a runtime dependency on OpenSSL to run the REPL." ON)
 
 option(BUILD_TESTS "Build the test suite" OFF)
+# Apple's libc++ has no std::chrono tzdb
+option(NUMEN_USE_DATE_TZ "Use the vendored HowardHinnant/date library for timezone support instead of std::chrono" ${APPLE})
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -76,6 +78,21 @@ else()
 endif()
 
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+if (NUMEN_USE_DATE_TZ)
+	set(DATE_DIR ${VENDOR_DIR}/date)
+	target_sources(${PROJECT_NAME} PRIVATE ${DATE_DIR}/src/tz.cpp)
+	# public: <numen/tz.hpp> and date's class layouts depend on these
+	target_compile_definitions(${PROJECT_NAME} PUBLIC NUMEN_USE_DATE_TZ=1 USE_OS_TZDB=1 HAS_REMOTE_API=0)
+	target_include_directories(${PROJECT_NAME} PUBLIC
+		$<BUILD_INTERFACE:${DATE_DIR}/include>
+		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+	)
+	install(DIRECTORY ${DATE_DIR}/include/date DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+	if (MSVC)
+		message(FATAL_ERROR "NUMEN_USE_DATE_TZ is not supported with MSVC: there is no OS tzdb to read. Use std::chrono instead.")
+	endif()
+endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	VERSION ${PROJECT_VERSION}

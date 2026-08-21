@@ -12,7 +12,7 @@ namespace {
 numen::EvalConfig configAt(year_month_day now) {
   return numen::EvalConfig{
       .now = sys_days(now),
-      .timezone = locate_zone("UTC"),
+      .timezone = test::zone("UTC"),
       .dateTimeFormat = {.relative = false, .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},
   };
 }

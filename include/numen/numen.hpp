@@ -1,5 +1,6 @@
 #pragma once
 #include "numen/unit.hpp"
+#include "numen/tz.hpp"
 #include <chrono>
 #include <compare>
 #include <expected>
@@ -40,7 +41,7 @@ struct DateTimeFormatOptions {
 };
 
 struct Timezone {
-  const std::chrono::time_zone *tz = nullptr;
+  const tz::time_zone *tz = nullptr;
   std::chrono::seconds offset = std::chrono::seconds(0);
 
   // Whether this timezone has the same local time as the
@@ -55,7 +56,7 @@ struct Timezone {
 
 struct DateTime {
   TimePoint time;
-  const std::chrono::time_zone *tz = nullptr;
+  const tz::time_zone *tz = nullptr;
   std::chrono::seconds offset = std::chrono::seconds(0);
 
   DateTimePrecision format = DateTimePrecision::DateTime;
@@ -260,7 +261,7 @@ struct EvalConfig {
    */
   std::optional<TimePoint> now;
 
-  const std::chrono::time_zone *timezone;
+  const tz::time_zone *timezone;
 
   /**
    * If the expression is only a currency, it will automatically be

@@ -9,7 +9,7 @@ namespace numen::detail {
 // calendar difference, always non-negative: callers order the operands
 Duration subtractDates(const DateTime &lhs, const DateTime &rhs);
 
-DateTime parseDateTime(const DateString &d, const std::chrono::time_zone &userTz, TimePoint now);
+DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoint now);
 
 // nanoseconds reach about 292 years either side of the epoch; past that the
 // conversion overflows. the bound keeps a day spare for a time of day

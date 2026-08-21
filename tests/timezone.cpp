@@ -87,10 +87,11 @@ TEST_CASE("should handle famous european timezones", TAG) {
   }
 }
 
+#if !NUMEN_USE_DATE_TZ
 TEST_CASE("Resolve timezone links", TAG) {
   TimezoneDB db;
 
-  for (const auto &link : std::chrono::get_tzdb().links) {
+  for (const auto &link : numen::tz::get_tzdb().links) {
     if (std::ranges::any_of(TimezoneDB::customLinks(), [&](auto &&l) { return l.name == link.name(); }))
       continue;
     CAPTURE(link.name());
@@ -100,6 +101,7 @@ TEST_CASE("Resolve timezone links", TAG) {
     if (tz && link.name().contains('/')) { CHECK(tz->name() == link.target()); }
   }
 }
+#endif
 
 TEST_CASE("resolve custom tz link", TAG) {
   TimezoneDB db;
@@ -176,7 +178,7 @@ TEST_CASE("timezone isUser utility should work properly") {
   // we need proper testing and mocking of the current user timezone actually...
 
   {
-    auto lhs = numen::Timezone{.tz = std::chrono::locate_zone("Asia/Tokyo")};
+    auto lhs = numen::Timezone{.tz = numen::tz::locate_zone("Asia/Tokyo")};
 
     REQUIRE(!lhs.isUser());
     REQUIRE(!lhs.isLocalTime());

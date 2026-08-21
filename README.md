@@ -7,7 +7,7 @@
 
 ## Key features
 
-- Dependency-free. You only need a C++23 compiler. Compiles with GCC/clang/MSVC.
+- Dependency-free. You only need a C++23 compiler. Compiles with GCC/clang/MSVC. On Apple platforms, whose libc++ [has no `std::chrono` timezone database](https://github.com/llvm/llvm-project/pull/122010), the vendored [date](https://github.com/HowardHinnant/date) library is used instead (`-DNUMEN_USE_DATE_TZ=ON`, the default there).
 - Evaluate algebraic expressions as you would expect.
 - Built-in math functions (see below).
 - Support for computer science operators like bitwise operators and modulo.

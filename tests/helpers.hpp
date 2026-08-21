@@ -1,6 +1,7 @@
 #pragma once
 
 #include "numen/numen.hpp"
+#include "timezone.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_tostring.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -20,19 +21,21 @@ template <typename T, typename E> struct StringMaker<std::expected<T, E>> {
 
 namespace test {
 
+// resolves links to the canonical zone, which raw locate_zone does not do with the date backend
+inline const numen::tz::time_zone *zone(std::string_view name) { return TimezoneDB{}.query(name); }
+
 // "now" is frozen so that tests depending on the current date stay valid
 inline const numen::EvalConfig &frozenConfig() {
   static const numen::EvalConfig config = [] {
     std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{1}, std::chrono::day{18}};
     return numen::EvalConfig{
         .now = std::chrono::sys_days(now),
-        .timezone = std::chrono::locate_zone("UTC"),
+        .timezone = test::zone("UTC"),
         // without this the ambient locale decides whether currencies auto-convert
         .locale = "en_US",
         // tests assert the full canonical form on purpose: localized output
         // depends on the host's locale data, relative output on the wall clock
-        .dateTimeFormat = {.relative = false,
-                           .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},
+        .dateTimeFormat = {.relative = false, .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},
     };
   }();
   return config;
