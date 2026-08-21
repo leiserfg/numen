@@ -94,7 +94,7 @@ You can look at the `include/numen/numen.hpp` header and the tests, which there 
 If built manually using `make` there is also a minimal REPL that you can use to try things out, without much configuration:
 
 ```bash
-./build/repl
+./build/numen
 ```
 
 ## Development

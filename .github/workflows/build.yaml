@@ -94,3 +94,15 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  nix:
+    name: Nix
+    runs-on: depot-ubuntu-24.04-4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v9
+      - name: Build and test
+        run: nix build -L .
+      - name: Check flake
+        run: nix flake check -L
