@@ -50,7 +50,9 @@ Duration subtractDates(const DateTime &lhs, const DateTime &rhs) {
 }
 
 TimePoint checkedTimePoint(std::chrono::sys_seconds t) {
-  constexpr std::chrono::seconds LIMIT{std::numeric_limits<TimePoint::rep>::max() / TimePoint::period::den -
+  // pinned to nanoseconds rather than the clock's tick, which varies per stdlib
+  using Nanos = std::chrono::nanoseconds;
+  constexpr std::chrono::seconds LIMIT{std::numeric_limits<Nanos::rep>::max() / Nanos::period::den -
                                        std::chrono::seconds{std::chrono::days{1}}.count()};
 
   if (t.time_since_epoch() > LIMIT || t.time_since_epoch() < -LIMIT) {

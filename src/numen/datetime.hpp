@@ -11,8 +11,8 @@ Duration subtractDates(const DateTime &lhs, const DateTime &rhs);
 
 DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoint now);
 
-// nanoseconds reach about 292 years either side of the epoch; past that the
-// conversion overflows. the bound keeps a day spare for a time of day
+// nanoseconds reach about 292 years either side of the epoch; past that duration
+// arithmetic overflows. the bound keeps a day spare for a time of day
 TimePoint checkedTimePoint(std::chrono::sys_seconds t);
 
 // moves by whole calendar units, clamping to the last day of the month when
