@@ -278,7 +278,8 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   if (!ns3 || ns3->type != Lexer::TokenType::Number) { return std::nullopt; }
 
-  auto [n1, n2, n3] = std::tuple{ns1->asNumber()->n.toDouble(), ns2->asNumber()->n.toDouble(), ns3->asNumber()->n.toDouble()};
+  auto [n1, n2, n3] =
+      std::tuple{ns1->asNumber()->n.toDouble(), ns2->asNumber()->n.toDouble(), ns3->asNumber()->n.toDouble()};
 
   const auto isMonth = [](auto n) { return n >= 1 && n <= 12; };
   const auto isDay = [](auto n) { return n >= 1 && n <= 31; };
@@ -721,13 +722,17 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   if (auto tok = m_lexer.peak()) {
-    bool unary = std::ranges::contains(std::initializer_list<std::string_view>{"+", "-"}, tok->raw);
-    if (!frontUnit && unary) {
-      m_lexer.next();
-      return std::make_unique<Expression>(UnaryExpression{
-          .op = tok->raw,
-          .lhs = pratParse(EXPONENT_PRECEDENCE),
-      });
+    constexpr auto isSign = [](const auto &t) { return t.raw == "+" || t.raw == "-"; };
+    if (!frontUnit && isSign(*tok)) {
+      // optimization: collapse large run of signs instead of accumulation unary expressions
+      bool negative = false;
+      for (auto sign = m_lexer.peak(); sign && isSign(*sign); sign = m_lexer.peak()) {
+        negative ^= sign->raw == "-";
+        m_lexer.next();
+      }
+      auto operand = pratParse(EXPONENT_PRECEDENCE);
+      if (!negative) return operand;
+      return std::make_unique<Expression>(UnaryExpression{.op = "-", .lhs = std::move(operand)});
     }
   }
 

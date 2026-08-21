@@ -78,15 +78,15 @@ std::optional<std::string_view> queryGeoDb(std::string_view query) {
 
 bool sameZoneName(std::string_view query, std::string_view name);
 
-#if NUMEN_USE_DATE_TZ
 struct TzLink {
   std::string_view name;
   std::string_view target;
 };
 
-// date's OS tzdb lists link files as zones of their own
 #include "gen/tz-links.inc"
 
+#if NUMEN_USE_DATE_TZ
+// date's OS tzdb lists link files as zones of their own
 bool isLinkName(std::string_view name) {
   return std::ranges::any_of(kTzLinks, [&](auto &&l) { return l.name == name; });
 }
@@ -162,6 +162,13 @@ bool sameZoneName(std::string_view query, std::string_view name) {
 }; // namespace
 
 std::span<const CustomTzLink> TimezoneDB::customLinks() { return CUSTOM_LINKS; }
+
+// a tzdb may call a zone by a legacy link name (MSVC's ICU: Asia/Calcutta)
+std::string_view TimezoneDB::canonicalName(const numen::tz::time_zone &tz) {
+  std::string_view name = tz.name();
+  if (auto it = std::ranges::find(kTzLinks, name, &TzLink::name); it != std::end(kTzLinks)) return it->target;
+  return name;
+}
 
 const numen::tz::time_zone *TimezoneDB::userTz() const { return numen::tz::get_tzdb().current_zone(); }
 

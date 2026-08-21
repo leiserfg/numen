@@ -74,7 +74,7 @@ TEST_CASE("localized date time formatting follows the configured locale") {
   if (available("en_US.UTF-8")) {
     auto res = calc.evaluate("18 Jan 2001 13:30:15", localizedConfig("en_US.UTF-8"));
     REQUIRE(res);
-    CHECK(res->starts_with("01/18")); // month first
+    CHECK((res->starts_with("01/18") || res->starts_with("1/18"))); // month first; MSVC does not pad
     // glibc's en_US %X is 12-hour, Apple's is 24-hour: only the hour digits are common ground
     CHECK((res->contains("1:30:15") || res->contains("13:30:15")));
   } else {

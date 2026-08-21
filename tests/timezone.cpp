@@ -126,7 +126,7 @@ TEST_CASE("resolve places from the geo database", TAG) {
     CAPTURE(query);
     auto tz = db.query(query);
     REQUIRE(tz);
-    CHECK(tz->name() == zone);
+    CHECK(TimezoneDB::canonicalName(*tz) == zone);
   };
 
   // cities that are not zone names

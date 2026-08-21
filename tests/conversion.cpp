@@ -27,14 +27,16 @@ TEST_CASE("a unit conversion names both of its sides", "[conversion]") {
 }
 
 TEST_CASE("a chain keeps the first question and the last answer", "[conversion]") {
-  auto u = compute("100 m to ft to in").conversion->as<Number::Unit>();
+  auto c = compute("100 m to ft to in");
+  auto u = c.conversion->as<Number::Unit>();
   REQUIRE(u);
   CHECK(u->from->raw == "m");
   CHECK(u->to.raw == "in");
 }
 
 TEST_CASE("a timezone conversion records both zones", "[conversion]") {
-  auto t = compute("now to pst").conversion->as<Timezone>();
+  auto c = compute("now to pst");
+  auto t = c.conversion->as<Timezone>();
   REQUIRE(t);
   REQUIRE(t->from);
   CHECK(t->from->tz == test::frozenConfig().timezone);
@@ -42,14 +44,16 @@ TEST_CASE("a timezone conversion records both zones", "[conversion]") {
 }
 
 TEST_CASE("formatting passes a conversion through", "[conversion]") {
-  auto u = compute("150 usd to jpy to binary").conversion->as<Number::Unit>();
+  auto c = compute("150 usd to jpy to binary");
+  auto u = c.conversion->as<Number::Unit>();
   REQUIRE(u);
   CHECK(u->from->raw == "usd");
   CHECK(u->to.raw == "jpy");
 }
 
 TEST_CASE("a source with nothing of the target's kind has no question side", "[conversion]") {
-  auto u = compute("now to unix").conversion->as<Number::Unit>();
+  auto c = compute("now to unix");
+  auto u = c.conversion->as<Number::Unit>();
   REQUIRE(u);
   CHECK_FALSE(u->from);
   CHECK(u->to.raw == "second");

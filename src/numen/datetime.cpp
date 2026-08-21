@@ -152,7 +152,7 @@ bool Timezone::isLocalTime() const {
 std::string Timezone::toString() const {
   std::string out{};
 
-  out += tz->name();
+  out += TimezoneDB::canonicalName(*tz);
 
   if (offset.count() != 0) {
     auto hours = offset.count() / 3600;

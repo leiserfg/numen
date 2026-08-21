@@ -52,6 +52,47 @@ private:
     return stamp(src, out, s ? s->unit : std::nullopt, *n->unit, implicit);
   }
 
+  Computed applyBinary(Computed lhs, Computed rhs, const std::string &op) const {
+
+    if (lhs.asNumber() && rhs.asNumber()) {
+      auto nlhs = lhs.asNumber();
+      auto nrhs = rhs.asNumber();
+
+      // converting years into months would floor the fraction, and adding
+      // durations does not need a common unit to begin with
+      bool durationSum = (op == "+" || op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
+
+      if (!durationSum) { reconcileUnits(lhs, rhs, op); }
+    }
+
+    auto r = [&]() -> std::optional<Computed> {
+      if (op == "+") return add(lhs, rhs);
+      if (op == "-") return subtract(lhs, rhs);
+      if (op == "*") return multiply(lhs, rhs);
+      if (op == "/") return div(lhs, rhs);
+      if (op == "%") return modulo(lhs, rhs);
+      if (op == "^") return pow(lhs, rhs);
+      if (op == "<<") return leftshift(lhs, rhs);
+      if (op == ">>") return rightshift(lhs, rhs);
+      if (op == "&") return bitwiseAnd(lhs, rhs);
+      if (op == "|") return bitwiseor(lhs, rhs);
+      if (op == "==") return Computed{.value = Boolean{lhs.value == rhs.value}};
+      if (op == "!=") return Computed{.value = Boolean{lhs.value != rhs.value}};
+      if (op == ">") return Computed{.value = Boolean{lhs.value > rhs.value}};
+      if (op == ">=") return Computed{.value = Boolean{lhs.value >= rhs.value}};
+      if (op == "<") return Computed{.value = Boolean{lhs.value < rhs.value}};
+      if (op == "<=") return Computed{.value = Boolean{lhs.value <= rhs.value}};
+      return std::nullopt;
+    }();
+
+    if (r) {
+      r->explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted;
+      return *r;
+    }
+
+    throw std::runtime_error(std::format("Unhandled operator {}", op));
+  }
+
 public:
   Interpreter(const UnitDatabase &db, const EvalConfig &opts)
       : m_db(db), m_opts(opts), m_now(opts.now.value_or(std::chrono::system_clock::now())) {}
@@ -67,47 +108,17 @@ public:
 
         return c;
       } else if constexpr (std::is_same_v<T, BinaryExpression>) {
-        const auto &be = value;
-        auto lhs = computeExpr(*be.lhs);
-        auto rhs = computeExpr(*be.rhs);
-
-        if (lhs.asNumber() && rhs.asNumber()) {
-          auto nlhs = lhs.asNumber();
-          auto nrhs = rhs.asNumber();
-
-          // converting years into months would floor the fraction, and adding
-          // durations does not need a common unit to begin with
-          bool durationSum = (be.op == "+" || be.op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
-
-          if (!durationSum) { reconcileUnits(lhs, rhs, be.op); }
+        // left-associative chains nest on the lhs: fold the spine in a loop so a
+        // long "1+1+...+1" does not recurse once per operator
+        std::vector<const BinaryExpression *> spine{&value};
+        while (auto next = std::get_if<BinaryExpression>(&spine.back()->lhs->data)) {
+          spine.push_back(next);
         }
-
-        auto r = [&]() -> std::optional<Computed> {
-          if (be.op == "+") return add(lhs, rhs);
-          if (be.op == "-") return subtract(lhs, rhs);
-          if (be.op == "*") return multiply(lhs, rhs);
-          if (be.op == "/") return div(lhs, rhs);
-          if (be.op == "%") return modulo(lhs, rhs);
-          if (be.op == "^") return pow(lhs, rhs);
-          if (be.op == "<<") return leftshift(lhs, rhs);
-          if (be.op == ">>") return rightshift(lhs, rhs);
-          if (be.op == "&") return bitwiseAnd(lhs, rhs);
-          if (be.op == "|") return bitwiseor(lhs, rhs);
-          if (be.op == "==") return Computed{.value = Boolean{lhs.value == rhs.value}};
-          if (be.op == "!=") return Computed{.value = Boolean{lhs.value != rhs.value}};
-          if (be.op == ">") return Computed{.value = Boolean{lhs.value > rhs.value}};
-          if (be.op == ">=") return Computed{.value = Boolean{lhs.value >= rhs.value}};
-          if (be.op == "<") return Computed{.value = Boolean{lhs.value < rhs.value}};
-          if (be.op == "<=") return Computed{.value = Boolean{lhs.value <= rhs.value}};
-          return std::nullopt;
-        }();
-
-        if (r) {
-          r->explicitlyConverted = lhs.explicitlyConverted || rhs.explicitlyConverted;
-          return *r;
+        auto acc = computeExpr(*spine.back()->lhs);
+        for (auto it = spine.rbegin(); it != spine.rend(); ++it) {
+          acc = applyBinary(std::move(acc), computeExpr(*(*it)->rhs), (*it)->op);
         }
-
-        throw std::runtime_error(std::format("Unhandled operator {}", be.op));
+        return acc;
       } else if constexpr (std::is_same_v<T, ConversionExpression>) {
         const auto &conv = value;
         auto v = computeExpr(*conv.lhs);

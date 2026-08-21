@@ -18,4 +18,7 @@ public:
 
   // take precedence over tzdb, so EST is New York rather than the fixed offset link
   static std::span<const CustomTzLink> customLinks();
+
+  // the IANA name, whatever the tzdb calls the zone
+  static std::string_view canonicalName(const numen::tz::time_zone &tz);
 };
