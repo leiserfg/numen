@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 set(PROJECT_NAME numen)
-project(${PROJECT_NAME})
+project(${PROJECT_NAME} VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -36,6 +36,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ${PROJECT_IS_TOP_LEVEL})
 	endif()
 endif()
 
+include(GNUInstallDirs)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 if (WIN32)
@@ -74,12 +75,35 @@ else()
 	add_library(${PROJECT_NAME} STATIC ${NUMEN_SRCS})
 endif()
 
-install(TARGETS ${PROJECT_NAME})
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
-target_link_libraries(${PROJECT_NAME})
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/numen/ DESTINATION ${CMAKE_INSTALL_PREFIX}/include/numen)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+	VERSION ${PROJECT_VERSION}
+	SOVERSION ${PROJECT_VERSION_MAJOR}
+)
 
-target_include_directories(${PROJECT_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} INTERFACE
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+include(CMakePackageConfigHelpers)
+
+install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Targets)
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/numen/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/numen)
+
+set(NUMEN_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+install(EXPORT ${PROJECT_NAME}Targets NAMESPACE ${PROJECT_NAME}:: DESTINATION ${NUMEN_CMAKE_DIR})
+configure_package_config_file(cmake/numenConfig.cmake.in
+	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+	INSTALL_DESTINATION ${NUMEN_CMAKE_DIR}
+)
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake COMPATIBILITY SameMajorVersion)
+install(FILES
+	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+	DESTINATION ${NUMEN_CMAKE_DIR}
+)
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${VENDOR_DIR}
