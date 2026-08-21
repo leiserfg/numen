@@ -90,6 +90,12 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 10am osaka                  => 2026-01-18 01:00:00 (Etc/UTC)
 10am utc                    => 2026-01-18 10:00:00 (Etc/UTC)
 
+# the "9" from "9pm" should not be mistaken for something else in the date
+August 10 9pm               => 2026-08-10 21:00:00 (Etc/UTC)
+August 10 9 pm              => 2026-08-10 21:00:00 (Etc/UTC)
+August 10 2025 9 pm         => 2025-08-10 21:00:00 (Etc/UTC)
+10 August 9 pm              => 2026-08-10 21:00:00 (Etc/UTC)
+
 # GeoNames places
 now to beijing              => 2026-01-18 08:00:00 (Asia/Shanghai)
 now to tokyo                => 2026-01-18 09:00:00 (Asia/Tokyo)

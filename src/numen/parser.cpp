@@ -68,6 +68,8 @@ constexpr auto CONSTANTS = std::to_array<ConstantDef>({
 
 namespace {
 
+bool isMeridiemMarker(std::string_view s) { return equalsIgnoreCase(s, "am") || equalsIgnoreCase(s, "pm"); }
+
 constexpr bool isConstant(std::string_view v) {
   return std::ranges::any_of(CONSTANTS, [&](auto &&def) { return equalsIgnoreCase(def.name, v); });
 };
@@ -211,6 +213,8 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
 
     if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
       auto value = it->n.toDouble();
+
+      if (auto next = m_lexer.peak(i + 1); next && isMeridiemMarker(next->raw)) break;
 
       if (auto dayOfMonth = clockComponent(value, 31); dayOfMonth && value >= 1) {
         day = std::chrono::day{*dayOfMonth};
