@@ -57,9 +57,22 @@ There is no strict roadmap properly speaking, but here are a few things I would 
 
 If you want to use `libnumen` in your project, we recommend vendoring it directly, which is easily done as it is dependency-free.
 
-The easiest way is to clone this repo and add it as a CMake subdirectory.
+The easiest way is to pull it in with CMake's `FetchContent`:
 
-If you want a system-wide installation of the library, run `make install`.
+```cmake
+include(FetchContent)
+FetchContent_Declare(numen
+  GIT_REPOSITORY https://github.com/vicinaehq/libnumen.git
+  GIT_TAG        v0.1.0
+)
+FetchContent_MakeAvailable(numen)
+
+target_link_libraries(your-target PRIVATE numen::numen)
+```
+
+Cloning the repo and adding it with `add_subdirectory` works the same way.
+
+If you want a system-wide installation of the library, run `make install`. It can then be consumed with `find_package(numen)`, which provides the same `numen::numen` target.
 
 ### Build
 
