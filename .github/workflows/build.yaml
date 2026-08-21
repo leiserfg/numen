@@ -26,8 +26,8 @@ jobs:
             cxx: g++-14
           - name: Linux / Clang
             os: depot-ubuntu-24.04-4
-            cc: clang-18
-            cxx: clang++-18
+            cc: clang-19
+            cxx: clang++-19
           - name: macOS / AppleClang
             os: depot-macos-26
             cc: clang
