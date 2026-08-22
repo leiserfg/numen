@@ -22,7 +22,7 @@ void assertDate(std::string_view expr, year_month_day now, std::string_view expe
   test::assertExpr(expr, std::format("{} 00:00:00 ({})", expected, config.timezone->name()), config);
 }
 
-}; // namespace
+} // namespace
 
 TEST_CASE("Month/year shifts clamp to the end of the month") {
   assertDate("1 month ago", {2026y, March, 31d}, "2026-02-28");

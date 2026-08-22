@@ -15,9 +15,7 @@ bool isSpace(char c) { return std::isspace(static_cast<unsigned char>(c)); }
 bool isAlnum(char c) { return std::isalnum(static_cast<unsigned char>(c)); }
 char toLower(char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
 
-bool isOperatorChar(char c) { return !isAlnum(c) && c != '$'; }
-
-}; // namespace
+} // namespace
 
 void Lexer::advance(int n) {
   for (int i = 0; i != n; ++i) {
@@ -47,7 +45,10 @@ std::optional<Lexer::Token> Lexer::next() {
     return Token{.raw = getSelection(), .type = type, .data = data, .start = startPos, .end = m_cursor};
   };
 
-  constexpr auto isValidChar = [](std::uint8_t c) { return std::isalpha(c) || c & 0x80 || c == '$'; };
+  constexpr auto isValidChar = [](char c) {
+    auto u = static_cast<std::uint8_t>(c);
+    return std::isalpha(u) || u & 0x80 || u == '$';
+  };
 
   const auto isCalled = [&](std::size_t pos) {
     while (pos < m_data.size() && (isValidChar(m_data[pos]) || isDigit(m_data[pos])))
@@ -147,7 +148,7 @@ std::optional<Lexer::Token> Lexer::next() {
 
       if (pos == std::string_view::npos || pos >= base) { return tryCommit(); }
 
-      n = n * base + pos;
+      n = n * base + static_cast<double>(pos);
       if (nfrac) { nfrac += 1; }
 
       break;
@@ -163,7 +164,7 @@ std::optional<Lexer::Token> Lexer::next() {
     }
     case State::NumberExponent: {
       if (!isDigit(c)) { return tryCommit(); }
-      expValue = expValue * 10 + (c - '0');
+      expValue = expValue * 10 + static_cast<unsigned>(c - '0');
       break;
     }
     case State::Operator: {

@@ -85,7 +85,7 @@ struct TzLink {
 
 #include "gen/tz-links.inc"
 
-#if NUMEN_USE_DATE_TZ
+#ifdef NUMEN_USE_DATE_TZ
 // date's OS tzdb lists link files as zones of their own
 bool isLinkName(std::string_view name) {
   return std::ranges::any_of(kTzLinks, [&](auto &&l) { return l.name == name; });
@@ -95,7 +95,7 @@ bool isLinkName(std::string_view) { return false; }
 #endif
 
 std::optional<std::string_view> findLinkTarget(std::string_view query) {
-#if NUMEN_USE_DATE_TZ
+#ifdef NUMEN_USE_DATE_TZ
   for (const auto &link : kTzLinks) {
     if (sameZoneName(query, link.name)) return link.target;
   }
@@ -159,7 +159,7 @@ bool sameZoneName(std::string_view query, std::string_view name) {
   });
 }
 
-}; // namespace
+} // namespace
 
 std::span<const CustomTzLink> TimezoneDB::customLinks() { return CUSTOM_LINKS; }
 

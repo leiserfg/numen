@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-constexpr auto isSpace = [](unsigned char c) { return std::isspace(c) != 0; };
+constexpr auto isSpace = [](char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; };
 
 std::string_view trim(std::string_view s) {
   auto first = std::ranges::find_if_not(s, isSpace);

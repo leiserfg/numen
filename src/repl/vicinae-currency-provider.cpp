@@ -50,9 +50,9 @@ std::optional<double> VicinaeCurrencyProvider::getRate(const std::string &code) 
   return std::nullopt;
 }
 
-bool VicinaeCurrencyProvider::loadRates(std::string_view json) {
+bool VicinaeCurrencyProvider::loadRates(std::string_view payload) {
   try {
-    auto obj = json::parse(json);
+    auto obj = json::parse(payload);
 
     {
       std::lock_guard lock{m_mut};
@@ -67,7 +67,7 @@ bool VicinaeCurrencyProvider::loadRates(std::string_view json) {
       return true;
     }
   } catch (const std::exception &e) {
-    std::cerr << "VicinaeCurrencyProvider: failed to fetch rates: " << e.what() << "\n" << json << "\n";
+    std::cerr << "VicinaeCurrencyProvider: failed to fetch rates: " << e.what() << "\n" << payload << "\n";
     return false;
   }
 }

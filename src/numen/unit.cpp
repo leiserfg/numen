@@ -108,12 +108,12 @@ Dimension CompoundUnit::dimension() const {
 
   for (const auto &term : terms) {
     auto base = dimensionOf(term.def.dimension);
-    d.length += base.length * term.exponent;
-    d.mass += base.mass * term.exponent;
-    d.time += base.time * term.exponent;
-    d.currency += base.currency * term.exponent;
-    d.data += base.data * term.exponent;
-    d.temperature += base.temperature * term.exponent;
+    d.length = static_cast<std::int8_t>(d.length + base.length * term.exponent);
+    d.mass = static_cast<std::int8_t>(d.mass + base.mass * term.exponent);
+    d.time = static_cast<std::int8_t>(d.time + base.time * term.exponent);
+    d.currency = static_cast<std::int8_t>(d.currency + base.currency * term.exponent);
+    d.data = static_cast<std::int8_t>(d.data + base.data * term.exponent);
+    d.temperature = static_cast<std::int8_t>(d.temperature + base.temperature * term.exponent);
   }
 
   return d;

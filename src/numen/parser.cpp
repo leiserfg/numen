@@ -10,7 +10,6 @@
 #include <chrono>
 #include <format>
 #include <initializer_list>
-#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -82,7 +81,7 @@ bool isOrdinalSuffix(std::string_view s) {
 
 constexpr bool isConstant(std::string_view v) {
   return std::ranges::any_of(CONSTANTS, [&](auto &&def) { return equalsIgnoreCase(def.name, v); });
-};
+}
 
 bool isOperatorToken(std::string_view tok) {
   return std::ranges::any_of(operators(), [&](auto &&op) { return std::ranges::contains(op.aliases, tok); });
@@ -135,7 +134,7 @@ std::optional<std::chrono::year> asYear(double value) {
 
   return std::nullopt;
 }
-}; // namespace
+} // namespace
 
 Parser::Parser(std::string_view data, const UnitDatabase &unitDb, const ParseOptions &opts)
     : m_lexer(data), m_unitDb(unitDb), m_opts(opts) {}
@@ -215,8 +214,8 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
   std::optional<std::chrono::day> day;
   std::optional<std::chrono::month> month;
   std::optional<std::chrono::year> year;
-  std::size_t i = 0;
-  std::size_t extraAdvance = 0;
+  int i = 0;
+  int extraAdvance = 0;
 
   const auto skipFiller = [&]() {
     ++i;
@@ -328,25 +327,25 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   // YYYY/MM/DD
   if (isYear(n1) && isMonth(n2) && isDay(n3)) {
-    d.year = std::chrono::year(n1);
-    d.month = std::chrono::month(n2);
-    d.day = std::chrono::day(n3);
+    d.year = std::chrono::year(static_cast<int>(n1));
+    d.month = std::chrono::month(static_cast<unsigned>(n2));
+    d.day = std::chrono::day(static_cast<unsigned>(n3));
     return commit(d);
   }
 
   // DD/MM/YYYY
   if (isDay(n1) && isMonth(n2) && isYear(n3)) {
-    d.day = std::chrono::day(n1);
-    d.month = std::chrono::month(n2);
-    d.year = std::chrono::year(n3);
+    d.day = std::chrono::day(static_cast<unsigned>(n1));
+    d.month = std::chrono::month(static_cast<unsigned>(n2));
+    d.year = std::chrono::year(static_cast<int>(n3));
     return commit(d);
   }
 
   // MM/DD/YYYY
   if (isMonth(n1) && isDay(n2) && isYear(n3)) {
-    d.month = std::chrono::month(n1);
-    d.day = std::chrono::day(n2);
-    d.year = std::chrono::year(n3);
+    d.month = std::chrono::month(static_cast<unsigned>(n1));
+    d.day = std::chrono::day(static_cast<unsigned>(n2));
+    d.year = std::chrono::year(static_cast<int>(n3));
     return commit(d);
   }
 
@@ -358,10 +357,10 @@ constexpr auto RESERVED_TIME_TOKENS =
 
 std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto duration = scanDuration()) {
-    if (auto s = m_lexer.peak(duration->tokenCount); s && s->type == Lexer::TokenType::String) {
+    if (auto s = m_lexer.peak(static_cast<int>(duration->tokenCount)); s && s->type == Lexer::TokenType::String) {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
-        m_lexer.advance(duration->tokenCount + 1);
+        m_lexer.advance(static_cast<int>(duration->tokenCount) + 1);
         return RelativeDateTimeLiteral{
             .delta = duration->data,
             .direction = RelativeDateTimeLiteral::Direction::Past,
@@ -504,7 +503,7 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
   }
 
   if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") {
-    if (tok->raw == "min") {
+    if (tok && tok->raw == "min") {
       reset();
       return std::nullopt;
     }
@@ -561,7 +560,7 @@ std::optional<DateString> Parser::parseRFC3339() {
 
   m_lexer.advance(std::tuple_size_v<decltype(parsed)::value_type>);
 
-  if (auto s = m_lexer.peakAs<Lexer::String>(); s && s->data == "Z") {
+  if (auto zulu = m_lexer.peakAs<Lexer::String>(); zulu && zulu->data == "Z") {
     m_lexer.next();
     ds.timezone = TimezoneOffset{.name = "UTC"};
     return ds;
@@ -588,9 +587,10 @@ std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
 
         if (auto tok = m_lexer.peak(); tok && tok->raw == ":") {
           m_lexer.next();
-          if (auto n = m_lexer.peakAs<Lexer::Number>(); n && n->n.isInteger() && n->n >= 0 && n->n < 60) {
+          if (auto mins = m_lexer.peakAs<Lexer::Number>();
+              mins && mins->n.isInteger() && mins->n >= 0 && mins->n < 60) {
             m_lexer.next();
-            offset += std::chrono::minutes(static_cast<int>(n->n.toDouble()) * sign);
+            offset += std::chrono::minutes(static_cast<int>(mins->n.toDouble()) * sign);
           }
         }
       }
@@ -665,7 +665,7 @@ std::optional<numen::Value> Parser::parseNumber() {
   double n;
   std::from_chars(ns.data(), ns.data() + ns.size(), n);
   return n;
-};
+}
 
 std::unique_ptr<Expression> Parser::parseTerm() {
   if (!m_lexer.peak()) {
@@ -687,15 +687,15 @@ std::unique_ptr<Expression> Parser::parseTerm() {
         return makeBinExpr(std::move(lhs), parseMul(), "*");
       }
 
-      return std::move(lhs);
+      return lhs;
     }
 
     if (auto date = parseRFC3339()) { return std::make_unique<Expression>(*date); }
 
     constexpr auto commitDate = [](DateString ds) {
       if (ds.timezone && std::holds_alternative<RelativeDateTimeLiteral>(ds.value)) {
-        auto expr = std::make_unique<Expression>(ds);
-        ConversionExpression conv{.lhs = std::move(expr)};
+        auto inner = std::make_unique<Expression>(ds);
+        ConversionExpression conv{.lhs = std::move(inner)};
         conv.target.tz = *ds.timezone;
         return std::make_unique<Expression>(std::move(conv));
       }
@@ -719,7 +719,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
     // less than 2 tokens means likely unit
     if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
-      for (int i = 0; i != duration->tokenCount; ++i) {
+      for (std::size_t i = 0; i != duration->tokenCount; ++i) {
         m_lexer.next();
       }
       return std::make_unique<Expression>(duration->data);
@@ -773,12 +773,12 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   if (auto tok = m_lexer.peak()) {
     if (auto n = parseNumber()) {
       expr = makeNumberExpr(*n);
-    } else if (auto tok = m_lexer.peakIf(Lexer::TokenType::String)) {
+    } else if (auto name = m_lexer.peakIf(Lexer::TokenType::String)) {
       if (auto next = m_lexer.peak(1); next && next->raw == "(") {
         m_lexer.next();
         m_lexer.next();
 
-        FunctionCall fn{.name = tok->raw};
+        FunctionCall fn{.name = name->raw};
 
         constexpr auto unterminated = "Expected ) to close the argument list";
 
@@ -789,9 +789,9 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
           fn.args.emplace_back(pratParse());
 
-          auto tok = m_lexer.peakOrThrow(unterminated);
-          if (tok.raw == ")") { break; }
-          if (tok.raw != ",") { throw std::runtime_error("Expected , to add another argument"); }
+          auto sep = m_lexer.peakOrThrow(unterminated);
+          if (sep.raw == ")") { break; }
+          if (sep.raw != ",") { throw std::runtime_error("Expected , to add another argument"); }
 
           m_lexer.next();
         }
@@ -876,7 +876,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
   auto left = parseTerm();
 
   while (auto tok = m_lexer.peak()) {
-    if (tok->raw == "to" || tok->raw == "in" | tok->raw == "->") {
+    if (tok->raw == "to" || tok->raw == "in" || tok->raw == "->") {
       if (minPrec > 0) break;
 
       m_lexer.next();
@@ -890,7 +890,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
             .lhs = std::move(left),
             .rhs = std::move(rhs),
         });
-        m_lexer.advance(duration->tokenCount);
+        m_lexer.advance(static_cast<int>(duration->tokenCount));
         continue;
       }
 
@@ -951,7 +951,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
           left = makeBinExpr(std::move(left), std::move(rhs), std::string{"*"});
           continue;
         } else if (tok->raw == "(") {
-          left = makeBinExpr(std::move(left), std::move(parseTerm()), std::string{"*"});
+          left = makeBinExpr(std::move(left), parseTerm(), std::string{"*"});
           continue;
         }
       }

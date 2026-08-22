@@ -87,7 +87,7 @@ TEST_CASE("should handle famous european timezones", TAG) {
   }
 }
 
-#if !NUMEN_USE_DATE_TZ
+#ifndef NUMEN_USE_DATE_TZ
 TEST_CASE("Resolve timezone links", TAG) {
   TimezoneDB db;
 

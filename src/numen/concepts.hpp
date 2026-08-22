@@ -13,4 +13,4 @@ struct is_variant_alternative<T, std::variant<Ts...>> : std::bool_constant<(std:
 template <class T, class V>
 concept VariantAlternative = is_variant_alternative<T, V>::value;
 
-}; // namespace concepts
+} // namespace concepts

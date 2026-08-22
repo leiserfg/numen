@@ -4,7 +4,7 @@
 
 namespace {
 constexpr double toSeconds(auto d) { return std::chrono::duration<double>(d).count(); }
-}; // namespace
+} // namespace
 
 // Aliases must be unique within a dimension; collisions across dimensions are
 // resolved from context at evaluation time. Lookup is case-insensitive and

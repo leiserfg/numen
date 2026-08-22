@@ -67,7 +67,7 @@ TEST_CASE("Should parse value type using parse method") {
     REQUIRE(result);
     REQUIRE(result->isCurrentTimezone());
   }
-};
+}
 
 TEST_CASE("should return an error if parsing wrong type") {
   numen::Numen calc{};

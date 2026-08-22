@@ -13,7 +13,7 @@ struct CharMapping {
 
 #include "gen/geo-charmap.inc"
 
-}; // namespace
+} // namespace
 
 void appendUtf8(std::string &out, uint32_t cp) {
   if (cp < 0x80) {
@@ -40,7 +40,7 @@ std::string normalizeName(std::string_view query) {
   };
 
   for (size_t i = 0; i < query.size(); ++i) {
-    unsigned char c = query[i];
+    auto c = static_cast<unsigned char>(query[i]);
 
     if (c < 0x80) {
       if (c == '.' || c == '\'') continue;
@@ -53,7 +53,7 @@ std::string normalizeName(std::string_view query) {
     }
 
     int extra = (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : -1;
-    if (extra < 0 || i + extra >= query.size()) continue;
+    if (extra < 0 || i + static_cast<size_t>(extra) >= query.size()) continue;
 
     uint32_t cp = c & (0x3F >> extra);
     for (int k = 0; k < extra; ++k)

@@ -63,12 +63,13 @@ namespace detail {
 Duration scaleDuration(const Duration &d, double factor) {
   using namespace std::chrono;
 
-  auto months =
-      (d.years.value_or(years{0}).count() * 12 + d.months.value_or(std::chrono::months{0}).count()) * factor;
+  auto months = static_cast<double>(d.years.value_or(years{0}).count() * 12 +
+                                    d.months.value_or(std::chrono::months{0}).count()) *
+                factor;
   auto wholeMonths = std::trunc(months);
 
-  auto secs = d.seconds.value_or(seconds{0}).count() * factor +
-              d.subsecond.value_or(nanoseconds{0}).count() * factor / nanosPerSecond +
+  auto secs = static_cast<double>(d.seconds.value_or(seconds{0}).count()) * factor +
+              static_cast<double>(d.subsecond.value_or(nanoseconds{0}).count()) * factor / nanosPerSecond +
               (months - wholeMonths) * perMonth;
   auto wholeSecs = std::trunc(secs);
 

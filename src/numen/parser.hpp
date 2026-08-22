@@ -149,16 +149,16 @@ struct Expression {
 
   template <concepts::VariantAlternative<decltype(data)> T> bool contains() const {
     return std::visit(
-        [&](const auto &data) {
-          using U = std::remove_cvref_t<decltype(data)>;
+        [&](const auto &node) {
+          using U = std::remove_cvref_t<decltype(node)>;
           if constexpr (std::is_same_v<T, U>) { return true; }
-          if constexpr (std::is_same_v<U, UnaryExpression>) { return data.lhs->template contains<T>(); }
+          if constexpr (std::is_same_v<U, UnaryExpression>) { return node.lhs->template contains<T>(); }
           if constexpr (std::is_same_v<U, BinaryExpression>) {
-            return data.lhs->template contains<T>() || data.rhs->template contains<T>();
+            return node.lhs->template contains<T>() || node.rhs->template contains<T>();
           }
-          if constexpr (std::is_same_v<U, ConversionExpression>) { return data.lhs->template contains<T>(); }
-          if constexpr (std::is_same_v<U, UnitExpression>) { return data.expr->template contains<T>(); }
-          if constexpr (std::is_same_v<U, PercentExpression>) { return data.expr->template contains<T>(); }
+          if constexpr (std::is_same_v<U, ConversionExpression>) { return node.lhs->template contains<T>(); }
+          if constexpr (std::is_same_v<U, UnitExpression>) { return node.expr->template contains<T>(); }
+          if constexpr (std::is_same_v<U, PercentExpression>) { return node.expr->template contains<T>(); }
           return false;
         },
         data);

@@ -27,7 +27,7 @@ inline constexpr const char *VOLUME = "volume";
 inline constexpr const char *AREA = "area";
 inline constexpr const char *SPEED = "speed";
 inline constexpr const char *CURRENCY = "currency";
-}; // namespace dimensions
+} // namespace dimensions
 
 // not about affine units, which are a property of the unit rather than its
 // dimension: kelvin composes freely where celsius cannot compose at all
@@ -58,7 +58,7 @@ inline constexpr const char *DURATION = "duration";
 inline constexpr const char *DEGREE = "degree";
 inline constexpr const char *DATA = "data";
 inline constexpr const char *CURRENCY = "currency";
-}; // namespace families
+} // namespace families
 
 struct UnitDef {
   std::string id;

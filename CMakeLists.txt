@@ -16,6 +16,8 @@ option(NUMEN_USE_DATE_TZ "Use the vendored HowardHinnant/date library for timezo
 
 option(BUILD_FUZZER "Build the libFuzzer target. Requires clang." OFF)
 
+option(NUMEN_HARDENING "Enable hardening compiler and linker flags" ON)
+
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 	set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 	set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
@@ -42,6 +44,53 @@ endif()
 
 include(GNUInstallDirs)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
+
+if (MSVC)
+	set(NUMEN_WARNING_OPTIONS /W4)
+	if (NUMEN_HARDENING)
+		set(NUMEN_HARDENING_OPTIONS /sdl /guard:cf)
+		set(NUMEN_HARDENING_LINK_OPTIONS /guard:cf)
+	endif()
+else()
+	set(NUMEN_WARNING_OPTIONS
+		-Wall -Wextra -Wpedantic
+		-Wshadow
+		-Wnon-virtual-dtor
+		-Woverloaded-virtual
+		-Wcast-align
+		-Wdouble-promotion
+		-Wimplicit-fallthrough
+		-Wformat=2
+		-Wundef
+		-Wextra-semi
+		-Wconversion
+		-Wsign-conversion
+		-Wno-missing-field-initializers
+	)
+	if (NUMEN_HARDENING)
+		set(NUMEN_HARDENING_OPTIONS
+			-fstack-protector-strong
+			-fstack-clash-protection
+			-D_GLIBCXX_ASSERTIONS
+			# needs optimization; sanitized builds (Debug, fuzzer) conflict with it
+			$<$<AND:$<NOT:$<CONFIG:Debug>>,$<NOT:$<BOOL:${BUILD_FUZZER}>>>:-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3>
+		)
+		if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i.86")
+			list(APPEND NUMEN_HARDENING_OPTIONS -fcf-protection=full)
+		elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+			list(APPEND NUMEN_HARDENING_OPTIONS -mbranch-protection=standard)
+		endif()
+		if (NOT APPLE)
+			set(NUMEN_HARDENING_LINK_OPTIONS
+				LINKER:-z,relro LINKER:-z,now LINKER:-z,noexecstack)
+		endif()
+	endif()
+endif()
+
+function(numen_harden target)
+	target_compile_options(${target} PRIVATE ${NUMEN_WARNING_OPTIONS} ${NUMEN_HARDENING_OPTIONS})
+	target_link_options(${target} PRIVATE ${NUMEN_HARDENING_LINK_OPTIONS})
+endfunction()
 
 if (WIN32)
 	set(DEFAULT_USE_SYSTEM_CATCH OFF)
@@ -80,10 +129,13 @@ else()
 endif()
 
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+numen_harden(${PROJECT_NAME})
 
 if (NUMEN_USE_DATE_TZ)
 	set(DATE_DIR ${VENDOR_DIR}/date)
 	target_sources(${PROJECT_NAME} PRIVATE ${DATE_DIR}/src/tz.cpp)
+	# vendored: not ours to keep warning-clean
+	set_source_files_properties(${DATE_DIR}/src/tz.cpp PROPERTIES COMPILE_OPTIONS "-w")
 	# public: <numen/tz.hpp> and date's class layouts depend on these
 	target_compile_definitions(${PROJECT_NAME} PUBLIC NUMEN_USE_DATE_TZ=1 USE_OS_TZDB=1 HAS_REMOTE_API=0)
 	target_include_directories(${PROJECT_NAME} PUBLIC
@@ -125,11 +177,11 @@ install(FILES
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${VENDOR_DIR}
 )
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${VENDOR_DIR})
 
 if (MSVC)
-	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /W3 /wd4996)
+	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /wd4996)
 	add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
@@ -151,10 +203,11 @@ if (BUILD_REPL)
 	endif()
 
 	add_executable(${REPL_TARGET} ${SRCS})
+	numen_harden(${REPL_TARGET})
 	target_include_directories(${REPL_TARGET} PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/include
-		${VENDOR_DIR}
 	)
+	target_include_directories(${REPL_TARGET} SYSTEM PRIVATE ${VENDOR_DIR})
 	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME} ${LINK_LIBS})
 	target_include_directories(${REPL_TARGET} PRIVATE ./include ./repl)
 	set_target_properties(${REPL_TARGET} PROPERTIES OUTPUT_NAME numen)
@@ -191,6 +244,7 @@ if (BUILD_TESTS)
 	)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
+	numen_harden(${TEST_TARGET})
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
 	target_include_directories(${TEST_TARGET} PRIVATE ./include ./src/numen)
 
@@ -202,6 +256,7 @@ endif()
 if (BUILD_FUZZER)
 	set(FUZZ_TARGET numen-fuzz)
 	add_executable(${FUZZ_TARGET} tests/fuzz.cpp)
+	numen_harden(${FUZZ_TARGET})
 	target_link_libraries(${FUZZ_TARGET} PRIVATE ${PROJECT_NAME})
 	target_include_directories(${FUZZ_TARGET} PRIVATE ./include)
 

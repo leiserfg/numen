@@ -10,7 +10,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t *data, std::size_t size
 
   if (res) {
     // touch the result so it cannot be optimised away
-    static volatile std::size_t sink = 0;
+    [[maybe_unused]] static volatile std::size_t sink = 0;
     sink = res->size();
   }
 

@@ -32,20 +32,20 @@ static void printASTNode(std::ostream &os, const Expression &expr, int depth = 0
           printASTNode(os, *value.lhs, depth + 1);
           os << ident() << "}\n";
         } else if constexpr (std::is_same_v<T, ConversionExpression>) {
-          auto visitor = [](const auto &value) -> std::string {
-            using T = std::remove_cvref_t<decltype(value)>;
-            if constexpr (std::is_same_v<T, TimezoneOffset>) {
-              return std::format("Timezone({})", value.name);
-            } else if constexpr (std::is_same_v<T, NamedUnit>) {
+          [[maybe_unused]] auto visitor = [](const auto &target) -> std::string {
+            using V = std::remove_cvref_t<decltype(target)>;
+            if constexpr (std::is_same_v<V, TimezoneOffset>) {
+              return std::format("Timezone({})", target.name);
+            } else if constexpr (std::is_same_v<V, NamedUnit>) {
               std::string name;
-              for (const auto &term : value.terms) {
+              for (const auto &term : target.terms) {
                 if (!name.empty()) name += term.exponent < 0 ? "/" : "*";
                 name += term.name;
               }
               return std::format("Unit({})", name);
             } else {
-              static_assert(std::is_same_v<T, NamedNumberFormat>);
-              return std::format("NumericFormat({})", value.name);
+              static_assert(std::is_same_v<V, NamedNumberFormat>);
+              return std::format("NumericFormat({})", target.name);
             }
           };
 

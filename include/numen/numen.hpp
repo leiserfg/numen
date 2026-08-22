@@ -330,7 +330,7 @@ public:
             if (auto ns = value.subsecond) d += into(*ns);
             return d;
           })
-          .or_else([&](auto &&f) {
+          .or_else([&](auto &&) {
             return parse<Number>(expr, opts).transform([](const Number &n) {
               return T{static_cast<long long>(n.n)};
             });

@@ -13,4 +13,4 @@ std::optional<std::string_view> currencyForRegion(std::string_view region);
  */
 std::optional<std::string_view> currencyForLocale(std::string_view locale);
 
-}; // namespace numen
+} // namespace numen

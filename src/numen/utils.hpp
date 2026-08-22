@@ -6,8 +6,8 @@
 
 inline bool equalsIgnoreCase(const auto &a, const auto &b) {
   using V = std::string_view;
-  return std::ranges::equal(V{a}, V{b}, [](auto a, auto b) {
-    return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+  return std::ranges::equal(V{a}, V{b}, [](auto lhs, auto rhs) {
+    return std::tolower(static_cast<unsigned char>(lhs)) == std::tolower(static_cast<unsigned char>(rhs));
   });
 }
 

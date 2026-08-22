@@ -16,7 +16,7 @@ struct RegionCurrency {
 bool isAlpha(char c) { return std::isalpha(static_cast<unsigned char>(c)); }
 char toUpper(char c) { return static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
 
-}; // namespace
+} // namespace
 
 std::optional<std::string_view> currencyForRegion(std::string_view region) {
   if (region.size() != 2) return std::nullopt;
@@ -55,4 +55,4 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale) {
   return std::nullopt;
 }
 
-}; // namespace numen
+} // namespace numen

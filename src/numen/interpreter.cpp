@@ -55,9 +55,6 @@ private:
   Computed applyBinary(Computed lhs, Computed rhs, const std::string &op) const {
 
     if (lhs.asNumber() && rhs.asNumber()) {
-      auto nlhs = lhs.asNumber();
-      auto nrhs = rhs.asNumber();
-
       // converting years into months would floor the fraction, and adding
       // durations does not need a common unit to begin with
       bool durationSum = (op == "+" || op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
@@ -149,24 +146,23 @@ public:
 
         if (auto d = v.asDuration()) {
           if (auto unit = conv.target.unit; unit && unit->isSimple()) {
-            return stampUnit(v, convertToUnit(d->total().count(), "second", unit->simpleName()));
+            return stampUnit(
+                v, convertToUnit(static_cast<double>(d->total().count()), "second", unit->simpleName()));
           }
         }
 
         if (auto n = v.asNumber()) {
-          auto value = *n;
-
           if (auto fmt = conv.target.fmt) {
-            const auto toFormatted = [&](NumberOutputFormat fmt) {
+            const auto toFormatted = [&](NumberOutputFormat format) {
               auto out = v;
-              out.asNumber()->format = fmt;
+              out.asNumber()->format = format;
               return out;
             };
 
             if (fmt->name == "hex" || fmt->name == "hexadecimal") {
               return toFormatted(NumberOutputFormat::Hexadecimal);
             }
-            if (fmt->name == "bin" | fmt->name == "binary") {
+            if (fmt->name == "bin" || fmt->name == "binary") {
               return toFormatted(NumberOutputFormat::Binary);
             }
             if (fmt->name == "octal") { return toFormatted(NumberOutputFormat::Octal); }
@@ -377,9 +373,6 @@ private:
 
     // Allow implict conversion such as "150 km/h to in", by promoting rhs to in/h
     if (!from.sole() && target.sole()) {
-      auto convertible =
-          dimensionOf(from.terms[0].def.dimension) == dimensionOf(target.terms[0].def.dimension);
-
       if (from.terms[0].def.dimension == target.terms[0].def.dimension) {
         target.terms.insert(target.terms.end(), from.terms.begin() + 1, from.terms.end());
       }
@@ -742,7 +735,7 @@ private:
     return output(n, lhs, rhs, rhs.unit.or_else([&]() { return lhs.unit; }));
   }
 
-  static Computed output(Value n, const Num &lhs, const Num &rhs, std::optional<Number::Unit> unit) {
+  static Computed output(Value n, const Num &lhs, const Num &, std::optional<Number::Unit> unit) {
     if (n.isNaN()) throw std::runtime_error("Result is undefined");
 
     return Computed{.value = Num{.n = n, .format = lhs.format, .unit = std::move(unit)}};
