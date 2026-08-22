@@ -69,7 +69,14 @@ constexpr auto CONSTANTS = std::to_array<ConstantDef>({
 
 namespace {
 
-bool isMeridiemMarker(std::string_view s) { return equalsIgnoreCase(s, "am") || equalsIgnoreCase(s, "pm"); }
+bool isInIgnoreCase(std::string_view s, auto &&range) {
+  return std::ranges::any_of(range, [&](auto &&v) { return equalsIgnoreCase(s, std::string_view{v}); });
+}
+
+bool isMeridiemMarker(std::string_view s) { return isInIgnoreCase(s, std::initializer_list{"am", "pm"}); }
+bool isOrdinalSuffix(std::string_view s) {
+  return isInIgnoreCase(s, std::initializer_list{"st", "rd", "nd", "th"});
+}
 
 constexpr bool isConstant(std::string_view v) {
   return std::ranges::any_of(CONSTANTS, [&](auto &&def) { return equalsIgnoreCase(def.name, v); });
@@ -201,10 +208,15 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
   std::optional<std::chrono::day> day;
   std::optional<std::chrono::month> month;
   std::optional<std::chrono::year> year;
+  std::size_t i = 0;
+  std::size_t extraAdvance = 0;
 
-  int i = 0;
+  const auto skipFiller = [&]() {
+    ++i;
+    ++extraAdvance;
+  };
 
-  while (i < 3) {
+  while (i < 3 + extraAdvance) {
     auto tok = m_lexer.peak(i);
     if (!tok) break;
 
@@ -214,6 +226,11 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
       if (auto next = m_lexer.peak(i + 1); next && isMeridiemMarker(next->raw)) break;
 
       if (auto dayOfMonth = clockComponent(value, 31); dayOfMonth && value >= 1) {
+        if (auto next = m_lexer.peak(i + 1); next && isOrdinalSuffix(next->raw)) skipFiller();
+
+        // 3 of January, 3rd of January...
+        if (auto next = m_lexer.peak(i + 1); next && next->raw == "of") skipFiller();
+
         day = std::chrono::day{*dayOfMonth};
       } else if (auto parsed = asYear(value)) {
         year = *parsed;
@@ -246,7 +263,7 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
     if (weekday) lit.day = weekday;
     if (day) lit.day = day;
 
-    m_lexer.advance(i);
+    m_lexer.advance(i + extraAdvance);
 
     return lit;
   }
