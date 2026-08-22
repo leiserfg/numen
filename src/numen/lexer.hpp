@@ -72,6 +72,12 @@ public:
   size_t cursor() const { return m_cursor; }
   void setCursor(size_t cursor) { m_cursor = cursor; }
 
+  // Return a function that will restore the lexer cursor
+  // to the position it was at when creating the checkpoint.
+  auto checkpoint() {
+    return [this, cursor = m_cursor]() { setCursor(cursor); };
+  }
+
   bool isGluedLeft(const Token &tok) const {
     return tok.start > 0 && std::isspace(static_cast<unsigned char>(m_data[tok.start - 1])) == 0;
   }

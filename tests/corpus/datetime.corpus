@@ -10,6 +10,14 @@
 01/18/2001                  => 2001-01-18 00:00:00 (Etc/UTC)
 18/01/2001 13:30:15         => 2001-01-18 13:30:15 (Etc/UTC)
 
+# time can go before date as well
+5:00 18/01/2001             => 2001-01-18 05:00:00 (Etc/UTC)
+5am 18/01/2001              => 2001-01-18 05:00:00 (Etc/UTC)
+5am 18 jan 2001             => 2001-01-18 05:00:00 (Etc/UTC)
+5am jan 2001                => 2001-01-01 05:00:00 (Etc/UTC)
+5:30:45 18 jan 2001         => 2001-01-18 05:30:45 (Etc/UTC)
+5:30:45pm 18 jan 2001       => 2001-01-18 17:30:45 (Etc/UTC)
+
 # with dashes as a separator 
 01-18-2001                  => 2001-01-18 00:00:00 (Etc/UTC)
 
@@ -153,6 +161,8 @@ time now                     => 2026-01-18 00:00:00 (Etc/UTC)
 now                          => 2026-01-18 00:00:00 (Etc/UTC)
 time now == now              => true
 tomorrow at 5pm              => 2026-01-19 17:00:00 (Etc/UTC)
+5pm tomorrow                 => 2026-01-19 17:00:00 (Etc/UTC)
+at 5pm tomorrow              => 2026-01-19 17:00:00 (Etc/UTC)
 yesterday at 5pm             => 2026-01-17 17:00:00 (Etc/UTC)
 2 months ago at 5pm          => 2025-11-18 17:00:00 (Etc/UTC)
 2 years 1 month ago at 5:30  => 2023-12-18 05:30:00 (Etc/UTC)

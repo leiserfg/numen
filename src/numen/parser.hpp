@@ -91,12 +91,14 @@ struct RelativeDateTimeLiteral {
   enum class Direction : std::uint8_t { Past, Future } direction;
   DateTimePrecision precision = DateTimePrecision::DateTime;
 
-  // additional time override that should superseded any relative time
+  // additional time override for the current day (after duration is added)
   std::optional<ParsedTime> time;
 };
 
+using DateTimeValue = std::variant<DateTimeLiteral, RelativeDateTimeLiteral, std::string_view>;
+
 struct DateString {
-  std::variant<DateTimeLiteral, RelativeDateTimeLiteral, std::string_view> value;
+  DateTimeValue value;
   std::optional<TimezoneOffset> timezone;
 };
 
@@ -177,7 +179,7 @@ public:
   bool isTimezoneToken(std::string_view name);
   std::optional<DateTimeLiteral> parseYYYYMMDD();
   std::optional<DateTimeLiteral> parseNaturalDateLiteral();
-  std::optional<DateTimeLiteral> parseDate();
+  std::optional<DateTimeValue> parseDate();
   std::optional<ParsedTime> parseTime(bool afterDate = false);
   std::optional<TimezoneOffset> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();

@@ -121,11 +121,6 @@ std::optional<std::chrono::year> asYear(double value) {
   if (value < lowest || value > highest || value != std::trunc(value)) return std::nullopt;
   return std::chrono::year{static_cast<int>(value)};
 }
-
-bool isRelativeDateToken(std::string_view name) {
-  // handle more relative expressions, e.g "last week" etc...
-  return false;
-}
 }; // namespace
 
 Parser::Parser(std::string_view data, const UnitDatabase &unitDb) : m_lexer(data), m_unitDb(unitDb) {}
@@ -333,9 +328,10 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
         m_lexer.advance(duration->tokenCount + 1);
-        return RelativeDateTimeLiteral{.delta = duration->data,
-                                       .direction = RelativeDateTimeLiteral::Direction::Past,
-                                       .time = parseTime(true)};
+        return RelativeDateTimeLiteral{
+            .delta = duration->data,
+            .direction = RelativeDateTimeLiteral::Direction::Past,
+        };
       }
     }
   }
@@ -344,43 +340,55 @@ std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
     if (s->data == "yesterday") {
       m_lexer.next();
 
-      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
-                                     .direction = RelativeDateTimeLiteral::Direction::Past,
-                                     .precision = DateTimePrecision::Date,
-                                     .time = parseTime(true)};
+      return RelativeDateTimeLiteral{
+          .delta = Duration{.seconds = std::chrono::days{1}},
+          .direction = RelativeDateTimeLiteral::Direction::Past,
+          .precision = DateTimePrecision::Date,
+      };
     }
 
     if (s->data == "tomorrow") {
       m_lexer.next();
 
-      return RelativeDateTimeLiteral{.delta = Duration{.seconds = std::chrono::days{1}},
-                                     .direction = RelativeDateTimeLiteral::Direction::Future,
-                                     .precision = DateTimePrecision::Date,
-                                     .time = parseTime(true)};
+      return RelativeDateTimeLiteral{
+          .delta = Duration{.seconds = std::chrono::days{1}},
+          .direction = RelativeDateTimeLiteral::Direction::Future,
+          .precision = DateTimePrecision::Date,
+      };
     }
 
     if (s->data == "today" || s->data == "date") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.precision = DateTimePrecision::Date, .time = parseTime(true)};
+      return RelativeDateTimeLiteral{.precision = DateTimePrecision::Date};
     }
 
     if (s->data == "now" || s->data == "time") {
       m_lexer.next();
-      return RelativeDateTimeLiteral{.precision = DateTimePrecision::DateTime, .time = parseTime(true)};
+      return RelativeDateTimeLiteral{.precision = DateTimePrecision::DateTime};
     }
   }
 
   return std::nullopt;
 }
 
-std::optional<DateTimeLiteral> Parser::parseDate() {
+std::optional<DateTimeValue> Parser::parseDate() {
+  auto time = parseTime();
+
+  if (auto d = parseRelativeDateTimeLiteral()) {
+    d->time = parseTime(true);
+    if (!d->time) d->time = time;
+    return d;
+  }
+
   if (auto d = parseYYYYMMDD()) {
     d->time = parseTime(true);
+    if (!d->time) d->time = time;
     return d;
   }
 
   if (auto d = parseNaturalDateLiteral()) {
     d->time = parseTime(true);
+    if (!d->time) d->time = time;
     return d;
   }
 
@@ -410,14 +418,16 @@ std::optional<DateTimeLiteral> Parser::parseDate() {
         return d;
       }
     }
-
-    if (auto time = parseTime()) { return DateTimeLiteral{.time = time}; }
   }
+
+  if (time) return DateTimeLiteral{.time = time};
 
   return std::nullopt;
 }
 
 std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
+  auto reset = m_lexer.checkpoint();
+
   if (auto tok = m_lexer.peakAs<Lexer::String>(); tok && tok->data == "at") { m_lexer.next(); }
 
   ParsedTime time;
@@ -487,7 +497,13 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     m_lexer.next();
   }
 
-  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") return commitTime();
+  if (auto tok = m_lexer.peak(); !tok || tok->raw != ":") {
+    if (tok->raw == "min") {
+      reset();
+      return std::nullopt;
+    }
+    return commitTime();
+  }
   m_lexer.next();
 
   if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
@@ -668,34 +684,20 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
     if (auto date = parseRFC3339()) { return std::make_unique<Expression>(*date); }
 
-    {
-      auto tz = parseTimezone();
-
-      if (auto date = parseRelativeDateTimeLiteral()) {
-        if (!tz) tz = parseTimezone();
-
-        auto ds = std::make_unique<Expression>(DateString{.value = *date});
-        // "time washington" asks for now as seen from there: a conversion, not a zoned literal
-        if (!tz) return ds;
-
-        ConversionExpression conv{.lhs = std::move(ds)};
-        conv.target.tz = *tz;
+    constexpr auto commitDate = [](DateString ds) {
+      if (ds.timezone && std::holds_alternative<RelativeDateTimeLiteral>(ds.value)) {
+        auto expr = std::make_unique<Expression>(ds);
+        ConversionExpression conv{.lhs = std::move(expr)};
+        conv.target.tz = *ds.timezone;
         return std::make_unique<Expression>(std::move(conv));
       }
-    }
-
-    // less than 2 tokens means likely unit
-    if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
-      for (int i = 0; i != duration->tokenCount; ++i) {
-        m_lexer.next();
-      }
-      return std::make_unique<Expression>(duration->data);
-    }
+      return std::make_unique<Expression>(ds);
+    };
 
     if (auto tz = parseTimezone()) {
       if (auto date = parseDate()) {
         DateString ds{.value = *date, .timezone = *tz};
-        return std::make_unique<Expression>(ds);
+        return commitDate(ds);
       }
     }
 
@@ -704,18 +706,15 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
       if (auto result = parseTimezone()) { ds.timezone = result.value(); }
 
-      return std::make_unique<Expression>(ds);
+      return commitDate(ds);
     }
 
-    if (isRelativeDateToken(tok->raw)) {
-      m_lexer.next();
-      DateString ds{.value = tok->raw};
-
-      if (auto tz = m_lexer.peak()) {
-        if (auto result = parseTimezone()) { ds.timezone = result.value(); }
+    // less than 2 tokens means likely unit
+    if (auto duration = scanDuration(); duration && duration->tokenCount > 2) {
+      for (int i = 0; i != duration->tokenCount; ++i) {
+        m_lexer.next();
       }
-
-      return std::make_unique<Expression>(ds);
+      return std::make_unique<Expression>(duration->data);
     }
   }
 
