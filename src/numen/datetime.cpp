@@ -80,11 +80,12 @@ static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const tz::time_z
       [&](const auto &v) {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr (std::is_same_v<T, std::chrono::weekday>) {
-          const std::chrono::year_month_weekday date{d.year.value_or(today.year()), d.month.value_or(today.month()),
-                                               v[0]};
+          const std::chrono::year_month_weekday date{d.year.value_or(today.year()),
+                                                     d.month.value_or(today.month()), v[0]};
           return process(date);
         } else if constexpr (std::is_same_v<T, std::chrono::day>) {
-          const std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()), v};
+          const std::chrono::year_month_day date{d.year.value_or(today.year()),
+                                                 d.month.value_or(today.month()), v};
           return process(date);
         }
       },
@@ -112,18 +113,19 @@ DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoi
               return now;
             } else {
               static_assert(std::is_same_v<A, Duration>);
-              if (value.precision == DateTimePrecision::Date) {
-                const std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
-                now = tz->to_sys(tz::local_seconds{std::chrono::local_days{date}.time_since_epoch()});
-              }
 
               if (auto &y = anchor.years) now = shift<std::chrono::years>(now, sign * *y);
               if (auto &m = anchor.months) now = shift<std::chrono::months>(now, sign * *m);
               if (auto &s = anchor.seconds) now = now + sign * *s;
 
+              // round to local day
+              if (value.time || value.precision == DateTimePrecision::Date) {
+                const std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
+                now = tz->to_sys(tz::local_seconds{std::chrono::local_days{date}.time_since_epoch()});
+              }
+
               // we apply the duration first, then override the time of the current day
               if (auto t = value.time) {
-                now = std::chrono::floor<std::chrono::days>(now);
                 if (auto h = t->hours) now += *h;
                 if (auto m = t->minutes) now += *m;
                 if (auto s = t->seconds) now += *s;

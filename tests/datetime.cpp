@@ -41,6 +41,7 @@ TEST_CASE("time anchors should parse as dates or instants") {
   test::assertExpr("time", "2026-01-18 02:30:00 (Etc/UTC)", config);
   test::assertExpr("date", "2026-01-18 00:00:00 (Etc/UTC)", config);
   test::assertExpr("tomorrow", "2026-01-19 00:00:00 (Etc/UTC)", config);
+  test::assertExpr("tomorrow at 6pm", "2026-01-19 18:00:00 (Etc/UTC)", config);
   test::assertExpr("yesterday", "2026-01-17 00:00:00 (Etc/UTC)", config);
 }
 
