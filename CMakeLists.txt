@@ -70,17 +70,17 @@ else()
 	if (NUMEN_HARDENING)
 		set(NUMEN_HARDENING_OPTIONS
 			-fstack-protector-strong
-			-fstack-clash-protection
 			-D_GLIBCXX_ASSERTIONS
 			# needs optimization; sanitized builds (Debug, fuzzer) conflict with it
 			$<$<AND:$<NOT:$<CONFIG:Debug>>,$<NOT:$<BOOL:${BUILD_FUZZER}>>>:-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3>
 		)
-		if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i.86")
-			list(APPEND NUMEN_HARDENING_OPTIONS -fcf-protection=full)
-		elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-			list(APPEND NUMEN_HARDENING_OPTIONS -mbranch-protection=standard)
-		endif()
 		if (NOT APPLE)
+			list(APPEND NUMEN_HARDENING_OPTIONS -fstack-clash-protection)
+			if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i.86")
+				list(APPEND NUMEN_HARDENING_OPTIONS -fcf-protection=full)
+			elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+				list(APPEND NUMEN_HARDENING_OPTIONS -mbranch-protection=standard)
+			endif()
 			set(NUMEN_HARDENING_LINK_OPTIONS
 				LINKER:-z,relro LINKER:-z,now LINKER:-z,noexecstack)
 		endif()
@@ -134,7 +134,7 @@ numen_harden(${PROJECT_NAME})
 if (NUMEN_USE_DATE_TZ)
 	set(DATE_DIR ${VENDOR_DIR}/date)
 	target_sources(${PROJECT_NAME} PRIVATE ${DATE_DIR}/src/tz.cpp)
-	# vendored: not ours to keep warning-clean
+	# don't check vendored
 	set_source_files_properties(${DATE_DIR}/src/tz.cpp PROPERTIES COMPILE_OPTIONS "-w")
 	# public: <numen/tz.hpp> and date's class layouts depend on these
 	target_compile_definitions(${PROJECT_NAME} PUBLIC NUMEN_USE_DATE_TZ=1 USE_OS_TZDB=1 HAS_REMOTE_API=0)
@@ -143,14 +143,16 @@ if (NUMEN_USE_DATE_TZ)
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 	)
 	install(DIRECTORY ${DATE_DIR}/include/date DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
 	if (MSVC)
-		message(FATAL_ERROR "NUMEN_USE_DATE_TZ is not supported with MSVC: there is no OS tzdb to read. Use std::chrono instead.")
+		message(FATAL_ERROR "NUMEN_USE_DATE_TZ is not supported with MSVC. Use std::chrono instead.")
 	endif()
 endif()
 
+# no ABI stability for now: every release is its own soname
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	VERSION ${PROJECT_VERSION}
-	SOVERSION ${PROJECT_VERSION_MAJOR}
+	SOVERSION ${PROJECT_VERSION}
 )
 
 target_include_directories(${PROJECT_NAME} INTERFACE
@@ -169,7 +171,7 @@ configure_package_config_file(cmake/numenConfig.cmake.in
 	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
 	INSTALL_DESTINATION ${NUMEN_CMAKE_DIR}
 )
-write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake COMPATIBILITY SameMajorVersion)
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake COMPATIBILITY ExactVersion)
 install(FILES
 	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
 	${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
