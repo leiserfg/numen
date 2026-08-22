@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include "numen/abstract-currency-provider.hpp"
 
-class VicinaeCurrencyProvider : public AbstractCurrencyProvider {
+class VicinaeCurrencyProvider : public numen::AbstractCurrencyProvider {
 public:
-  std::optional<double> getRate(const std::string &code) const override;
+  std::optional<numen::ExchangeRate> getRate(std::string_view code) const override;
 
   // non-blocking: fetches on a worker thread and swaps rates in when done
   void updateRates() override { fetchRates(); }

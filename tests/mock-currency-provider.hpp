@@ -1,23 +1,21 @@
 #pragma once
-
 #include "numen/numen.hpp"
 #include "numen/abstract-currency-provider.hpp"
 #include <map>
 #include <memory>
 #include <optional>
-#include <string>
 
 namespace test {
 
-class MockCurrencyProvider : public AbstractCurrencyProvider {
+class MockCurrencyProvider : public numen::AbstractCurrencyProvider {
 public:
   MockCurrencyProvider() = default;
-  explicit MockCurrencyProvider(std::map<std::string, double> rates) : m_rates(std::move(rates)) {}
+  explicit MockCurrencyProvider(std::map<std::string_view, double> rates) : m_rates(std::move(rates)) {}
 
-  std::optional<double> getRate(const std::string &code) const override {
+  std::optional<numen::ExchangeRate> getRate(const std::string_view code) const override {
     auto it = m_rates.find(code);
     if (it == m_rates.end()) return std::nullopt;
-    return it->second;
+    return numen::ExchangeRate{.rate = it->second};
   }
 
   void updateRates() override { ++m_updates; }
@@ -25,7 +23,7 @@ public:
   int updateCount() const { return m_updates; }
 
 private:
-  std::map<std::string, double> m_rates{
+  std::map<std::string_view, double> m_rates{
       {"usd", 1.0},
       {"eur", 0.9234567},
       {"gbp", 0.7891234},

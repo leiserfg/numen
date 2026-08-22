@@ -355,11 +355,11 @@ std::expected<double, std::string> UnitDatabase::factorOf(const UnitDef &unit) c
 
   // a rate is how many of this unit one base unit buys: the reciprocal of a factor
   auto rate = m_currencyProvider->getRate(unit.id);
-  if (!rate || *rate == 0) {
+  if (!rate || rate->rate == 0) {
     return std::unexpected(std::format("No conversion rate available for {}.", unit.id));
   }
 
-  return 1 / *rate;
+  return 1 / rate->rate;
 }
 
 std::expected<double, std::string> UnitDatabase::conversionRatio(const CompoundUnit &from,

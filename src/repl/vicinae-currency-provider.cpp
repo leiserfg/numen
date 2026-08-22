@@ -9,6 +9,7 @@
 #include <thread>
 #include "nlohmann/json.hpp"
 #include "httplib/httplib.h"
+#include "numen/abstract-currency-provider.hpp"
 #include "vicinae-currency-provider.hpp"
 
 using json = nlohmann::json;
@@ -42,10 +43,13 @@ std::string normalizeCurrencyId(std::string_view id) {
 
 } // namespace
 
-std::optional<double> VicinaeCurrencyProvider::getRate(const std::string &code) const {
+std::optional<numen::ExchangeRate> VicinaeCurrencyProvider::getRate(std::string_view code) const {
   {
     const std::scoped_lock lock{m_mut};
-    if (auto it = m_rates.find(code); it != m_rates.end()) { return it->second; }
+    if (auto it = m_rates.find(std::string{code}); it != m_rates.end()) {
+      return numen::ExchangeRate{.rate = it->second};
+    }
+    if (code.starts_with("$")) return getRate(code.substr(1));
   }
   return std::nullopt;
 }

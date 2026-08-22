@@ -4,7 +4,6 @@
 #include "dummy-currency-provider.hpp"
 #include "interpreter.hpp"
 #include "parser.hpp"
-#include "region-currency.hpp"
 #include <exception>
 #include <expected>
 #include <iostream>

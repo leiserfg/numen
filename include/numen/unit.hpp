@@ -141,7 +141,9 @@ public:
 
   std::expected<double, std::string> conversionRatio(const CompoundUnit &from, const CompoundUnit &to) const;
 
-  void setCurrencyProvider(const AbstractCurrencyProvider &provider) { m_currencyProvider = &provider; }
+  void setCurrencyProvider(const numen::AbstractCurrencyProvider &provider) {
+    m_currencyProvider = &provider;
+  }
 
 private:
   std::optional<CompoundUnit> expandComposition(std::string_view spec) const;
@@ -150,5 +152,5 @@ private:
   std::optional<UnitDef> providerCurrency(std::string_view q) const;
 
   std::vector<UnitDef> m_units;
-  const AbstractCurrencyProvider *m_currencyProvider = nullptr;
+  const numen::AbstractCurrencyProvider *m_currencyProvider = nullptr;
 };
