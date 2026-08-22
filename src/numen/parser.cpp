@@ -6,7 +6,6 @@
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
 #include <format>
 #include <initializer_list>
@@ -16,6 +15,8 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <locale>
+#include <sstream>
 
 struct OperatorDefinition {
   std::string_view id;
@@ -69,6 +70,22 @@ constexpr auto CONSTANTS = std::to_array<ConstantDef>({
 // clang-format on
 
 namespace {
+
+struct ParsedDouble {
+  double value = 0;
+  bool whole = false;
+};
+
+// we avoid using from_chars because some of the overloads require very recent toolchains (most notably on
+// macOS)
+ParsedDouble parseDouble(std::string_view s) {
+  ParsedDouble out;
+  std::istringstream in{std::string{s}};
+  in.imbue(std::locale::classic());
+  in >> out.value;
+  out.whole = !in.fail() && in.peek() == std::char_traits<char>::eof();
+  return out;
+}
 
 bool isInIgnoreCase(std::string_view s, auto &&range) {
   return std::ranges::any_of(range, [&](auto &&v) { return equalsIgnoreCase(s, std::string_view{v}); });
@@ -641,16 +658,11 @@ std::optional<numen::Value> Parser::parseNumber() {
     auto n = m_lexer.peak();
     if (!n || n->type != Lexer::TokenType::Number) break;
     auto &nb = std::get<Lexer::Number>(n->data);
-    double nn;
 
     ns += n->raw;
     m_lexer.next();
 
-    if (std::from_chars(n->raw.data(), n->raw.data() + n->raw.size(), nn).ptr !=
-            n->raw.data() + n->raw.size() &&
-        count == 0) {
-      return nb.n;
-    }
+    if (!parseDouble(n->raw).whole && count == 0) { return nb.n; }
 
     if (auto tok = m_lexer.peak(); m_inFunction || !tok || tok->raw != CONTEXT_AWARE_THOUSAND_SEP) {
       if (count == 0) return nb.n; // do not bother stringifying, there is only one part so pass the number
@@ -663,9 +675,7 @@ std::optional<numen::Value> Parser::parseNumber() {
 
   if (ns.empty()) return std::nullopt;
 
-  double n;
-  std::from_chars(ns.data(), ns.data() + ns.size(), n);
-  return n;
+  return parseDouble(ns).value;
 }
 
 std::unique_ptr<Expression> Parser::parseTerm() {
