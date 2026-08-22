@@ -310,7 +310,7 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   for (const auto &[n, raw] : std::views::zip(ns, strs)) {
     if (n < 0) return std::nullopt;
-    if (n < 9 && !raw.starts_with('0'))
+    if (n <= 9 && !raw.starts_with('0'))
       return std::nullopt; // avoid conflict with regular arithemetic, e.g '2024-1-18'
   }
 
