@@ -11,7 +11,7 @@
 
 - Dependency-free. You only need a C++23 compiler. Compiles with GCC/clang/MSVC. On Apple platforms, whose libc++ [has no `std::chrono` timezone database](https://github.com/llvm/llvm-project/pull/122010), the vendored [date](https://github.com/HowardHinnant/date) library is used instead (`-DNUMEN_USE_DATE_TZ=ON`, the default there).
 - Evaluate algebraic expressions as you would expect.
-- Built-in math functions (see below).
+- Built-in math functions
 - Support for computer science operators like bitwise operators and modulo.
 - Full support for units
 - Date-time arithmetic and timezone conversion based on timezone name, city/region/state name.
