@@ -9,6 +9,7 @@
 #include <chrono>
 #include <format>
 #include <initializer_list>
+#include <iostream>
 #include <memory>
 #include <numbers>
 #include <stdexcept>
@@ -152,7 +153,8 @@ std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   if (!head) return std::nullopt;
 
   // constants always have priority over currency symbol
-  const bool isNotUnitLike = isConstant(head->raw) || m_unitDb.findCompounds(head->raw).empty();
+  const bool isNotUnitLike = m_dateStringVocab.asMonth(head->raw) || m_dateStringVocab.asWeekday(head->raw) ||
+                             isConstant(head->raw) || m_unitDb.findCompounds(head->raw).empty();
 
   if ((validate || head->type != Lexer::TokenType::String) && isNotUnitLike) { return std::nullopt; }
 
@@ -411,34 +413,6 @@ std::optional<DateTimeValue> Parser::parseDate() {
     return d;
   }
 
-  // 12 Jan 2026 18:50
-  if (auto tok = m_lexer.peakIf(Lexer::TokenType::Number)) {
-    if (auto m = m_lexer.peak(1)) {
-
-      if (auto month = m_dateStringVocab.asMonth(m->raw)) {
-        auto dayOfMonth = clockComponent(tok->asNumber()->n.toDouble(), 31);
-        if (!dayOfMonth) return std::nullopt;
-
-        DateTimeLiteral d;
-        d.day = std::chrono::day{*dayOfMonth};
-        d.month = month;
-
-        m_lexer.next();
-        m_lexer.next();
-        if (auto year = m_lexer.peakIf(Lexer::TokenType::Number)) {
-          auto parsed = asYear(year->asNumber()->n.toDouble());
-          if (!parsed) return std::nullopt;
-
-          d.year = *parsed;
-          m_lexer.next();
-        }
-
-        d.time = parseTime(true);
-        return d;
-      }
-    }
-  }
-
   if (time) return DateTimeLiteral{.time = time};
 
   return std::nullopt;
@@ -615,7 +589,9 @@ std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
 
 std::optional<TimezoneOffset> Parser::parseTimezone() {
   if (auto str = m_lexer.peakIf(Lexer::TokenType::String)) {
-    if (std::ranges::contains(RESERVED_TIME_TOKENS, str->raw)) return std::nullopt;
+    const bool isCalendarWord = m_dateStringVocab.asMonth(str->raw) || m_dateStringVocab.asWeekday(str->raw);
+
+    if (isCalendarWord || std::ranges::contains(RESERVED_TIME_TOKENS, str->raw)) return std::nullopt;
 
     auto isOffsettableTz = std::ranges::any_of(std::initializer_list<std::string_view>({"gmt", "utc"}),
                                                [&](auto &&s) { return equalsIgnoreCase(s, str->raw); });

@@ -1,3 +1,4 @@
+#pragma once
 #include "utils.hpp"
 #include <string>
 #include <chrono>
@@ -22,15 +23,15 @@ public:
     auto dflt = std::locale::classic();
 
     if (locale != dflt) {
-      m_months.resize(12 * 2);
-      m_weekdays.resize(12 * 2);
+      m_months.reserve(12 * 2);
+      m_weekdays.reserve(12 * 2);
       for (const auto &l : {locale, dflt}) {
         generateMonthNames(m_months, l);
         generateWeekdays(m_weekdays, l);
       }
     } else {
-      m_months.resize(12);
-      m_weekdays.resize(12);
+      m_months.reserve(12);
+      m_weekdays.reserve(12);
       generateMonthNames(m_months, dflt);
       generateWeekdays(m_weekdays, dflt);
     }
@@ -49,7 +50,7 @@ public:
   }
 
 private:
-  static MonthMap generateMonthNames(MonthMap &map, std::locale locale = {}) {
+  MonthMap generateMonthNames(MonthMap &map, std::locale locale = {}) {
     for (unsigned i = 0; i != 12; ++i) {
       std::chrono::month month{i + 1};
       auto add = [&](std::string str) { map.push_back({str, month}); };
@@ -60,7 +61,7 @@ private:
     return map;
   }
 
-  static WeekdayMap generateWeekdays(WeekdayMap &map, std::locale locale = {}) {
+  WeekdayMap generateWeekdays(WeekdayMap &map, std::locale locale = {}) {
     for (unsigned i = 0; i != 6; ++i) {
       std::chrono::weekday weekday{i};
       auto add = [&](std::string str) { map.push_back({str, weekday}); };
