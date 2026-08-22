@@ -7,6 +7,7 @@
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <format>
 #include <initializer_list>
 #include <memory>
 #include <numbers>
@@ -123,7 +124,8 @@ std::optional<std::chrono::year> asYear(double value) {
 }
 }; // namespace
 
-Parser::Parser(std::string_view data, const UnitDatabase &unitDb) : m_lexer(data), m_unitDb(unitDb) {}
+Parser::Parser(std::string_view data, const UnitDatabase &unitDb, const ParseOptions &opts)
+    : m_lexer(data), m_unitDb(unitDb), m_opts(opts) {}
 
 AST Parser::parse() {
   AST ast;
@@ -949,6 +951,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
       }
 
       if (tok->raw == "(" || tok->raw == ")" || tok->raw == "," || parseConstant(tok->raw)) break;
+      if (m_opts.strict) throw std::runtime_error(std::format("Unknown token: {}", tok->raw));
 
       m_lexer.next();
       continue;

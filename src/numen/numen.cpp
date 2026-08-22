@@ -78,7 +78,7 @@ static ComputedValue toPublic(const detail::Computed &c) {
 
 std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, const EvalOptions &opts) {
   try {
-    Parser parser{expr, m_unitDb};
+    Parser parser{expr, m_unitDb, opts.parseOptions};
     auto ast = parser.parse();
     return toPublic(interpret(*ast.root, m_unitDb, opts));
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
@@ -92,7 +92,7 @@ std::expected<std::string, std::string> Numen::evaluate(const std::string_view e
 }
 
 void Numen::printAST(const std::string &expr) const {
-  Parser parser{expr, m_unitDb};
+  Parser parser{expr, m_unitDb, {}};
   auto ast = parser.parse();
 
   detail::printAST(std::cout, *ast.root);

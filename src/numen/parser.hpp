@@ -171,7 +171,7 @@ struct AST {
 
 class Parser {
 public:
-  Parser(std::string_view data, const UnitDatabase &unitDb);
+  Parser(std::string_view data, const UnitDatabase &unitDb, const ParseOptions &options);
 
   std::optional<NamedUnit> parseUnit(bool validate = true);
   std::optional<NamedUnit> parseConversionTarget();
@@ -216,6 +216,7 @@ private:
   Lexer m_lexer;
   DateStringVocab m_dateStringVocab;
   const UnitDatabase &m_unitDb;
+  ParseOptions m_opts;
 
   // flags
   bool m_inFunction = false;

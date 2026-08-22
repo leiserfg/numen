@@ -186,7 +186,9 @@ if (BUILD_TESTS)
 		tests/corpus.cpp 
 		tests/currency.cpp 
 		tests/conversion.cpp
-		tests/value.cpp)
+		tests/value.cpp
+		tests/strict.cpp
+	)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 
 	target_link_libraries(${TEST_TARGET} PRIVATE Catch2::Catch2WithMain ${PROJECT_NAME})
