@@ -12,10 +12,15 @@
 stdenv.mkDerivation {
   pname = "numen";
   # single source of truth: project(... VERSION x.y.z) in CMakeLists.txt
-  version = builtins.head (builtins.match ".*project\\([^)]*VERSION ([0-9.]+).*" (builtins.readFile ../CMakeLists.txt));
+  version = builtins.head (
+    builtins.match ".*project\\([^)]*VERSION ([0-9.]+).*" (builtins.readFile ../CMakeLists.txt)
+  );
   inherit src;
 
-  nativeBuildInputs = [ cmake ninja ];
+  nativeBuildInputs = [
+    cmake
+    ninja
+  ];
   buildInputs = lib.optionals withRepl [ openssl ];
   nativeCheckInputs = [ catch2_3 ];
 
@@ -32,5 +37,6 @@ stdenv.mkDerivation {
     description = "Natural language calculator library";
     homepage = "https://github.com/vicinaehq/numen";
     platforms = lib.platforms.unix;
-  } // lib.optionalAttrs withRepl { mainProgram = "numen"; };
+  }
+  // lib.optionalAttrs withRepl { mainProgram = "numen"; };
 }
