@@ -125,11 +125,15 @@ std::optional<unsigned> clockComponent(double value, unsigned limit) {
 
 std::optional<std::chrono::year> asYear(double value) {
   // FIXME: maybe do not make this super arbitrary
-  constexpr int lowest = 100;
+  constexpr int minAllowed = 1000;
+  constexpr int lowest = static_cast<int>(std::chrono::year::min());
+  constexpr int highest = static_cast<int>(std::chrono::year::max());
 
-  if (value < lowest) return std::nullopt;
+  if (value >= minAllowed && value >= lowest && value <= highest) {
+    return std::chrono::year{static_cast<int>(value)};
+  }
 
-  return std::chrono::year{static_cast<int>(value)};
+  return std::nullopt;
 }
 }; // namespace
 
