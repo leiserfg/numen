@@ -1,5 +1,5 @@
 {
-  description = "numen: natural language calculator library";
+  description = "numen: a zero dependency calculator library with first class support for units and timezone conversions";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -7,7 +7,6 @@
     let
       lib = nixpkgs.lib;
       forAllSystems = f: lib.genAttrs lib.systems.flakeExposed (system: f nixpkgs.legacyPackages.${system});
-      # single source of truth: project(... VERSION x.y.z) in CMakeLists.txt
       version = builtins.head (builtins.match ".*project\\([^)]*VERSION ([0-9.]+).*" (builtins.readFile ./CMakeLists.txt));
     in
     {
@@ -31,8 +30,8 @@
           doCheck = true;
 
           meta = {
-            description = "Natural language calculator library";
-            homepage = "https://github.com/vicinaehq/libnumen";
+            description = "Zero dependency calculator library with first class support for units and timezone conversions";
+            homepage = "https://github.com/vicinaehq/numen";
             mainProgram = "numen";
             platforms = lib.platforms.unix;
           };
