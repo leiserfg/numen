@@ -2,6 +2,7 @@
 #include "numen/abstract-currency-provider.hpp"
 
 class DummyCurrencyProvider : public AbstractCurrencyProvider {
+public:
   std::optional<double> getRate(const std::string &) const override { return std::nullopt; }
   void updateRates() override {}
 };

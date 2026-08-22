@@ -64,7 +64,7 @@ std::optional<Lexer::Token> Lexer::next() {
     case State::NumberExponent:
     case State::Number:
     case State::NumberBase: {
-      int scale = expSign * static_cast<int>(expValue) - (nfrac ? static_cast<int>(nfrac) - 1 : 0);
+      const int scale = expSign * static_cast<int>(expValue) - (nfrac ? static_cast<int>(nfrac) - 1 : 0);
 
       return makeToken(TokenType::Number, Number{.n = numen::Value::scaled(n, scale), .fromBase = base});
     }
@@ -78,7 +78,7 @@ std::optional<Lexer::Token> Lexer::next() {
   };
 
   while (m_cursor < m_data.size()) {
-    char c = m_data[m_cursor];
+    const char c = m_data[m_cursor];
 
     switch (state) {
     case State::Reset: {

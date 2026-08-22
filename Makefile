@@ -32,6 +32,10 @@ gen:
 	$(PY) ./scripts/gen-timezone-tables.py
 .PHONY: gen
 
+tidy: static
+	run-clang-tidy -quiet -p build 'src/.*'
+.PHONY: tidy
+
 format:
 	find ./src -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i
 	find ./tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.mm' \) -print0 | xargs -0 -n 10 clang-format -i

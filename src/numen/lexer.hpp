@@ -44,13 +44,13 @@ public:
   template <typename... Ts> std::optional<std::tuple<Ts...>> peakForward(std::size_t i = 0) {
     return [&]<std::size_t... I>(std::index_sequence<I...>) -> std::optional<std::tuple<Ts...>> {
       std::array<std::optional<Lexer::Token>, sizeof...(Ts)> p{peak(static_cast<int>(i + I))...};
-      bool ok = std::apply([](auto... q) { return (... && (q && std::holds_alternative<Ts>(q->data))); }, p);
+      const bool ok = std::apply([](auto... q) { return (... && (q && std::holds_alternative<Ts>(q->data))); }, p);
       if (!ok) return std::nullopt;
       return std::tuple<Ts...>{std::get<Ts>(p[I]->data)...};
     }(std::index_sequence_for<Ts...>{});
   }
 
-  Lexer(std::string_view data) : m_data(data), m_cursor(0) {}
+  Lexer(std::string_view data) : m_data(data) {}
 
   std::optional<Token> peakIf(TokenType type);
   std::optional<Token> peak(int n = 0);
@@ -88,5 +88,5 @@ public:
 
 private:
   std::string_view m_data;
-  std::string_view::size_type m_cursor;
+  std::string_view::size_type m_cursor{0};
 };

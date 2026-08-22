@@ -20,12 +20,13 @@ constexpr double SCIENTIFIC_THRESHOLD = 1e40;
 // this is because the parser only handles `,` and `_` as thousand separators
 // so we don't want to render something that can't be evaluated back.
 struct GroupedNumpunct : std::numpunct<char> {
+protected:
   char do_thousands_sep() const override { return ','; }
   std::string do_grouping() const override { return "\3"; }
 };
 
 const std::locale &groupedLocale() {
-  static const std::locale loc(std::locale::classic(), new GroupedNumpunct);
+  const static std::locale loc(std::locale::classic(), new GroupedNumpunct);
   return loc;
 }
 
@@ -86,7 +87,7 @@ Value Value::operator>>(const Value &rhs) const {
 
 std::string Value::renderBase(NumberOutputFormat format) const {
   auto i = toInt();
-  bool negative = i < 0;
+  const bool negative = i < 0;
   // the sign comes off in unsigned, where the most negative value cannot overflow
   auto magnitude = static_cast<unsigned long long>(i);
   if (negative) magnitude = 0ULL - magnitude;

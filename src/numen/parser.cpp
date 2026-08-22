@@ -28,7 +28,7 @@ constexpr int EXPONENT_PRECEDENCE = 5;
 
 const auto &operators() {
   // clang-format off
-  static const auto OPERATORS = std::to_array<OperatorDefinition>({
+  const static auto OPERATORS = std::to_array<OperatorDefinition>({
      OperatorDefinition{.id = "==", .aliases = {"=="}, .precedence = 1},
      OperatorDefinition{.id = "!=", .aliases = {"!="}, .precedence = 1},
      OperatorDefinition{.id = ">", .aliases = {">"}, .precedence = 1},
@@ -357,7 +357,8 @@ constexpr auto RESERVED_TIME_TOKENS =
 
 std::optional<RelativeDateTimeLiteral> Parser::parseRelativeDateTimeLiteral() {
   if (auto duration = scanDuration()) {
-    if (auto s = m_lexer.peak(static_cast<int>(duration->tokenCount)); s && s->type == Lexer::TokenType::String) {
+    if (auto s = m_lexer.peak(static_cast<int>(duration->tokenCount));
+        s && s->type == Lexer::TokenType::String) {
       auto word = s->raw;
       if (equalsIgnoreCase(word, std::string_view{"ago"})) {
         m_lexer.advance(static_cast<int>(duration->tokenCount) + 1);
@@ -551,7 +552,7 @@ std::optional<DateString> Parser::parseRFC3339() {
 
   ds.value = DateTimeLiteral{.day = std::chrono::day{*dayOfMonth},
                              .month = std::chrono::month{*mon},
-                             .year = *yr,
+                             .year = yr,
                              .time = ParsedTime{
                                  .hours = std::chrono::hours{*hours},
                                  .minutes = std::chrono::minutes{*minutes},
@@ -578,7 +579,7 @@ std::optional<std::chrono::seconds> Parser::parseTimezoneOffset() {
 
   if (auto str = m_lexer.peakIf(Lexer::TokenType::Operator)) {
     if (str->raw == "+" || str->raw == "-") {
-      int sign = str->raw == "+" ? 1 : -1;
+      const int sign = str->raw == "+" ? 1 : -1;
       m_lexer.next();
 
       if (auto n = m_lexer.peakAs<Lexer::Number>(); n && n->n.isInteger() && isValidOffset(n->n)) {
@@ -704,7 +705,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
 
     if (auto tz = parseTimezone()) {
       if (auto date = parseDate()) {
-        DateString ds{.value = *date, .timezone = *tz};
+        const DateString ds{.value = *date, .timezone = tz};
         return commitDate(ds);
       }
     }
@@ -918,7 +919,7 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
 
     if (tok->raw == "%" && isPostfixPercent(*tok)) {
       auto next = m_lexer.peak(1);
-      bool ofFollows = next && next->raw == "of";
+      const bool ofFollows = next && next->raw == "of";
 
       if (ofFollows && 3 < minPrec) { break; }
 

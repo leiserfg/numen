@@ -5,7 +5,6 @@
 #include <locale>
 #include <optional>
 #include <stdexcept>
-#include <optional>
 #include <string>
 #include <type_traits>
 #include <variant>
@@ -41,7 +40,7 @@ Duration subtractDates(const DateTime &lhs, const DateTime &rhs) {
   auto y = m / 12;
   auto mo = m % 12;
 
-  seconds secs =
+  const seconds secs =
       duration_cast<seconds>(days{d}) - seconds{std::abs(duration_cast<seconds>(atod - btod).count())};
 
   return Duration{.years = std::chrono::years{std::abs(y.count())},
@@ -81,11 +80,11 @@ static TimePoint parseDateTimeLiteral(const DateTimeLiteral &d, const tz::time_z
       [&](const auto &v) {
         using T = std::remove_cvref_t<decltype(v)>;
         if constexpr (std::is_same_v<T, std::chrono::weekday>) {
-          std::chrono::year_month_weekday date{d.year.value_or(today.year()), d.month.value_or(today.month()),
+          const std::chrono::year_month_weekday date{d.year.value_or(today.year()), d.month.value_or(today.month()),
                                                v[0]};
           return process(date);
         } else if constexpr (std::is_same_v<T, std::chrono::day>) {
-          std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()), v};
+          const std::chrono::year_month_day date{d.year.value_or(today.year()), d.month.value_or(today.month()), v};
           return process(date);
         }
       },
@@ -107,14 +106,14 @@ DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoi
       return std::visit(
           [&](auto &&anchor) {
             using A = std::remove_cvref_t<decltype(anchor)>;
-            int sign = value.direction == RelativeDateTimeLiteral::Direction::Past ? -1 : 1;
+            const int sign = value.direction == RelativeDateTimeLiteral::Direction::Past ? -1 : 1;
             if constexpr (std::is_same_v<A, std::chrono::weekday>) {
               // TODO: implement weekday delta
               return now;
             } else {
               static_assert(std::is_same_v<A, Duration>);
               if (value.precision == DateTimePrecision::Date) {
-                std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
+                const std::chrono::year_month_day date{std::chrono::floor<std::chrono::days>(now)};
                 now = tz->to_sys(tz::local_seconds{std::chrono::local_days{date}.time_since_epoch()});
               }
 
@@ -183,7 +182,7 @@ static std::locale resolveLocale(const std::optional<std::string> &name) {
     for (const auto &candidate : {*name, *name + ".UTF-8"}) {
       try {
         return std::locale{candidate};
-      } catch (const std::runtime_error &) {}
+      } catch (const std::runtime_error &) {} // NOLINT(bugprone-empty-catch)
     }
   }
   try {

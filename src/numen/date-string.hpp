@@ -23,8 +23,8 @@ public:
     auto dflt = std::locale::classic();
 
     if (locale != dflt) {
-      m_months.reserve(12 * 2);
-      m_weekdays.reserve(12 * 2);
+      m_months.reserve(12uz * 2);
+      m_weekdays.reserve(12uz * 2);
       for (const auto &l : {locale, dflt}) {
         generateMonthNames(m_months, l);
         generateWeekdays(m_weekdays, l);
@@ -50,10 +50,10 @@ public:
   }
 
 private:
-  MonthMap generateMonthNames(MonthMap &map, std::locale locale = {}) {
+  MonthMap generateMonthNames(MonthMap &map, const std::locale &locale = {}) {
     for (unsigned i = 0; i != 12; ++i) {
       std::chrono::month month{i + 1};
-      auto add = [&](std::string str) { map.push_back({str, month}); };
+      auto add = [&](std::string str) { map.push_back({std::move(str), month}); };
       add(std::format(locale, "{:L%B}", month));
       add(std::format(locale, "{:L%b}", month));
     }
@@ -61,10 +61,10 @@ private:
     return map;
   }
 
-  WeekdayMap generateWeekdays(WeekdayMap &map, std::locale locale = {}) {
+  WeekdayMap generateWeekdays(WeekdayMap &map, const std::locale &locale = {}) {
     for (unsigned i = 0; i != 6; ++i) {
       std::chrono::weekday weekday{i};
-      auto add = [&](std::string str) { map.push_back({str, weekday}); };
+      auto add = [&](std::string str) { map.push_back({std::move(str), weekday}); };
       add(std::format(locale, "{:L%A}", weekday));
       add(std::format(locale, "{:L%a}", weekday));
     }

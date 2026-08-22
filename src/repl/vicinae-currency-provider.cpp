@@ -30,7 +30,7 @@ std::optional<std::string_view> genv(const char *id) {
 fs::path persistPath() {
   auto cacheHome = genv("XDG_CACHE_HOME")
                        .transform([](auto &&s) { return fs::path{s}; })
-                       .value_or(fs::path{*genv("HOME")} / ".cache");
+                       .value_or(fs::path{genv("HOME").value_or(".")} / ".cache");
   return cacheHome / "libnumen" / "vicinae-rates.json";
 }
 
@@ -44,7 +44,7 @@ std::string normalizeCurrencyId(std::string_view id) {
 
 std::optional<double> VicinaeCurrencyProvider::getRate(const std::string &code) const {
   {
-    std::lock_guard lock{m_mut};
+    const std::scoped_lock lock{m_mut};
     if (auto it = m_rates.find(code); it != m_rates.end()) { return it->second; }
   }
   return std::nullopt;
@@ -55,7 +55,7 @@ bool VicinaeCurrencyProvider::loadRates(std::string_view payload) {
     auto obj = json::parse(payload);
 
     {
-      std::lock_guard lock{m_mut};
+      const std::scoped_lock lock{m_mut};
       for (const auto &[k, v] : obj["crypto"]["prices"].get<json::object_t>()) {
         m_rates[normalizeCurrencyId(k)] = 1 / v.get<double>();
       }
@@ -78,7 +78,7 @@ void VicinaeCurrencyProvider::fetchRates() {
 
   if (!m_lastFetchedAt && fs::is_regular_file(path, ec)) {
     if (std::chrono::file_clock::now() - fs::last_write_time(path) < CACHE_TTL) {
-      std::ifstream ifs{path};
+      const std::ifstream ifs{path};
       std::stringstream buffer;
       buffer << ifs.rdbuf();
       loadRates(buffer.str());

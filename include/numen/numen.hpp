@@ -132,7 +132,7 @@ struct Duration {
   }
 
   auto operator<=>(const Duration &rhs) const {
-    if (auto order = total() <=> rhs.total(); order != 0) return order;
+    if (auto order = total() <=> rhs.total(); std::is_neq(order)) return order;
     return subsecond.value_or(std::chrono::nanoseconds{0}) <=>
            rhs.subsecond.value_or(std::chrono::nanoseconds{0});
   }
@@ -302,12 +302,12 @@ struct EvalOptions {
   }
 };
 
-template <typename T> struct is_duration : std::false_type {};
+template <typename T> struct IsDuration : std::false_type {};
 
 template <typename Rep, typename Period>
-struct is_duration<std::chrono::duration<Rep, Period>> : std::true_type {};
+struct IsDuration<std::chrono::duration<Rep, Period>> : std::true_type {};
 
-template <typename T> inline constexpr bool is_duration_v = is_duration<T>::value;
+template <typename T> inline constexpr bool is_duration_v = IsDuration<T>::value;
 
 class Numen {
 
@@ -375,6 +375,7 @@ template <typename T>
   requires std::is_same_v<T, numen::Number> || std::is_same_v<T, numen::DateTime> ||
            std::is_same_v<T, numen::Duration> || std::is_same_v<T, numen::Boolean> ||
            std::is_same_v<T, numen::ComputedValue>
+// NOLINTNEXTLINE(bugprone-std-namespace-modification)
 struct std::formatter<T> : std::formatter<std::string> {
   auto format(const T &value, std::format_context &ctx) const {
     return std::formatter<std::string>::format(value.toString(), ctx);

@@ -13,7 +13,7 @@
 #include <type_traits>
 #include <variant>
 
-using namespace numen;
+using namespace numen; // NOLINT(google-global-names-in-headers)
 
 struct Expression;
 
@@ -193,7 +193,7 @@ public:
     for (int i = 0; i != n; ++i) {
       auto str = m_lexer.peakString(n - i);
       if (str && fn(*str)) {
-        int consumable = n - i;
+        const int consumable = n - i;
         for (int j = 0; j != consumable; ++j)
           m_lexer.next();
         return str;

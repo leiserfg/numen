@@ -22,9 +22,8 @@ std::optional<std::string_view> currencyForRegion(std::string_view region) {
   if (region.size() != 2) return std::nullopt;
 
   const char key[2] = {toUpper(region[0]), toUpper(region[1])};
-  auto it = std::lower_bound(std::begin(kRegionCurrencyTable), std::end(kRegionCurrencyTable),
-                             std::string_view(key, 2),
-                             [](const RegionCurrency &e, std::string_view k) { return e.region < k; });
+  auto it =
+      std::ranges::lower_bound(kRegionCurrencyTable, std::string_view(key, 2), {}, &RegionCurrency::region);
 
   if (it != std::end(kRegionCurrencyTable) && it->region == std::string_view(key, 2)) return it->currency;
 

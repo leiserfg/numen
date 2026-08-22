@@ -52,7 +52,7 @@ std::string normalizeName(std::string_view query) {
       continue;
     }
 
-    int extra = (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : -1;
+    const int extra = (c & 0xE0) == 0xC0 ? 1 : (c & 0xF0) == 0xE0 ? 2 : (c & 0xF8) == 0xF0 ? 3 : -1;
     if (extra < 0 || i + static_cast<size_t>(extra) >= query.size()) continue;
 
     uint32_t cp = c & (0x3F >> extra);
@@ -63,7 +63,7 @@ std::string normalizeName(std::string_view query) {
     if (it == std::end(kCharMap) || it->codepoint != cp) {
       appendUtf8(out, cp);
     } else {
-      for (char r : it->replacement) {
+      for (const char r : it->replacement) {
         r == ' ' ? separate() : out.push_back(r);
       }
     }

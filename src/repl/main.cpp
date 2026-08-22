@@ -28,7 +28,7 @@ void process(numen::Numen &calc, const std::string &s) {
   }
 }
 
-int main(int ac, char **av) {
+int main(int ac, char **av) try {
   numen::Numen calc{};
 
 #ifdef BUILD_CURRENCY_PROVIDER
@@ -50,4 +50,7 @@ int main(int ac, char **av) {
     process(calc, line);
     std::cout << "$> ";
   }
+} catch (const std::exception &e) {
+  std::cerr << "fatal: " << e.what() << "\n";
+  return 1;
 }

@@ -122,6 +122,7 @@ double factorial(double x) {
   if (x != std::trunc(x)) return std::tgamma(x + 1);
   // 171! overflows a double, so the loop stays short
   double out = 1;
+  // NOLINTNEXTLINE(bugprone-float-loop-counter,clang-analyzer-security.FloatLoopCounter)
   for (double i = 2; i <= x; ++i)
     out *= i;
   return out;
@@ -217,7 +218,7 @@ FunctionDatabase makeBuiltin() {
   db.add("round", [](const FunctionCtx &ctx) {
     ctx.expectArgs(1, 2);
     const auto &n = ctx.number(0);
-    double digits = ctx.args.size() == 2 ? integer(ctx, 1).n.toDouble() : 0;
+    const double digits = ctx.args.size() == 2 ? integer(ctx, 1).n.toDouble() : 0;
     return output(ctx, fromVisible(n, roundTo(visible(n), digits)), n, UnitPolicy::Keep);
   });
 
@@ -318,7 +319,7 @@ FunctionDatabase makeBuiltin() {
 } // namespace
 
 const FunctionDatabase &FunctionDatabase::builtin() {
-  static const FunctionDatabase db = makeBuiltin();
+  const static FunctionDatabase db = makeBuiltin();
   return db;
 }
 

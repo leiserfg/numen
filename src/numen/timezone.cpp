@@ -64,7 +64,7 @@ const GeoEntry *findGeoEntry(std::string_view name, std::string_view qualifier) 
 
 std::optional<std::string_view> queryGeoDb(std::string_view query) {
   auto normalized = normalizeName(query);
-  std::string_view q{normalized};
+  const std::string_view q{normalized};
 
   for (auto split = q.size(); split != std::string_view::npos; split = q.rfind(' ', split - 1)) {
     if (auto entry = findGeoEntry(q.substr(0, split), split < q.size() ? q.substr(split + 1) : ""sv)) {
@@ -165,7 +165,7 @@ std::span<const CustomTzLink> TimezoneDB::customLinks() { return CUSTOM_LINKS; }
 
 // a tzdb may call a zone by a legacy link name (MSVC's ICU: Asia/Calcutta)
 std::string_view TimezoneDB::canonicalName(const numen::tz::time_zone &tz) {
-  std::string_view name = tz.name();
+  const std::string_view name = tz.name();
   if (auto it = std::ranges::find(kTzLinks, name, &TzLink::name); it != std::end(kTzLinks)) return it->target;
   return name;
 }

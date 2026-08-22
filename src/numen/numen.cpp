@@ -30,7 +30,7 @@ std::string Number::toString() const {
     std::erase_if(rate.terms, [](const UnitTerm &term) { return term.exponent > 0; });
 
     std::string_view amount{text};
-    bool negative = amount.starts_with('-');
+    const bool negative = amount.starts_with('-');
     if (negative) amount.remove_prefix(1);
 
     return std::format("{}{}{}{}", negative ? "-" : "", currency->symbol, amount,

@@ -57,7 +57,7 @@ private:
     if (lhs.asNumber() && rhs.asNumber()) {
       // converting years into months would floor the fraction, and adding
       // durations does not need a common unit to begin with
-      bool durationSum = (op == "+" || op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
+      const bool durationSum = (op == "+" || op == "-") && promoteDuration(lhs) && promoteDuration(rhs);
 
       if (!durationSum) { reconcileUnits(lhs, rhs, op); }
     }
@@ -181,8 +181,8 @@ public:
 
             // a single token can still name a composition, so ask what it
             // resolved to rather than how it was spelled
-            bool plainTarget = unit->isSimple() && target.sole();
-            bool plainSource = !n->unit->resolved || n->unit->resolved->sole();
+            const bool plainTarget = unit->isSimple() && target.sole();
+            const bool plainSource = !n->unit->resolved || n->unit->resolved->sole();
 
             // the plain path is the only one that knows about offsets, and the
             // only one that can settle an ambiguous token against its target
@@ -335,7 +335,8 @@ private:
     if (!res) throw std::runtime_error(res.error());
 
     return {
-        .value = Num{.n = Value{res.value()}, .unit = Number::Unit{.raw = display, .resolved = soleUnit(to)}},
+        .value = Num{.n = Value{res.value()},
+                     .unit = Number::Unit{.raw = std::move(display), .resolved = soleUnit(to)}},
         .explicitlyConverted = true,
     };
   }
@@ -434,7 +435,7 @@ private:
     const auto &ca = *n1->unit->resolved;
     const auto &cb = *n2->unit->resolved;
 
-    bool keepLhs = ca.hasStableFactor() && cb.hasStableFactor() && ca.factor() > cb.factor();
+    const bool keepLhs = ca.hasStableFactor() && cb.hasStableFactor() && ca.factor() > cb.factor();
 
     if (keepLhs) {
       rhs = convertCompound(*n2, ca);
@@ -480,7 +481,7 @@ private:
 
     // larger wins, so "1 km + 100 m" reads as 1.1km. a factor that moves has no
     // size to rank by, so there the right-hand side decides
-    bool keepLhs = !traitsOf(a.dimension).dynamicFactor && a.factor > b.factor;
+    const bool keepLhs = !traitsOf(a.dimension).dynamicFactor && a.factor > b.factor;
 
     // the kept side holds the settled reading, so "1m + 30s" still knows its
     // "m" is a minute once the other side is gone
@@ -503,7 +504,7 @@ private:
       if (compositionOf(term.def.dimension) != Composition::RateOnly) continue;
 
       // "usd/kg" and "km/usd" mean something, "usd·kg" and "usd²" do not
-      bool alone = std::ranges::none_of(terms, [&](const UnitTerm &other) {
+      const bool alone = std::ranges::none_of(terms, [&](const UnitTerm &other) {
         return other.def.id != term.def.id && (other.exponent > 0) == (term.exponent > 0);
       });
 
@@ -546,7 +547,7 @@ private:
   }
 
   template <typename T, typename U = T> static void assertBinary(const Computed &lhs, const Computed &rhs) {
-    bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
+    const bool ok = std::holds_alternative<T>(lhs.value) && std::holds_alternative<U>(rhs.value);
 
     if (!ok) {
       throw std::runtime_error(
