@@ -25,10 +25,10 @@ namespace test {
 inline const numen::tz::time_zone *zone(std::string_view name) { return TimezoneDB{}.query(name); }
 
 // "now" is frozen so that tests depending on the current date stay valid
-inline const numen::EvalConfig &frozenConfig() {
-  static const numen::EvalConfig config = [] {
+inline const numen::EvalOptions &frozenConfig() {
+  static const numen::EvalOptions config = [] {
     std::chrono::year_month_day now{std::chrono::year{2026}, std::chrono::month{1}, std::chrono::day{18}};
-    return numen::EvalConfig{
+    return numen::EvalOptions{
         .now = std::chrono::sys_days(now),
         .timezone = test::zone("UTC"),
         // without this the ambient locale decides whether currencies auto-convert
@@ -41,7 +41,8 @@ inline const numen::EvalConfig &frozenConfig() {
   return config;
 }
 
-inline void assertExpr(std::string_view expr, std::string_view expected, const numen::EvalConfig &opts = {}) {
+inline void assertExpr(std::string_view expr, std::string_view expected,
+                       const numen::EvalOptions &opts = {}) {
   CAPTURE(expr);
   numen::Numen calc;
   auto res = calc.evaluate(expr, opts);
@@ -53,7 +54,7 @@ inline void assertExpr(std::string_view expr, std::string_view expected, const n
 }
 
 inline void assertNumber(std::string_view expr, double expected, double margin = 1e-9,
-                         const numen::EvalConfig &opts = {}) {
+                         const numen::EvalOptions &opts = {}) {
   CAPTURE(expr);
   numen::Numen calc;
   auto res = calc.compute(expr, opts);

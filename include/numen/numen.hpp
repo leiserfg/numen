@@ -254,7 +254,14 @@ struct ComputedValue {
   std::string toString(const DateTimeFormatOptions &dateTimeFormat = {}) const;
 };
 
-struct EvalConfig {
+struct ParseOptions {
+  // return an error if an unknown token is encountered, instead of skipping it.
+  bool strict = false;
+};
+
+struct EvalOptions {
+  ParseOptions parseOptions;
+
   /**
    * Timepoint that should be used as the current time.
    * You most likely don't want to change this, the main use case is testing.
@@ -307,11 +314,11 @@ class Numen {
 public:
   Numen();
 
-  std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalConfig &opts = {});
-  std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalConfig &opts = {});
+  std::expected<std::string, std::string> evaluate(std::string_view expr, const EvalOptions &opts = {});
+  std::expected<ComputedValue, std::string> compute(std::string_view expr, const EvalOptions &opts = {});
 
   template <typename T>
-  std::expected<T, std::string> parse(std::string_view expr, const EvalConfig &opts = {}) {
+  std::expected<T, std::string> parse(std::string_view expr, const EvalOptions &opts = {}) {
     if constexpr (is_duration_v<T>) {
       return parse<Duration>(expr, opts)
           .transform([](const Duration &value) {

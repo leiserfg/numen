@@ -66,7 +66,7 @@ TEST_CASE("a currency amount lands on its minor units even without a conversion"
   CHECK(calc.evaluate("1 usd / 3") == "$0.33");
 
   // jpy has no minor units at all
-  numen::EvalConfig jp{.locale = "ja_JP"};
+  numen::EvalOptions jp{.locale = "ja_JP"};
   CHECK(calc.evaluate("1 jpy / 3", jp) == "¥0");
   CHECK(calc.evaluate("1234.7 jpy", jp) == "¥1,235");
 

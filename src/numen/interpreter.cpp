@@ -94,7 +94,7 @@ private:
   }
 
 public:
-  Interpreter(const UnitDatabase &db, const EvalConfig &opts)
+  Interpreter(const UnitDatabase &db, const EvalOptions &opts)
       : m_db(db), m_opts(opts), m_now(opts.now.value_or(std::chrono::system_clock::now())) {}
 
   Computed computeExpr(const Expression &expr) const {
@@ -813,13 +813,13 @@ private:
   }
 
   const UnitDatabase &m_db;
-  const EvalConfig &m_opts;
+  const EvalOptions &m_opts;
   TimePoint m_now;
 };
 
 } // namespace
 
-Computed interpret(const Expression &expr, const UnitDatabase &db, const EvalConfig &opts) {
+Computed interpret(const Expression &expr, const UnitDatabase &db, const EvalOptions &opts) {
   return Interpreter{db, opts}.computeExprBase(expr);
 }
 

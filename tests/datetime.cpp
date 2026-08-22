@@ -9,8 +9,8 @@ using namespace std::chrono;
 
 namespace {
 
-numen::EvalConfig configAt(year_month_day now) {
-  return numen::EvalConfig{
+numen::EvalOptions configAt(year_month_day now) {
+  return numen::EvalOptions{
       .now = sys_days(now),
       .timezone = test::zone("UTC"),
       .dateTimeFormat = {.relative = false, .format = numen::DateTimeFormatOptions::TimeFormat::Neutral},

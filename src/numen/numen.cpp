@@ -76,7 +76,7 @@ static ComputedValue toPublic(const detail::Computed &c) {
   return out(std::get<Boolean>(c.value));
 }
 
-std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, const EvalConfig &opts) {
+std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, const EvalOptions &opts) {
   try {
     Parser parser{expr, m_unitDb};
     auto ast = parser.parse();
@@ -84,7 +84,8 @@ std::expected<ComputedValue, std::string> Numen::compute(std::string_view expr, 
   } catch (const std::exception &e) { return std::unexpected(e.what()); }
 }
 
-std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr, const EvalConfig &opts) {
+std::expected<std::string, std::string> Numen::evaluate(const std::string_view expr,
+                                                        const EvalOptions &opts) {
   return compute(expr, opts).transform([&](const ComputedValue &v) {
     return v.toString(opts.effectiveDateTimeFormat());
   });
