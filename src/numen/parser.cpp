@@ -123,11 +123,11 @@ std::optional<unsigned> clockComponent(double value, unsigned limit) {
 }
 
 std::optional<std::chrono::year> asYear(double value) {
-  // year's conversion to int is explicit, hence the casts
-  constexpr int lowest = static_cast<int>(std::chrono::year::min());
-  constexpr int highest = static_cast<int>(std::chrono::year::max());
+  // FIXME: maybe do not make this super arbitrary
+  constexpr int lowest = 100;
 
-  if (value < lowest || value > highest || value != std::trunc(value)) return std::nullopt;
+  if (value < lowest) return std::nullopt;
+
   return std::chrono::year{static_cast<int>(value)};
 }
 }; // namespace
@@ -227,7 +227,7 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
 
       if (auto next = m_lexer.peak(i + 1); next && isMeridiemMarker(next->raw)) break;
 
-      if (auto dayOfMonth = clockComponent(value, 31); dayOfMonth && value >= 1) {
+      if (auto dayOfMonth = clockComponent(value, 31); (!day && !weekday) && dayOfMonth && value >= 1) {
         if (auto next = m_lexer.peak(i + 1); next && isOrdinalSuffix(next->raw)) skipFiller();
 
         // 3 of January, 3rd of January...
@@ -265,7 +265,7 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
     if (weekday) lit.day = weekday;
     if (day) lit.day = day;
 
-    m_lexer.advance(i + extraAdvance);
+    m_lexer.advance(i);
 
     return lit;
   }
