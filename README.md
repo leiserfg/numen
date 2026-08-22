@@ -15,7 +15,7 @@
 - Support for computer science operators like bitwise operators and modulo.
 - Full support for units
 - Date-time arithmetic and timezone conversion based on timezone name, city/region/state name.
-- Currency conversion support (requires implementing a currency provider; this repo contains an example of one).
+- Currency conversion support (requires implementing a currency provider, this repo contains an example of one).
 - Natural language syntactic sugar: you can write expressions like `20% of 100` to calculate `0.20 * 100`.
 
 ## Goals

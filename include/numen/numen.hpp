@@ -362,6 +362,11 @@ public:
     m_unitDb.setCurrencyProvider(*m_currencyProvider);
   }
 
+  void updateRates() { m_currencyProvider->updateRates(); }
+
+  AbstractCurrencyProvider &currencyProvider() { return *m_currencyProvider; }
+  const AbstractCurrencyProvider &currencyProvider() const { return *m_currencyProvider; }
+
 private:
   std::unique_ptr<AbstractCurrencyProvider> m_currencyProvider;
   UnitDatabase m_unitDb;

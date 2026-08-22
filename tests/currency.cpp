@@ -121,18 +121,17 @@ TEST_CASE("a ticker the provider quotes a rate for is a currency", "[currency]")
 
 TEST_CASE("the provider supplies the rates a conversion uses", "[currency]") {
   numen::Numen calc;
-  auto provider = std::make_unique<test::MockCurrencyProvider>();
-  auto *handle = provider.get();
-
-  calc.setCurrencyProvider(std::move(provider));
-  provider = nullptr;
+  calc.setCurrencyProvider(std::make_unique<test::MockCurrencyProvider>());
+  auto &provider = dynamic_cast<test::MockCurrencyProvider &>(calc.currencyProvider());
 
   CHECK(calc.evaluate("100 usd to eur") == "€92.35");
   CHECK(calc.evaluate("100 usd to gbp") == "£78.91");
 
   // an unknown code has no rate, so the conversion cannot be done
   CHECK_FALSE(calc.evaluate("100 usd to zzz"));
-  CHECK(handle->updateCount() == 0);
+  CHECK(provider.updateCount() == 0);
+  calc.updateRates();
+  CHECK(provider.updateCount() == 1);
 }
 
 TEST_CASE("a rate applies inside a composed unit too", "[currency][compound]") {

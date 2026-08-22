@@ -32,9 +32,8 @@ int main(int ac, char **av) try {
   numen::Numen calc{};
 
 #ifdef BUILD_CURRENCY_PROVIDER
-  auto provider = std::make_unique<VicinaeCurrencyProvider>();
-  provider->updateRates();
-  calc.setCurrencyProvider(std::move(provider));
+  calc.setCurrencyProvider(std::make_unique<VicinaeCurrencyProvider>());
+  calc.updateRates();
 #endif
 
   if (ac == 2) {

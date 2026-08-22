@@ -86,9 +86,14 @@ void VicinaeCurrencyProvider::fetchRates() {
     }
   }
 
-  if (m_lastFetchedAt && std::chrono::system_clock::now() - *m_lastFetchedAt < CACHE_TTL) return;
+  {
+    const std::scoped_lock lock{m_mut};
+    if (m_lastFetchedAt && std::chrono::system_clock::now() - *m_lastFetchedAt < CACHE_TTL) return;
+  }
 
-  std::thread{[this]() {
+  if (m_worker.joinable()) m_worker.join(); // a previous fetch still in flight: let it land first
+
+  m_worker = std::jthread{[this]() {
     httplib::Client client{"https://api.vicinae.com"};
     auto res = client.Get("/v1/currencies");
 
@@ -98,8 +103,11 @@ void VicinaeCurrencyProvider::fetchRates() {
     }
 
     if (loadRates(res->body)) {
-      m_lastFetchedAt = std::chrono::system_clock::now();
+      {
+        const std::scoped_lock lock{m_mut};
+        m_lastFetchedAt = std::chrono::system_clock::now();
+      }
       persistOnDisk(persistPath(), res->body);
     }
-  }}.join();
+  }};
 }

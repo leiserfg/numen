@@ -16,5 +16,9 @@ public:
    */
   virtual std::optional<double> getRate(const std::string &code) const = 0;
 
+  /**
+   * Request a rates refresh. May block or may return before the new rates
+   * are in. `getRate` needs to remain callable when rates are refreshing.
+   */
   virtual void updateRates() = 0;
 };
