@@ -2,6 +2,7 @@
 #include "numen/numen.hpp"
 #include "numen/unit.hpp"
 #include "timezone.hpp"
+#include <ranges>
 #include "utils.hpp"
 #include <algorithm>
 #include <array>
@@ -300,6 +301,14 @@ std::optional<DateTimeLiteral> Parser::parseYYYYMMDD() {
 
   auto [n1, n2, n3] =
       std::tuple{ns1->asNumber()->n.toDouble(), ns2->asNumber()->n.toDouble(), ns3->asNumber()->n.toDouble()};
+  auto ns = std::initializer_list{n1, n2, n3};
+  auto strs = std::initializer_list{ns1->raw, ns2->raw, ns3->raw};
+
+  for (const auto &[n, raw] : std::views::zip(ns, strs)) {
+    if (n < 0) return std::nullopt;
+    if (n < 9 && !raw.starts_with('0'))
+      return std::nullopt; // avoid conflict with regular arithemetic, e.g '2024-1-18'
+  }
 
   const auto isMonth = [](auto n) { return n >= 1 && n <= 12; };
   const auto isDay = [](auto n) { return n >= 1 && n <= 31; };

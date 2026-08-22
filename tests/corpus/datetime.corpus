@@ -77,7 +77,9 @@ Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 01/18/1700                  => 1700-01-18 00:00:00 (Etc/UTC)
 01/18/1600                  => !error Date is out of the representable range
 01/18/20                    => !error Date is out of the representable range
-01-18-2                     => !error Date is out of the representable range
+
+# '2' is ambiguous, so we don't parse this as a date
+01-18-2                     => -19 
 
 # the same limit, reached by shifting
 100 years ago               => 1926-01-18 00:00:00 (Etc/UTC)
