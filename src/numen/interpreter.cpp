@@ -259,6 +259,11 @@ public:
       }
     }
 
+    if (auto n = result.asNumber(); m_opts.implicitUnitConversion && n && n->unit && n->unit->def() &&
+                                    !n->unit->def()->implicitTarget.empty() && !result.explicitlyConverted) {
+      result = stampUnit(result, convertToUnit(n->n.toDouble(), n->unit->def()->id, n->unit->def()->implicitTarget), true);
+    }
+
     if (auto n = result.asNumber(); n && !result.explicitlyConverted) {
       if (auto d = foldToDuration(*n)) return Computed{.value = *d};
     }
@@ -323,7 +328,8 @@ private:
 
   // callers holding both readings must come here: convertToUnit rediscovers them
   // from the tokens and cannot when both are ambiguous
-  Computed convertResolved(double v, const UnitDef &from, const UnitDef &to, std::string display) const {
+  Computed convertResolved(double v, const UnitDef &from, const UnitDef &to, std::string display,
+                           bool pinned = true) const {
     if (from.dimension != to.dimension) {
       throw std::runtime_error(std::format("Incompatible units: {} ({}) to {} ({})", from.id, from.dimension,
                                            to.id, to.dimension));
@@ -336,7 +342,7 @@ private:
     return {
         .value = Num{.n = Value{res.value()},
                      .unit = Number::Unit{.raw = std::move(display), .resolved = soleUnit(to)}},
-        .explicitlyConverted = true,
+        .explicitlyConverted = pinned,
     };
   }
 
@@ -484,12 +490,13 @@ private:
 
     // the kept side holds the settled reading, so "1m + 30s" still knows its
     // "m" is a minute once the other side is gone
+    // reconciling is not the user pinning a unit, so the operand's own flag stays
     if (keepLhs) {
       n1->unit->resolved = soleUnit(a);
-      rhs = convertResolved(n2->n.toDouble(), b, a, n1->unit->raw);
+      rhs = convertResolved(n2->n.toDouble(), b, a, n1->unit->raw, rhs.explicitlyConverted);
     } else {
       n2->unit->resolved = soleUnit(b);
-      lhs = convertResolved(n1->n.toDouble(), a, b, n2->unit->raw);
+      lhs = convertResolved(n1->n.toDouble(), a, b, n2->unit->raw, lhs.explicitlyConverted);
     }
   }
 

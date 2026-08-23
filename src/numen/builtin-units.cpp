@@ -38,8 +38,8 @@ std::span<const UnitDef> units::builtins() {
     {.id = "point", .aliases = {"pt"}, .symbol = "pt", .factor = 0.0254 / 72, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
     {.id = "pica",  .aliases = {"pc"}, .symbol = "pc", .factor = 0.0254 / 6,  .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
     {.id = "pixel", .aliases = {"px"}, .symbol = "px", .factor = 0.0254 / 96, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
-    {.id = "rem", .aliases = {},       .symbol = "rem", .factor = 0.0254 / 96 * 16, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
-    {.id = "em",  .aliases = {},       .symbol = "em",  .factor = 0.0254 / 96 * 16, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC},
+    {.id = "rem", .aliases = {},       .symbol = "rem", .factor = 0.0254 / 96 * 16, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC, .implicitTarget = "pixel"},
+    {.id = "em",  .aliases = {},       .symbol = "em",  .factor = 0.0254 / 96 * 16, .dimension = dimensions::LENGTH, .family = families::TYPOGRAPHIC, .implicitTarget = "pixel"},
 
     // mass
     {.id = "gram",     .aliases = {"g", "gm", "gramme"}, .symbol = "g",  .factor = 1,            .dimension = dimensions::MASS, .family = families::METRIC, .prefixable = true},

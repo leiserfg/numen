@@ -281,6 +281,11 @@ struct EvalOptions {
   bool implicitTimezoneConversion = true;
 
   /**
+   * Units that declare an implicit target convert to it when they are the
+   */
+  bool implicitUnitConversion = true;
+
+  /**
    * Locale to use for implicit conversions. If not specified, the default locale
    * is used.
    */

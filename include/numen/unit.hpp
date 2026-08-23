@@ -86,6 +86,9 @@ struct UnitDef {
   // fixes the fraction a rendered amount may show, as money does: two for
   // usd, none for jpy. unset means the generic number formatting applies
   std::optional<int> decimals;
+
+  // target to convert this unit to
+  std::string implicitTarget;
 };
 
 struct UnitTerm {

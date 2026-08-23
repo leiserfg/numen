@@ -328,3 +328,10 @@ usd150k                      => $150,000
 1 m/s^2 to ft/s^2           => 3.28084ft/s²
 9.8 m/s^2 to ft/s²          => 32.152231ft/s²
 1 m^3 to l                  => 1,000L
+
+# rem and em are only ever asked for in pixels
+1 rem                       => 16px
+1.5 em                      => 24px
+1 rem + 4 px                => 20px
+1 rem to em                 => 1em
+rem2k                       => 32,000px

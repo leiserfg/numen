@@ -185,8 +185,16 @@ std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   // shorthand squaring/cubing. We don't support other exponents are they are not typically
   // used as shorthand.
   if (auto num = m_lexer.peakAs<Lexer::Number>(); num && num->n >= 2 && num->n <= 3) {
-    target.terms.front().exponent = num->n.to<int>();
-    m_lexer.next();
+    bool qualifies = true;
+
+    // the thousand shorthand 'k' should not directly follow the '2' or '3' otherwise we can't interpret it as
+    // an exponent
+    if (auto next = m_lexer.peak(1); next && equalsIgnoreCase(next->raw, "k")) { qualifies = false; }
+
+    if (qualifies) {
+      target.terms.front().exponent = num->n.to<int>();
+      m_lexer.next();
+    }
   }
 
   if (auto tok = m_lexer.peak(); tok && tok->raw == "(") {
@@ -784,7 +792,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     m_lexer.next();
 
     // TODO: refactorize so that there is only one entrypoint for this
-    if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k")) {
+    if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k") && expr) {
       expr = std::make_unique<Expression>(PostfixExpression{.lhs = std::move(expr), .op = "k"});
       m_lexer.next();
     }
@@ -838,7 +846,7 @@ std::unique_ptr<Expression> Parser::parseTerm() {
     }
   }
 
-  if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k")) {
+  if (auto tok = m_lexer.peak(); tok && equalsIgnoreCase(tok->raw, "k") && expr) {
     expr = std::make_unique<Expression>(PostfixExpression{.lhs = std::move(expr), .op = "k"});
     m_lexer.next();
   }
