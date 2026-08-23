@@ -1,6 +1,7 @@
 #include "region-currency.hpp"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 
 namespace numen {
 
@@ -52,6 +53,13 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale) {
   }
 
   return std::nullopt;
+}
+
+std::string monetaryLocale() {
+  for (const auto *var : {"LC_ALL", "LC_MONETARY", "LANG"}) {
+    if (const auto *v = std::getenv(var); v && *v) return v;
+  }
+  return {};
 }
 
 } // namespace numen

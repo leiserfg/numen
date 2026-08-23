@@ -1,5 +1,6 @@
 #pragma once
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace numen {
@@ -12,5 +13,8 @@ std::optional<std::string_view> currencyForRegion(std::string_view region);
  * region subtag ("fr", "C", "POSIX") resolve to nothing.
  */
 std::optional<std::string_view> currencyForLocale(std::string_view locale);
+
+// LC_ALL, LC_MONETARY, LANG; empty when unset, as in gui processes on macOS
+std::string monetaryLocale();
 
 } // namespace numen
