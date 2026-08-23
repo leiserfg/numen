@@ -310,8 +310,8 @@ std::span<const UnitDef> units::builtins() {
   return BUILTIN_UNITS;
 }
 
-// spellings that stand for a composition. the composition doubles as the
-// rendered form, so it is written with short aliases
+// It is not needed to add compound aliases for e.g "km2" as this is automatically handled
+// as part of the unit parsing. <unit>(2|3) is tolerated.
 // clang-format off
 std::span<const CompoundAlias> units::compoundAliases() {
   static constexpr auto ALIASES = std::to_array<CompoundAlias>({
@@ -320,22 +320,12 @@ std::span<const CompoundAlias> units::compoundAliases() {
       {.name = "kph",  .composition = "km/h"},
       {.name = "mph",  .composition = "mi/h"},
       {.name = "sqm",  .composition = "m^2"},
-      {.name = "m2",   .composition = "m^2"},
       {.name = "sqkm", .composition = "km^2"},
-      {.name = "km2",  .composition = "km^2"},
       {.name = "sqft", .composition = "ft^2"},
-      {.name = "ft2",  .composition = "ft^2"},
       {.name = "sqmi", .composition = "mi^2"},
-      {.name = "mi2",  .composition = "mi^2"},
       {.name = "sqyd", .composition = "yd^2"},
-      {.name = "yd2",  .composition = "yd^2"},
       {.name = "sqin", .composition = "in^2"},
-      {.name = "in2",  .composition = "in^2"},
-      {.name = "m3",   .composition = "m^3"},
-      {.name = "cm3",  .composition = "cm^3"},
       {.name = "cc",   .composition = "cm^3"},
-      {.name = "ft3",  .composition = "ft^3"},
-      {.name = "in3",  .composition = "in^3"},
       {.name = "fps",  .composition = "ft/s"},
       {.name = "fpm",  .composition = "ft/min"},
       {.name = "kbps", .composition = "kbit/s"},

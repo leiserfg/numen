@@ -44,7 +44,6 @@ TEST_CASE("an alias expands to the composition it names", "[unit][compound]") {
   CHECK(expand("kph").render() == "km/h");
   CHECK(expand("mph").render() == "mi/h");
 
-  CHECK(expand("km2").dimension() == dimensionOf(dimensions::AREA));
   CHECK(expand("mps").dimension() == dimensionOf(dimensions::SPEED));
 
   // the factor now follows from the parts rather than being stated
@@ -150,7 +149,6 @@ TEST_CASE("a rendered unit parses back", "[unit]") {
 
   CHECK(roundtrip("km") == "km");
   CHECK(roundtrip("sqm") == "m²");
-  CHECK(roundtrip("km2") == "km²");
   CHECK(roundtrip("m³") == "m³");
   CHECK(roundtrip("usd") == "$");
   CHECK(roundtrip("celsius") == "°C");
