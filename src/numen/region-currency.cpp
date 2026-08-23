@@ -1,7 +1,11 @@
 #include "region-currency.hpp"
+#include "env.hpp"
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace numen {
 
@@ -56,10 +60,19 @@ std::optional<std::string_view> currencyForLocale(std::string_view locale) {
 }
 
 std::string monetaryLocale() {
+#ifdef _WIN32
+  // BCP 47 names ("en-US") are ASCII; len includes the null terminator, 0 on failure
+  wchar_t name[LOCALE_NAME_MAX_LENGTH];
+  const int len = GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH);
+  std::string locale;
+  for (int i = 0; i + 1 < len; ++i) locale += static_cast<char>(name[i]);
+  return locale;
+#else
   for (const auto *var : {"LC_ALL", "LC_MONETARY", "LANG"}) {
-    if (const auto *v = std::getenv(var); v && *v) return v;
+    if (auto v = getEnv(var); v && !v->empty()) return *std::move(v);
   }
   return {};
+#endif
 }
 
 } // namespace numen

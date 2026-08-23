@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -10,6 +9,7 @@
 #include "nlohmann/json.hpp"
 #include "httplib/httplib.h"
 #include "numen/abstract-currency-provider.hpp"
+#include "numen/env.hpp"
 #include "vicinae-currency-provider.hpp"
 
 using json = nlohmann::json;
@@ -23,15 +23,16 @@ void persistOnDisk(const std::filesystem::path &path, std::string_view body) {
   std::ofstream{path} << body;
 }
 
-std::optional<std::string_view> genv(const char *id) {
-  if (auto v = getenv(id)) { return v; }
-  return std::nullopt;
-}
-
 fs::path persistPath() {
-  auto cacheHome = genv("XDG_CACHE_HOME")
+#ifdef _WIN32
+  auto cacheHome = numen::getEnv("LOCALAPPDATA")
                        .transform([](auto &&s) { return fs::path{s}; })
-                       .value_or(fs::path{genv("HOME").value_or(".")} / ".cache");
+                       .value_or(fs::path{"."});
+#else
+  auto cacheHome = numen::getEnv("XDG_CACHE_HOME")
+                       .transform([](auto &&s) { return fs::path{s}; })
+                       .value_or(fs::path{numen::getEnv("HOME").value_or(".")} / ".cache");
+#endif
   return cacheHome / "libnumen" / "vicinae-rates.json";
 }
 

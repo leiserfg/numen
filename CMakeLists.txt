@@ -209,6 +209,7 @@ if (BUILD_REPL)
 	numen_harden(${REPL_TARGET})
 	target_include_directories(${REPL_TARGET} PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/include
+		${CMAKE_CURRENT_SOURCE_DIR}/src
 	)
 	target_include_directories(${REPL_TARGET} SYSTEM PRIVATE ${VENDOR_DIR})
 	target_link_libraries(${REPL_TARGET} PRIVATE ${PROJECT_NAME} ${LINK_LIBS})
