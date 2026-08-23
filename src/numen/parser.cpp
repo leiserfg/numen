@@ -498,13 +498,17 @@ std::optional<ParsedTime> Parser::parseTime(bool afterDate) {
     time.hours = std::chrono::hours{*value};
   }
 
-  const auto commitTime = [&]() {
+  const auto commitTime = [&]() -> std::optional<ParsedTime> {
     if (auto tok = m_lexer.peakAs<Lexer::String>()) {
       const bool am = equalsIgnoreCase(tok->data, "am");
       const bool pm = equalsIgnoreCase(tok->data, "pm");
-      // TODO: if using 12h we need to make sure the clock component actually make sense...
+      const bool is12Hour = am || pm;
 
-      if (am || pm) {
+      if (is12Hour) {
+        if (time.hours->count() > 12) {
+          reset();
+          return std::nullopt;
+        }
         m_lexer.next();
         if (pm) time.hours = time.hours.value_or(std::chrono::hours{0}) + std::chrono::hours{12};
       }

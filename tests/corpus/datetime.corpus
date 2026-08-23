@@ -56,6 +56,12 @@ Jan 2025 18 7 pm            => 2025-01-18 19:00:00 (Etc/UTC)
 9 pm                        => 2026-01-18 21:00:00 (Etc/UTC)
 9:30 pm                     => 2026-01-18 21:30:00 (Etc/UTC)
 
+13 am                       => 13
+# pm can be interpreted as a unit, am is not
+13 pm                       => 13pm
+12 am                       => 2026-01-18 12:00:00 (Etc/UTC)
+12 pm                       => 2026-01-19 00:00:00 (Etc/UTC)
+
 # optional "at" token between date and time 
 Jan 2025 18 at 7 pm         => 2025-01-18 19:00:00 (Etc/UTC)
 
