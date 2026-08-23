@@ -273,7 +273,10 @@ std::optional<DateTimeLiteral> Parser::parseNaturalDateLiteral() {
     auto tok = m_lexer.peak(i);
     if (!tok) break;
 
-    if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
+    if (tok->raw == "," || equalsIgnoreCase(tok->raw, "the")) {
+      skipFiller();
+      continue;
+    } else if (auto it = std::get_if<Lexer::Number>(&tok->data)) {
       auto value = it->n.toDouble();
 
       if (auto next = m_lexer.peak(i + 1); next && isMeridiemMarker(next->raw)) break;
