@@ -175,6 +175,7 @@ public:
 
   std::optional<NamedUnit> parseUnit(bool validate = true);
   std::optional<NamedUnit> parseConversionTarget();
+  std::optional<int> parseUnitExponent();
 
   bool isTimezoneToken(std::string_view name);
   std::optional<DateTimeLiteral> parseYYYYMMDD();

@@ -321,3 +321,10 @@ usd150k                      => $150,000
 8 oz to g                   => 226.796185g
 1 mwh to kwh                => 1,000kWh
 150kw*1h == 150kwh          => true
+
+# a caret exponent in the target, on any term
+1 m^2 to ft^2               => 10.76391ft²
+1 km^2 to m^2               => 1,000,000m²
+1 m/s^2 to ft/s^2           => 3.28084ft/s²
+9.8 m/s^2 to ft/s²          => 32.152231ft/s²
+1 m^3 to l                  => 1,000L

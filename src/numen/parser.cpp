@@ -197,12 +197,32 @@ std::optional<NamedUnit> Parser::parseUnit(bool validate) {
   return target;
 }
 
+// "^2" right after a unit name, as typed in a target where no operator applies
+std::optional<int> Parser::parseUnitExponent() {
+  auto op = m_lexer.peak();
+  if (!op || op->raw != "^") return std::nullopt;
+
+  auto tok = m_lexer.peak(1);
+  if (!tok || !std::holds_alternative<Lexer::Number>(tok->data)) return std::nullopt;
+
+  auto n = std::get<Lexer::Number>(tok->data).n;
+  if (!n.isInteger()) return std::nullopt;
+
+  m_lexer.next();
+  m_lexer.next();
+  return n.to<int>();
+}
+
 // only a real unit token may follow the slash, so "1 km to m / 2" still divides
 // the result rather than naming metres per two
 std::optional<NamedUnit> Parser::parseConversionTarget() {
   auto target = parseUnit(false); // FIXME: we should not need to disable validation here
 
   if (!target) return std::nullopt;
+
+  if (target->terms.front().exponent == 1) {
+    target->terms.front().exponent = parseUnitExponent().value_or(1);
+  }
 
   while (auto op = m_lexer.peak()) {
     if (op->raw != "/" && op->raw != "*") break;
@@ -213,7 +233,9 @@ std::optional<NamedUnit> Parser::parseConversionTarget() {
 
     m_lexer.next();
     m_lexer.next();
-    target->terms.push_back(NamedUnitTerm{.name = next->raw, .exponent = op->raw == "/" ? -1 : 1});
+    const int sign = op->raw == "/" ? -1 : 1;
+    const int exponent = parseUnitExponent().value_or(1);
+    target->terms.push_back(NamedUnitTerm{.name = next->raw, .exponent = sign * exponent});
   }
 
   return target;
