@@ -26,6 +26,11 @@ inline constexpr const char *DATA = "data";
 inline constexpr const char *VOLUME = "volume";
 inline constexpr const char *AREA = "area";
 inline constexpr const char *SPEED = "speed";
+inline constexpr const char *FORCE = "force";
+inline constexpr const char *PRESSURE = "pressure";
+inline constexpr const char *ENERGY = "energy";
+inline constexpr const char *POWER = "power";
+inline constexpr const char *FREQUENCY = "frequency";
 inline constexpr const char *CURRENCY = "currency";
 } // namespace dimensions
 
@@ -56,6 +61,7 @@ inline constexpr const char *IMPERIAL = "imperial";
 inline constexpr const char *TYPOGRAPHIC = "typographic";
 inline constexpr const char *DURATION = "duration";
 inline constexpr const char *DEGREE = "degree";
+inline constexpr const char *SI = "si";
 inline constexpr const char *DATA = "data";
 inline constexpr const char *CURRENCY = "currency";
 } // namespace families
@@ -65,7 +71,8 @@ struct UnitDef {
   std::vector<std::string> aliases;
   // "km", "$". resolvable like any alias; empty leaves the id to stand for it
   std::string symbol;
-  // only currencies state one, as CLDR spells it: "US Dollar"
+  // CLDR spelling for currencies ("US Dollar"), else only where the id is no
+  // readable word ("short ton")
   std::string name;
   // "$12.50", not "12.50 $"
   bool symbolPrefix = false;

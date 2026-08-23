@@ -95,6 +95,11 @@ DimensionTraits traitsOf(std::string_view name) {
   if (name == dimensions::AREA) return {.signature = {.length = 2}};
   if (name == dimensions::VOLUME) return {.signature = {.length = 3}};
   if (name == dimensions::SPEED) return {.signature = {.length = 1, .time = -1}};
+  if (name == dimensions::FORCE) return {.signature = {.length = 1, .mass = 1, .time = -2}};
+  if (name == dimensions::PRESSURE) return {.signature = {.length = -1, .mass = 1, .time = -2}};
+  if (name == dimensions::ENERGY) return {.signature = {.length = 2, .mass = 1, .time = -2}};
+  if (name == dimensions::POWER) return {.signature = {.length = 2, .mass = 1, .time = -3}};
+  if (name == dimensions::FREQUENCY) return {.signature = {.time = -1}};
 
   if (name == dimensions::CURRENCY) {
     return {.signature = {.currency = 1}, .composition = Composition::RateOnly, .dynamicFactor = true};

@@ -257,3 +257,67 @@ km45 * km4                  => 180km²
 150k usd                     => $150,000
 usd150k                      => $150,000
 150k usd == usd150k          => true
+
+# length, long tail
+1 nmi to km                 => 1.852km
+1 au to km                  => 149,597,870.7km
+1 pc to pt                  => 12pt
+2 furlongs to m             => 402.336m
+
+# mass, long tail
+1 ton to kg                 => 1,000kg
+1 shortton to kg            => 907.18474kg
+1 longton to kg             => 1,016.046909kg
+2 ozt to g                  => 62.206954g
+5 carats to g               => 1g
+
+# volume, US vs imperial
+1 floz to ml                => 29.57353mL
+1 pint to ml                => 473.176473mL
+1 ukpint to ml              => 568.26125mL
+1 ukgal to l                => 4.54609L
+1 cc to ml                  => 1mL
+1 bbl to l                  => 158.987295L
+
+# bits are prefixable, bandwidth aliases compose
+1 kb to kbit                => 8kbit
+100 mbps to MB/s            => 12.5MB/s
+1 gbps to mbps              => 1,000Mbit/s
+
+# derived SI composes from base units
+5 kg * 9.8 m/s^2 to N       => 49N
+5 N * 2 m to J              => 10J
+1 J/s to W                  => 1W
+100 W * 1 h to kWh          => 0.1kWh
+500 kcal to kJ              => 2,092kJ
+1 kWh to J                  => 3,600,000J
+1 btu to kj                 => 1.055056kJ
+1 lbf to N                  => 4.448222N
+1 kgf to N                  => 9.80665N
+
+# pressure
+2 bar to psi                => 29.007548psi
+30 psi to kPa               => 206.842719kPa
+1 atm to bar                => 1.01325bar
+760 mmhg to atm             => 1atm
+
+# power and frequency
+100 hp to kW                => 74.569987kW
+3000 rpm to Hz              => 50Hz
+1 khz to rpm                => 60,000rpm
+
+# rankine
+100 f to ra                 => 559.67°R
+0 k to rankine              => 0°R
+
+# css relative units at the browser default
+1 rem to px                 => 16px
+2 em to px                  => 32px
+24 px to rem                => 1.5rem
+1 rem to pt                 => 12pt
+
+# oz is the ounce or the fluid ounce, whichever the other side asks for
+8 oz to ml                  => 236.588237mL
+8 oz to g                   => 226.796185g
+1 mwh to kwh                => 1,000kWh
+150kw*1h == 150kwh          => true

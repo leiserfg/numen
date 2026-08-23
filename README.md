@@ -35,8 +35,7 @@
 
 - `libnumen` stores every number and computation result in `double` data types, meaning the range and precision of representable values are inherently limited. We could solve this by using one of the various arbitrary-precision libraries. We probably will, eventually.
 - Does not implement an equation solver
-- Implicit unit conversion is only implemented for currencies at this time
-- No support for niche units, only the most popular ones.
+- Implicit unit conversion is only implemented for currencies at this time (you need to explicitly convert using the `to` operator)
 - Parsing may be too permissive (in a bad way) at times
 - Natural language syntax sugar targets English only, although number and dates are localized
 - `.` is always used as a decimal separator, and `,` as a thousand separator, no matter the user's locale. Numbers are rendered with US-style grouping (`1,234,567.89`) for the same reason, so any output can be fed back in as input. Date time values are otherwise properly localized.
