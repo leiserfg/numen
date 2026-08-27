@@ -45,6 +45,19 @@ TEST_CASE("time anchors should parse as dates or instants") {
   test::assertExpr("yesterday", "2026-01-17 00:00:00 (Etc/UTC)", config);
 }
 
+TEST_CASE("day rounding uses the local timezone, not UTC") {
+  auto config = configAt({2026y, January, 18d});
+  config.timezone = test::zone("Europe/Moscow"); // UTC+3, no DST
+  // 01:30 local on Jan 18 is 22:30 UTC on Jan 17: UTC-based rounding would pick the prior day
+  config.now = sys_days{year_month_day{2026y, January, 17d}} + 22h + 30min;
+
+  test::assertExpr("now", "2026-01-18 01:30:00 (Europe/Moscow)", config);
+  test::assertExpr("date", "2026-01-18 00:00:00 (Europe/Moscow)", config);
+  test::assertExpr("yesterday", "2026-01-17 00:00:00 (Europe/Moscow)", config);
+  test::assertExpr("tomorrow", "2026-01-19 00:00:00 (Europe/Moscow)", config);
+  test::assertExpr("tomorrow at 6pm", "2026-01-19 18:00:00 (Europe/Moscow)", config);
+}
+
 TEST_CASE("relative formatting drops the midnight time") {
   auto config = configAt({2026y, January, 18d});
   config.dateTimeFormat.relative = true;
