@@ -123,8 +123,8 @@ DateTime parseDateTime(const DateString &d, const tz::time_zone &userTz, TimePoi
                 // Convert to local time first, then extract the date in the local timezone
                 const auto localTime = tz->to_local(now);
                 const tz::local_days localDays = std::chrono::floor<std::chrono::days>(localTime);
-                const std::chrono::year_month_day date{localDays};
-                now = tz->to_sys(tz::local_seconds{std::chrono::local_days{date}.time_since_epoch()});
+                const tz::year_month_day date{localDays};
+                now = tz->to_sys(tz::local_seconds{tz::local_days{date}.time_since_epoch()});
               }
 
               // we apply the duration first, then override the time of the current day
