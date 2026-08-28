@@ -47,6 +47,9 @@ include(GNUInstallDirs)
 set(VENDOR_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 if (MSVC)
+	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /wd4996)
+	add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+
 	set(NUMEN_WARNING_OPTIONS /W4)
 	if (NUMEN_HARDENING)
 		set(NUMEN_HARDENING_OPTIONS /sdl /guard:cf)
@@ -183,11 +186,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${VENDOR_DIR})
 
-if (MSVC)
-	add_compile_options(/permissive- /Zc:preprocessor /Zc:__cplusplus /bigobj /utf-8 /wd4996)
-	add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
-endif()
-
 if (BUILD_REPL)
 	set(REPL_TARGET repl)
 	set(SRCS src/repl/main.cpp)
@@ -245,6 +243,7 @@ if (BUILD_TESTS)
 		tests/conversion.cpp
 		tests/value.cpp
 		tests/strict.cpp
+		tests/locale.cpp
 	)
 	target_compile_definitions(${TEST_TARGET} PRIVATE CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/corpus")
 

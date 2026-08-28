@@ -7,7 +7,6 @@ constexpr std::string_view BASE_CHARS = "0123456789abcdef";
 
 // we hardcode these, in order to avoid ambiguity. Only result strings are localized.
 constexpr char THOUSAND_DELIM = '_';
-constexpr char FRACTION_DELIM = '.';
 
 // <cctype> wants an unsigned char value: a raw UTF-8 byte in a signed char is UB
 bool isDigit(char c) { return std::isdigit(static_cast<unsigned char>(c)); }
@@ -35,6 +34,8 @@ std::optional<Lexer::Token> Lexer::next() {
   const auto getSelection = [&]() -> std::string_view {
     return m_data.substr(startPos, m_cursor - startPos);
   };
+
+  const auto isFractionDelim = [&](char c) { return c == '.' || c == m_numpunct.decimal_point(); };
 
   const auto hasExponentDigits = [&](std::size_t pos) {
     if (pos < m_data.size() && (m_data[pos] == '+' || m_data[pos] == '-')) ++pos;
@@ -98,7 +99,7 @@ std::optional<Lexer::Token> Lexer::next() {
         state = State::String;
         continue;
       }
-      if (c == FRACTION_DELIM && m_cursor + 1 < m_data.size() && isDigit(m_data[m_cursor + 1])) {
+      if (isFractionDelim(c) && m_cursor + 1 < m_data.size() && isDigit(m_data[m_cursor + 1])) {
         state = State::Number;
         continue;
       }
@@ -130,7 +131,7 @@ std::optional<Lexer::Token> Lexer::next() {
       break;
     }
     case State::Number: {
-      if (c == FRACTION_DELIM) {
+      if (isFractionDelim(c)) {
         if (base != 10) { return tryCommit(); }
         if (nfrac == 0) { nfrac = 1; }
         break;
@@ -179,6 +180,7 @@ std::optional<Lexer::Token> Lexer::next() {
         case '^':
         case '/':
         case '%':
+        case ';':
           ++m_cursor;
           return tryCommit();
         default:

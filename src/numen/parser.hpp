@@ -212,8 +212,11 @@ protected:
   std::unique_ptr<Expression> pratParse(int minPrec = 0);
   std::unique_ptr<Expression> parseMul() { return pratParse(4); }
   std::optional<numen::Value> parseNumber();
+  bool isFunctionParameterSeparator(std::string_view tok) const;
 
 private:
+  std::locale m_locale;
+  const std::numpunct<char> &m_numpunct;
   Lexer m_lexer;
   DateStringVocab m_dateStringVocab;
   const UnitDatabase &m_unitDb;
