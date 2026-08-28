@@ -11,8 +11,10 @@ TEST_CASE("Should reject ill-formed in strict mode") {
   REQUIRE(calc.evaluate("5 32", us) == "532");
   REQUIRE(calc.evaluate("5  32", us) == "532");
   REQUIRE_FALSE(calc.evaluate("what time is it currently", opts));
-  REQUIRE_FALSE(eval("time in ewoeoweiwewo"));
+  REQUIRE_FALSE(eval("time inewoeoweiwewo"));
   REQUIRE_FALSE(eval("3 in jan"));
   REQUIRE_FALSE(eval("5 bears plus 2 rabbits"));
   REQUIRE_FALSE(eval("how many m in km"));
+  REQUIRE_FALSE(eval("nvidia m"));
+  REQUIRE_FALSE(eval("pdf k"));
 }

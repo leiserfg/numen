@@ -918,6 +918,11 @@ std::unique_ptr<Expression> Parser::parseTerm() {
   }
 
   if (!expr) {
+    if (m_opts.strict) {
+      auto token =
+          m_lexer.peak().transform([](auto &&tok) { return tok.raw; }).value_or(std::string_view{"unknown"});
+      throw std::runtime_error(std::format("Unknown token: \"{}\"", token));
+    }
     m_lexer.next();
     return parseTerm();
   }
