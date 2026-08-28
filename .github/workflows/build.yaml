@@ -104,8 +104,12 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   nix:
-    name: Nix
-    runs-on: depot-ubuntu-24.04-4
+    name: Nix (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [depot-ubuntu-24.04-4, depot-macos-26]
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v16
@@ -114,3 +118,9 @@ jobs:
         run: nix build -L .
       - name: Check flake
         run: nix flake check -L
+      # darwin checks are off by default (see nix/package.nix); keep the
+      # failure visible without blocking until the libc++ divergence is fixed
+      - name: Run tests (informational)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: nix build -L .#numen-checked

@@ -40,8 +40,8 @@ TEST_CASE("Results render with the locale's separators", GROUP) {
 
   if (available("de_DE.UTF-8")) {
     auto de = numen::EvalOptions{.parseOptions = {.locale = "de_DE.UTF-8"}};
-    REQUIRE(calc.evaluate("1234567,5", de) == "1.234.567,5");
-    REQUIRE(calc.evaluate("1/3", de) == "0,333333");
+    test::assertExpr("1234567,5", "1.234.567,5", de);
+    test::assertExpr("1/3", "0,333333", de);
   } else {
     WARN("de_DE.UTF-8 locale not available, skipping");
   }
@@ -49,7 +49,7 @@ TEST_CASE("Results render with the locale's separators", GROUP) {
   // grouping is not always by 3: en_IN is "12,34,567.5"
   if (available("en_IN.UTF-8")) {
     auto in = numen::EvalOptions{.parseOptions = {.locale = "en_IN.UTF-8"}};
-    REQUIRE(calc.evaluate("1234567.5", in) == "12,34,567.5");
+    test::assertExpr("1234567.5", "12,34,567.5", in);
   } else {
     WARN("en_IN.UTF-8 locale not available, skipping");
   }

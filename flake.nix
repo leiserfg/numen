@@ -14,6 +14,8 @@
       packages = forAllSystems (pkgs: rec {
         # override knobs: withRepl, doCheck, stdenv
         numen = pkgs.callPackage ./nix/package.nix { src = self; };
+        # tests forced on, even where the default skips them
+        numen-checked = numen.override { doCheck = true; };
         default = numen;
       });
 
