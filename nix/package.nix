@@ -8,7 +8,6 @@
   glibcLocales ? null,
   src ? lib.cleanSource ../.,
   withRepl ? true,
-  # a locale test renders differently under nixpkgs libc++ on darwin (locale.cpp:43)
   doCheck ? !stdenv.hostPlatform.isDarwin,
 }:
 stdenv.mkDerivation {
@@ -34,6 +33,7 @@ stdenv.mkDerivation {
   cmakeFlags = [
     (lib.cmakeBool "BUILD_SHARED_LIBS" true)
     (lib.cmakeBool "BUILD_REPL" withRepl)
+    (lib.cmakeBool "BUILD_REPL_CURRENCY_PROVIDER" !stdenv.hostPlatform.isDarwin)
     (lib.cmakeBool "BUILD_TESTS" doCheck)
     (lib.cmakeBool "USE_SYSTEM_CATCH" true)
   ];
