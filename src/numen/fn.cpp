@@ -335,9 +335,9 @@ FunctionDatabase makeBuiltin() {
         ctx.expectAtLeast(1);
         const auto dt = ctx.dateTime(0);
         const auto displayTz = dt.tz ? dt.tz : tz::current_zone();
-        auto zt = tz::zoned_time{displayTz, dt.time};
-        const std::string result = std::format("{:%A}", zt);
-        return Computed{.value = result};
+        // vendored date::zoned_time has no std::formatter (will hit the macOS path)
+        const std::chrono::local_time localTime{displayTz->to_local(dt.time + dt.offset).time_since_epoch()};
+        return Computed{.value = std::format("{:%A}", localTime)};
       },
       true);
 
