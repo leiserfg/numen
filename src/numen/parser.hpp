@@ -47,6 +47,10 @@ struct NamedNumberFormat {
   std::string_view name;
 };
 
+struct Converter {
+  std::string_view name;
+};
+
 using ConversionTarget = std::variant<NamedUnit, TimezoneOffset, NamedNumberFormat>;
 
 struct ConversionExpression {
@@ -184,6 +188,7 @@ public:
   std::optional<ParsedTime> parseTime(bool afterDate = false);
   std::optional<TimezoneOffset> parseTimezone();
   std::optional<NamedNumberFormat> parseNumberFormat();
+  std::optional<Converter> parseConverter();
   std::optional<RelativeDateTimeLiteral> parseRelativeDateTimeLiteral();
   std::optional<DateString> parseRFC3339();
 

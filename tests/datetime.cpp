@@ -32,7 +32,7 @@ TEST_CASE("Month/year shifts clamp to the end of the month") {
 }
 
 TEST_CASE("time anchors should parse as dates or instants") {
-  numen::Numen calc{};
+  const numen::Numen calc{};
   auto now = sys_days{year_month_day{2026y, January, 18d}} + 2h + 30min; // 2026-01-18 02:30:00
   auto config = configAt({2026y, January, 18d});
   config.now = now;
@@ -108,4 +108,12 @@ TEST_CASE("localized date time formatting follows the configured locale") {
 TEST_CASE("Trying to convert to non existent timezone fails") {
   numen::Numen calc{};
   REQUIRE_FALSE(calc.evaluate("now to WrongTimezone"));
+}
+
+TEST_CASE("weekday() and 'in weekday' functions return the current day name") {
+  numen::Numen calc{};
+  // Sunday is 2026-01-18
+  auto config = configAt({2026y, January, 18d});
+  test::assertExpr("weekday(today)", "Sunday", config);
+  test::assertExpr("today in weekday", "Sunday", config);
 }

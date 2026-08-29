@@ -200,7 +200,7 @@ struct Boolean {
   std::string toString() const;
 };
 
-using ValueType = std::variant<Number, DateTime, Boolean, Duration>;
+using ValueType = std::variant<Number, DateTime, Boolean, Duration, std::string>;
 
 template <class T> struct ConversionOf {
   std::optional<T> from;
@@ -223,6 +223,8 @@ template <class T> std::string_view valueName() {
     return "Number";
   } else if constexpr (std::is_same_v<T, DateTime>) {
     return "DateTime";
+  } else if constexpr (std::is_same_v<T, std::string>) {
+    return "Text";
   } else {
     static_assert(std::is_same_v<T, Boolean>);
     return "Boolean";
@@ -244,6 +246,9 @@ struct ComputedValue {
 
   const Duration *asDuration() { return std::get_if<Duration>(&value); }
   const Duration *asDuration() const { return std::get_if<Duration>(&value); }
+
+  const std::string *asStr() const { return std::get_if<std::string>(&value); }
+  std::string *asStr() { return std::get_if<std::string>(&value); }
 
   std::string_view valueTypeName() const {
     return std::visit([](const auto &v) { return valueName<std::remove_cvref_t<decltype(v)>>(); }, value);

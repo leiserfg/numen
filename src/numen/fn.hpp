@@ -14,6 +14,7 @@ struct FunctionCtx {
   std::span<const Computed> args;
 
   const Num &number(std::size_t i) const;
+  const DateTime &dateTime(std::size_t i) const;
   std::vector<const Num *> numbers() const;
 
   void expectArgs(std::size_t n) const;
@@ -27,8 +28,9 @@ class FunctionDatabase {
 public:
   static const FunctionDatabase &builtin();
 
-  void add(std::string_view name, FunctionHandler handler);
+  void add(std::string_view name, FunctionHandler handler, bool isConverter = false);
   const FunctionHandler *find(std::string_view name) const;
+  const std::vector<std::string> &converterNames() const;
 
 private:
   struct Entry {
@@ -37,6 +39,7 @@ private:
   };
 
   std::vector<Entry> m_fns;
+  std::vector<std::string> m_convNames;
 };
 
 } // namespace numen::detail

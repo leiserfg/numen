@@ -47,6 +47,8 @@ std::string ComputedValue::toString(const DateTimeFormatOptions &dateTimeFormat)
       [&](const auto &v) {
         if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, DateTime>) {
           return v.toString(dateTimeFormat);
+        } else if constexpr (std::is_same_v<std::remove_cvref_t<decltype(v)>, std::string>) {
+          return v;
         } else {
           return v.toString();
         }
@@ -73,6 +75,7 @@ static ComputedValue toPublic(const detail::Computed &c, const NumberLocale &nlo
   }
   if (auto d = c.asDateTime()) return out(*d);
   if (auto d = c.asDuration()) return out(*d);
+  if (auto s = c.asStr()) return out(*s);
   return out(std::get<Boolean>(c.value));
 }
 

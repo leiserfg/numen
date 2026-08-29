@@ -1,4 +1,5 @@
 #include "fn.hpp"
+#include "computed.hpp"
 #include "numen/numen.hpp"
 #include <algorithm>
 #include <cmath>
@@ -18,6 +19,18 @@ const Num &FunctionCtx::number(std::size_t i) const {
   throw std::runtime_error(
       std::format("{}: argument {} must be a number, got {}", name, i + 1, args[i].valueTypeName()));
 }
+
+const DateTime &FunctionCtx::dateTime(std::size_t i) const {
+  if (auto n = args[i].asDateTime()) return *n;
+  throw std::runtime_error(
+      std::format("{}: argument {} must be a date, got {}", name, i + 1, args[i].valueTypeName()));
+}
+
+// const Num &FunctionCtx::number(std::size_t i) const {
+//   if (auto n = args[i].asNumber()) return *n;
+//   throw std::runtime_error(
+//       std::format("{}: argument {} must be a number, got {}", name, i + 1, args[i].valueTypeName()));
+// }
 
 std::vector<const Num *> FunctionCtx::numbers() const {
   std::vector<const Num *> out;
@@ -48,14 +61,17 @@ void FunctionCtx::expectAtLeast(std::size_t n) const {
   }
 }
 
-void FunctionDatabase::add(std::string_view name, FunctionHandler handler) {
+void FunctionDatabase::add(std::string_view name, FunctionHandler handler, bool isConverter) {
   m_fns.emplace_back(Entry{.name = name, .fn = std::move(handler)});
+  if (isConverter) { m_convNames.emplace_back(name); }
 }
 
 const FunctionHandler *FunctionDatabase::find(std::string_view name) const {
   auto it = std::ranges::find(m_fns, name, &Entry::name);
   return it == m_fns.end() ? nullptr : &it->fn;
 }
+
+const std::vector<std::string> &FunctionDatabase::converterNames() const { return m_convNames; }
 
 namespace {
 
@@ -312,6 +328,18 @@ FunctionDatabase makeBuiltin() {
       });
     });
   }
+
+  db.add(
+      "weekday",
+      [](const FunctionCtx &ctx) {
+        ctx.expectAtLeast(1);
+        const auto dt = ctx.dateTime(0);
+        const auto displayTz = dt.tz ? dt.tz : tz::current_zone();
+        auto zt = tz::zoned_time{displayTz, dt.time};
+        const std::string result = std::format("{:%A}", zt);
+        return Computed{.value = result};
+      },
+      true);
 
   return db;
 }

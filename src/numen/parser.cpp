@@ -1,4 +1,5 @@
 #include "parser.hpp"
+#include "fn.hpp"
 #include "numen/numen.hpp"
 #include "numen/unit.hpp"
 #include "timezone.hpp"
@@ -696,6 +697,15 @@ std::optional<NamedNumberFormat> Parser::parseNumberFormat() {
       .transform([](auto &&str) { return NamedNumberFormat(str); });
 }
 
+std::optional<Converter> Parser::parseConverter() {
+  return greedyParse(3,
+                     [&](std::string_view word) {
+                       return std::ranges::contains(detail::FunctionDatabase::builtin().converterNames(),
+                                                    word);
+                     })
+      .transform([](auto &&str) { return Converter(str); });
+}
+
 std::optional<numen::Value> Parser::parseNumber() {
   constexpr auto CONTEXT_AWARE_THOUSAND_SEP = ",";
   std::string ns;
@@ -991,8 +1001,6 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         continue;
       }
 
-      ConversionExpression expr{.lhs = std::move(left)};
-
       auto cursor = m_lexer.cursor();
       size_t maxCursor = 0;
 
@@ -1002,6 +1010,16 @@ std::unique_ptr<Expression> Parser::pratParse(int minPrec) {
         m_lexer.setCursor(cursor);
         return r;
       };
+
+      if (auto strConverter = parseConverter()) {
+        FunctionCall fn{.name = strConverter->name};
+        fn.args.emplace_back(std::move(left));
+
+        left = std::make_unique<Expression>(std::move(fn));
+        continue;
+      }
+
+      ConversionExpression expr{.lhs = std::move(left)};
 
       expr.target.tz = stampChoice([&]() { return parseTimezone(); });
       expr.target.unit = stampChoice([&]() { return parseConversionTarget(); });

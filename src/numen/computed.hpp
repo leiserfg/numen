@@ -21,7 +21,7 @@ struct Num {
   std::partial_ordering operator<=>(const Num &rhs) const { return n <=> rhs.n; }
 };
 
-using Val = std::variant<Num, DateTime, Boolean, Duration>;
+using Val = std::variant<Num, DateTime, Boolean, Duration, std::string>;
 
 struct Computed {
   Val value;
@@ -31,6 +31,7 @@ struct Computed {
 
   bool isNumber() const { return std::holds_alternative<Num>(value); }
   bool isDateTime() const { return std::holds_alternative<DateTime>(value); }
+  bool isStr() const { return std::holds_alternative<std::string>(value); }
 
   const Num *asNumber() const { return std::get_if<Num>(&value); }
   Num *asNumber() { return std::get_if<Num>(&value); }
@@ -38,6 +39,7 @@ struct Computed {
 
   const Duration *asDuration() { return std::get_if<Duration>(&value); }
   const Duration *asDuration() const { return std::get_if<Duration>(&value); }
+  const std::string *asStr() const { return std::get_if<std::string>(&value); }
 
   std::string_view valueTypeName() const {
     return std::visit(
@@ -49,6 +51,8 @@ struct Computed {
             return "Number";
           } else if constexpr (std::is_same_v<T, DateTime>) {
             return "DateTime";
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            return "Text";
           } else {
             static_assert(std::is_same_v<T, Boolean>);
             return "Boolean";
